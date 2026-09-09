@@ -370,3 +370,103 @@ describe('consoles ambiguës', () => {
   });
 });
 
+
+/**
+ * Les consoles servies par un émulateur autonome.
+ *
+ * Leur nom de dossier contient celui d'une autre console — « PlayStation 2 »
+ * contient « playstation », « Wii U » contient « wii » — et leurs formats sont
+ * ceux que réclament aussi des cœurs libretro. Sans indice explicite, un jeu PS2
+ * partirait chez SwanStation et un titre Wii U chez Dolphin.
+ */
+describe('consoles à émulateur autonome', () => {
+  /** Fabrique une entrée d'émulateur autonome, telle que le catalogue la crée. */
+  function external(system: string, extensions: string[]): CatalogEntry {
+    return {
+      kind: 'externe',
+      id: `externe:${system}`,
+      label: system,
+      extensions,
+      layout: JOYPAD,
+      needsPath: true,
+      async open() {
+        throw new Error('un émulateur externe se lance, il ne s’héberge pas');
+      },
+    };
+  }
+
+  const MIXED: CatalogEntry[] = [
+    core('dolphin_libretro', ['elf', 'dol', 'gcm', 'iso', 'wbfs', 'wad', 'rvz'], 'dolphin-emu'),
+    core('swanstation_libretro', ['cue', 'bin', 'img', 'iso', 'chd', 'pbp'], 'SwanStation'),
+    core('flycast_libretro', ['chd', 'cdi', 'cue', 'iso', 'bin'], 'Flycast'),
+    core('dosbox_pure_libretro', ['zip', 'exe', 'iso', 'chd', 'cue'], 'DOSBox-pure'),
+    core('opera_libretro', ['iso', 'bin', 'chd', 'cue'], 'Opera'),
+    external('Nintendo Switch', ['nsp', 'xci', 'nca', 'nro', 'nso']),
+    external('Wii U', ['wud', 'wux', 'wua', 'rpx', 'wad']),
+    external('PlayStation 2', ['iso', 'chd', 'cso', 'bin', 'mdf', 'nrg']),
+    external('Xbox 360', ['iso', 'xex', 'zar']),
+    external('Xbox', ['iso', 'xiso']),
+    external('PS Vita', ['vpk']),
+  ];
+
+  /** Le dossier tel qu'il existe sur le disque, et l'émulateur qu'il doit obtenir. */
+  const CASES: [string, string[], string][] = [
+    ['Nintendo Switch (.nsp .xci .nca .nro .nso)', ['xci', 'nsp'], 'externe:Nintendo Switch'],
+    ['Wii U (.wud .wux .wua .rpx .wad)', ['wad', 'wux'], 'externe:Wii U'],
+    ['PlayStation 2 (.iso .chd .cso .bin .mdf .nrg)', ['iso', 'chd'], 'externe:PlayStation 2'],
+    ['Xbox 360 (.iso .xex .zar)', ['iso', 'xex'], 'externe:Xbox 360'],
+    ['Xbox (.iso .xiso)', ['iso'], 'externe:Xbox'],
+    ['PS Vita (.vpk)', ['vpk'], 'externe:PS Vita'],
+  ];
+
+  for (const [folder, extensions, expected] of CASES) {
+    it(`confie « ${folderLabel(folder)} » à ${expected}`, () => {
+      const games = extensions.map((extension, index) => rom(`jeu${index}.${extension}`, folder));
+      const [shelf] = groupLibrary(games, MIXED, {}, NO_CHOICE, '');
+
+      assert.ok(shelf, 'le dossier doit produire un volet');
+      assert.equal(shelf.preferred, expected);
+    });
+  }
+
+  it('ne détourne pas les consoles voisines', () => {
+    // « wii u » ne doit pas manger « Gamecube-Wii », ni « playstation 2 »
+    // manger « PlayStation ».
+    const voisins: [string, string, string][] = [
+      ['Gamecube-Wii (iso-gcm-dol-wbfs)', 'iso', 'dolphin_libretro'],
+      ['PlayStation (.cue .bin .chd .pbp .iso)', 'bin', 'swanstation_libretro'],
+    ];
+
+    for (const [folder, extension, expected] of voisins) {
+      const [shelf] = groupLibrary([rom(`jeu.${extension}`, folder)], MIXED, {}, NO_CHOICE, '');
+      assert.equal(shelf.preferred, expected, folder);
+    }
+  });
+
+  it("laisse le classement décider quand l'émulateur n'est pas déclaré", () => {
+    // Sans l'entrée externe, un `.iso` rangé en PS2 reste ouvrable par les cœurs
+    // qui acceptent ce format : mieux vaut un volet imparfait qu'un jeu invisible.
+    const sansPs2 = MIXED.filter((candidate) => candidate.id !== 'externe:PlayStation 2');
+    const folder = 'PlayStation 2 (.iso .chd .cso .bin .mdf .nrg)';
+    const [shelf] = groupLibrary([rom('jeu.iso', folder)], sansPs2, {}, NO_CHOICE, '');
+
+    assert.ok(shelf, 'le jeu ne doit pas disparaître');
+    assert.ok(
+      shelf.candidates.some((candidate) => candidate.id === shelf.preferred),
+      'le cœur retenu doit figurer parmi les candidats',
+    );
+  });
+
+  it('respecte le choix explicite malgré l’indice', () => {
+    const folder = 'Wii U (.wud .wux .wua .rpx .wad)';
+    const [shelf] = groupLibrary(
+      [rom('jeu.wad', folder)],
+      MIXED,
+      { [folder]: 'dolphin_libretro' },
+      NO_CHOICE,
+      '',
+    );
+
+    assert.equal(shelf.preferred, 'dolphin_libretro');
+  });
+});

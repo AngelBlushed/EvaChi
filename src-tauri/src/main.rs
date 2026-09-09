@@ -16,6 +16,7 @@
 mod commands;
 mod emulators;
 mod install;
+mod skeleton;
 
 use evachi::libretro::Session;
 use tauri::Manager;
@@ -78,6 +79,10 @@ fn main() {
             commands::write_log(&paths, &format!("cœurs   {}", paths.cores.display()));
             commands::write_log(&paths, &format!("jeux    {}", paths.roms.display()));
             commands::write_log(&paths, &format!("réglages {}", paths.config.display()));
+
+            // Un dossier par console, vide, pour n'avoir plus qu'à y déposer
+            // ses jeux. Au premier lancement seulement.
+            commands::seed_library(&paths);
             // Ce qui se lancera vraiment pour les consoles sans cœur libretro.
             // Un chemin périmé ici ne se voit nulle part ailleurs.
             for line in commands::declared_externals_summary(&paths) {

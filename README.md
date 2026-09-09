@@ -104,6 +104,17 @@ anti-robot, qu'EvaChi ne cherche pas à contourner. Installez-le depuis
 
 Ni jeux, ni BIOS, ni clés : ceux-là viennent de vos propres consoles.
 
+### Où poser ses jeux
+
+Au premier lancement, EvaChi crée sous `%APPDATA%\app.evachi\roms` un dossier
+vide par console, formats attendus compris — « Nintendo 64 (n64-z64-v64) »,
+« Dreamcast (.gdi .cdi .chd .cue) ». Il suffit d'y glisser ses fichiers : le nom
+du dossier désigne la console, et donc l'émulateur employé, même quand plusieurs
+savent lire le même format.
+
+On peut aussi désigner ses propres dossiers — `Fichier → Ajouter un dossier de
+jeux…` — auquel cas c'est ce classement-là qui fait loi.
+
 ## Architecture
 
 Tout passe par un contrat unique, [`src/core/types.ts`](src/core/types.ts) :

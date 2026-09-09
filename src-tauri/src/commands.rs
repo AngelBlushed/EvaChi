@@ -117,6 +117,12 @@ struct Config {
     /// Émulateurs autonomes déclarés par l'utilisateur.
     #[serde(default)]
     external: Vec<ExternalSystem>,
+    /// Vrai une fois l'ossature de la bibliothèque créée.
+    ///
+    /// Elle n'est posée qu'au premier lancement : quelqu'un qui supprime les
+    /// dossiers qu'il n'utilise pas ne doit pas les voir revenir au suivant.
+    #[serde(default)]
+    library_seeded: bool,
     /// Systèmes déjà installés une fois, d'eux-mêmes ou à la main.
     ///
     /// Sans cette mémoire, retirer un émulateur ne servirait à rien : la
@@ -1069,6 +1075,31 @@ pub fn install_cores_to_stdout() -> i32 {
     write_log(&paths, &summary);
 
     i32::from(failures > 0)
+}
+
+/// Pose l'ossature de la bibliothèque au premier lancement.
+///
+/// Un dossier par console, vide, avec les formats attendus dans le nom : il ne
+/// reste qu'à y glisser ses jeux. Une seule fois — le drapeau dans les réglages
+/// fait que les dossiers supprimés ne reviennent pas.
+pub fn seed_library(paths: &Paths) {
+    let Ok(config) = load_config(paths) else {
+        // Réglages illisibles : ne rien créer, et surtout ne rien écrire.
+        return;
+    };
+    if config.library_seeded {
+        return;
+    }
+
+    match crate::skeleton::seed(&paths.roms) {
+        Ok(created) => {
+            write_log(paths, &format!("bibliothèque : {created} dossier(s) de console créé(s)"));
+            if let Err(error) = update_config(paths, |config| config.library_seeded = true) {
+                write_log(paths, &format!("ossature non retenue : {error}"));
+            }
+        }
+        Err(error) => write_log(paths, &format!("ossature non créée : {error}")),
+    }
 }
 
 /// Décrit les émulateurs autonomes déclarés, une ligne chacun.

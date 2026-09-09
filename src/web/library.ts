@@ -56,6 +56,22 @@ export function folderLabel(folder: string): string {
  * « gameboy advance » avant « gameboy ».
  */
 const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
+  // Les consoles servies par un emulateur autonome viennent en premier. Sans
+  // cela le nom du dossier trahit son contenu : « PlayStation 2 » contient
+  // « playstation » et partirait chez SwanStation, « Wii U » contient « wii »
+  // et partirait chez Dolphin — qui accepte justement les `.iso` et les `.wad`.
+  ['nintendo switch', 'externe:Nintendo Switch'],
+  ['switch', 'externe:Nintendo Switch'],
+  ['wii u', 'externe:Wii U'],
+  ['wiiu', 'externe:Wii U'],
+  ['playstation 2', 'externe:PlayStation 2'],
+  ['ps2', 'externe:PlayStation 2'],
+  ['xbox 360', 'externe:Xbox 360'],
+  ['xbox360', 'externe:Xbox 360'],
+  ['xbox', 'externe:Xbox'],
+  ['ps vita', 'externe:PS Vita'],
+  ['psvita', 'externe:PS Vita'],
+  ['vita', 'externe:PS Vita'],
   ['3do', 'opera'],
   ['cd i', 'same_cdi'],
   ['cdi', 'same_cdi'],
