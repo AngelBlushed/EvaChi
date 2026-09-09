@@ -1,0 +1,14 @@
+[package]
+name = "evachi-test-core"
+version = "0.1.0"
+edition = "2021"
+description = "Coeur libretro d'essai, pour eprouver l'hote d'EvaChi"
+license = "GPL-3.0-or-later"
+publish = false
+
+[lib]
+name = "evachi_test_core"
+# Seulement une bibliothèque dynamique : elle se charge comme n'importe quel
+# cœur. La lier en plus au binaire de test ferait entrer ses symboles `retro_*`
+# dans le processus, ce qu'on veut justement éviter.
+crate-type = ["cdylib"]

@@ -1,0 +1,18 @@
+node_modules/
+dist/
+src-tauri/target/
+src-tauri/gen/
+
+# Aucune ROM commerciale ni BIOS dans le depot : voir roms/README.md
+roms/*
+!roms/README.md
+
+# Coeurs libretro : chacun a sa propre licence, ils se distribuent a part
+cores/
+
+# executable construit, pas une source
+EvaChi.exe
+EvaChi-nouveau.exe
+
+# sauvegardes ecrites par les coeurs pendant les essais
+sram.dat

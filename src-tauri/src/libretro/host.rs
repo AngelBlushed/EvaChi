@@ -1,0 +1,542 @@
+//! Côté hôte de l'ABI libretro : l'état que les rappels alimentent, et les
+//! rappels eux-mêmes.
+//!
+//! libretro ne transporte aucun pointeur utilisateur dans ses rappels : le cœur
+//! appelle des fonctions globales. L'état vit donc dans une variable de thread,
+//! ce qui est exact ici puisque tous les rappels sont déclenchés depuis
+//! `retro_run`, sur le thread qui l'appelle.
+
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_uint, c_void};
+
+use super::abi::*;
+
+/// Une trame vidéo convertie en RGBA8888, prête pour un canvas.
+#[derive(Default, Clone)]
+pub struct VideoFrame {
+    pub rgba: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
+pub struct HostState {
+    /// Format annoncé par le cœur ; libretro impose 0RGB1555 par défaut.
+    pub pixel_format: PixelFormat,
+    pub video: VideoFrame,
+    /// Faux quand le cœur a demandé de réafficher la trame précédente.
+    pub video_fresh: bool,
+    /// Échantillons stéréo entrelacés accumulés pendant la trame.
+    pub audio: Vec<i16>,
+    /// État des boutons du port 0. Les autres ports renvoient zéro.
+    pub input: [i16; JOYPAD_BUTTONS],
+    pub system_dir: CString,
+    pub save_dir: CString,
+    /// Géométrie redemandée en cours de partie par certains cœurs.
+    pub geometry: Option<GameGeometry>,
+    /// Le cœur a demandé l'arrêt de lui-même.
+    pub shutdown: bool,
+    /// Messages que le cœur veut afficher à l'utilisateur.
+    pub messages: Vec<String>,
+    /// Options du cœur : valeur courante par clé, gardée en `CString` pour que
+    /// le pointeur rendu au cœur reste valide après le retour du rappel.
+    pub options: HashMap<String, CString>,
+    /// Vrai tant que le cœur n'a pas relu les options modifiées.
+    pub options_dirty: bool,
+}
+
+impl Default for HostState {
+    fn default() -> Self {
+        Self {
+            pixel_format: PixelFormat::default(),
+            video: VideoFrame::default(),
+            video_fresh: false,
+            audio: Vec::new(),
+            input: [0; JOYPAD_BUTTONS],
+            system_dir: CString::default(),
+            save_dir: CString::default(),
+            geometry: None,
+            shutdown: false,
+            messages: Vec::new(),
+            options: HashMap::new(),
+            options_dirty: false,
+        }
+    }
+}
+
+thread_local! {
+    /// L'état du cœur actif sur ce thread. Un seul cœur tourne à la fois.
+    pub static HOST: RefCell<HostState> = RefCell::new(HostState::default());
+}
+
+/// Applique une closure à l'état hôte du thread courant.
+pub fn with_host<R>(f: impl FnOnce(&mut HostState) -> R) -> R {
+    HOST.with(|host| f(&mut host.borrow_mut()))
+}
+
+// --- Conversion vidéo -------------------------------------------------------
+
+/// Étend un canal de 5 bits sur 8 en répliquant les bits de poids fort, ce qui
+/// envoie bien 31 sur 255 plutôt que sur 248.
+#[inline]
+fn expand5(value: u16) -> u8 {
+    ((value << 3) | (value >> 2)) as u8
+}
+
+#[inline]
+fn expand6(value: u16) -> u8 {
+    ((value << 2) | (value >> 4)) as u8
+}
+
+/// Convertit le tampon du cœur en RGBA8888.
+///
+/// `pitch` est la longueur d'une ligne source en octets : elle dépasse souvent
+/// `width * bytes_per_pixel`, les cœurs alignant leurs lignes.
+///
+/// # Safety
+/// `data` doit pointer sur au moins `height * pitch` octets lisibles.
+unsafe fn convert(
+    data: *const c_void,
+    width: u32,
+    height: u32,
+    pitch: usize,
+    format: PixelFormat,
+    out: &mut Vec<u8>,
+) {
+    let (w, h) = (width as usize, height as usize);
+    out.clear();
+    out.resize(w * h * 4, 0);
+
+    match format {
+        PixelFormat::Xrgb8888 => {
+            for y in 0..h {
+                let row = data.cast::<u8>().add(y * pitch).cast::<u32>();
+                for x in 0..w {
+                    let pixel = row.add(x).read_unaligned();
+                    let o = (y * w + x) * 4;
+                    out[o] = ((pixel >> 16) & 0xff) as u8;
+                    out[o + 1] = ((pixel >> 8) & 0xff) as u8;
+                    out[o + 2] = (pixel & 0xff) as u8;
+                    out[o + 3] = 0xff;
+                }
+            }
+        }
+        PixelFormat::Rgb565 => {
+            for y in 0..h {
+                let row = data.cast::<u8>().add(y * pitch).cast::<u16>();
+                for x in 0..w {
+                    let pixel = row.add(x).read_unaligned();
+                    let o = (y * w + x) * 4;
+                    out[o] = expand5((pixel >> 11) & 0x1f);
+                    out[o + 1] = expand6((pixel >> 5) & 0x3f);
+                    out[o + 2] = expand5(pixel & 0x1f);
+                    out[o + 3] = 0xff;
+                }
+            }
+        }
+        PixelFormat::Rgb1555 => {
+            for y in 0..h {
+                let row = data.cast::<u8>().add(y * pitch).cast::<u16>();
+                for x in 0..w {
+                    let pixel = row.add(x).read_unaligned();
+                    let o = (y * w + x) * 4;
+                    out[o] = expand5((pixel >> 10) & 0x1f);
+                    out[o + 1] = expand5((pixel >> 5) & 0x1f);
+                    out[o + 2] = expand5(pixel & 0x1f);
+                    out[o + 3] = 0xff;
+                }
+            }
+        }
+    }
+}
+
+// --- Rappels ----------------------------------------------------------------
+
+/// # Safety
+/// Appelé par le cœur pendant `retro_run` ou le chargement.
+pub unsafe extern "C" fn video_refresh(
+    data: *const c_void,
+    width: c_uint,
+    height: c_uint,
+    pitch: usize,
+) {
+    with_host(|host| {
+        // Un pointeur nul signifie « rejoue la trame précédente » : on garde le
+        // tampon en place et on signale que rien de neuf n'est arrivé.
+        if data.is_null() {
+            host.video_fresh = false;
+            return;
+        }
+
+        let format = host.pixel_format;
+        let mut rgba = std::mem::take(&mut host.video.rgba);
+        convert(data, width, height, pitch, format, &mut rgba);
+
+        host.video = VideoFrame { rgba, width, height };
+        host.video_fresh = true;
+    });
+}
+
+/// # Safety
+/// Appelé par le cœur pendant `retro_run`.
+pub unsafe extern "C" fn audio_sample(left: i16, right: i16) {
+    with_host(|host| host.audio.extend_from_slice(&[left, right]));
+}
+
+/// # Safety
+/// `data` doit pointer sur `frames * 2` entiers 16 bits.
+pub unsafe extern "C" fn audio_sample_batch(data: *const i16, frames: usize) -> usize {
+    if data.is_null() || frames == 0 {
+        return frames;
+    }
+    let samples = std::slice::from_raw_parts(data, frames * 2);
+    with_host(|host| host.audio.extend_from_slice(samples));
+    frames
+}
+
+/// # Safety
+/// Appelé par le cœur pendant `retro_run`.
+pub unsafe extern "C" fn input_poll() {
+    // L'état des manettes est déposé avant `retro_run` : rien à relever ici.
+}
+
+/// # Safety
+/// Appelé par le cœur pendant `retro_run`.
+pub unsafe extern "C" fn input_state(
+    port: c_uint,
+    device: c_uint,
+    _index: c_uint,
+    id: c_uint,
+) -> i16 {
+    if port != 0 || device != RETRO_DEVICE_JOYPAD || id as usize >= JOYPAD_BUTTONS {
+        return 0;
+    }
+    with_host(|host| host.input[id as usize])
+}
+
+/// Journalise un message émis par le cœur.
+///
+/// L'ABI attend ici une fonction variadique à la C, que Rust stable ne sait pas
+/// *définir*. On en fournit une non variadique dont le début de signature
+/// correspond : la convention d'appel C laisse le nettoyage à l'appelant, et
+/// cette fonction ne lit jamais les arguments surnuméraires.
+///
+/// Le format n'est donc pas interprété — on remonte le gabarit tel quel, ce qui
+/// suffit à situer un problème. Écrire sur la sortie d'erreur plutôt que dans
+/// l'état hôte évite un emprunt réentrant : un cœur peut très bien journaliser
+/// depuis l'intérieur d'un autre rappel.
+///
+/// # Safety
+/// `fmt` doit être une chaîne C valide ou nulle.
+unsafe extern "C" fn log_printf(level: c_uint, fmt: *const c_char) {
+    if fmt.is_null() {
+        return;
+    }
+    let text = CStr::from_ptr(fmt).to_string_lossy();
+    let text = text.trim_end();
+    if text.is_empty() {
+        return;
+    }
+
+    let severity = match level {
+        0 => "debug",
+        1 => "info",
+        2 => "attention",
+        _ => "erreur",
+    };
+    eprintln!("[cœur/{severity}] {text}");
+}
+
+/// Point d'entrée unique par lequel le cœur interroge et configure son hôte.
+///
+/// Renvoyer `false` sur une commande inconnue est la réponse correcte : le cœur
+/// bascule alors sur un comportement de repli. On ne traite donc que ce qui est
+/// nécessaire à un démarrage propre.
+///
+/// # Safety
+/// `data` doit correspondre au type attendu par `cmd`, ce que garantit le cœur.
+pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
+    match cmd {
+        ENV_GET_CAN_DUPE => {
+            if data.is_null() {
+                return false;
+            }
+            // On sait réafficher la trame précédente sur pointeur vidéo nul.
+            data.cast::<bool>().write(true);
+            true
+        }
+
+        ENV_SET_PIXEL_FORMAT => {
+            if data.is_null() {
+                return false;
+            }
+            match PixelFormat::from_raw(data.cast::<c_uint>().read()) {
+                Some(format) => {
+                    with_host(|host| host.pixel_format = format);
+                    true
+                }
+                None => false,
+            }
+        }
+
+        ENV_GET_SYSTEM_DIRECTORY => {
+            if data.is_null() {
+                return false;
+            }
+            with_host(|host| {
+                data.cast::<*const c_char>().write(host.system_dir.as_ptr());
+            });
+            true
+        }
+
+        ENV_GET_SAVE_DIRECTORY | ENV_GET_CORE_ASSETS_DIRECTORY => {
+            if data.is_null() {
+                return false;
+            }
+            with_host(|host| {
+                data.cast::<*const c_char>().write(host.save_dir.as_ptr());
+            });
+            true
+        }
+
+        ENV_SET_VARIABLES => {
+            if data.is_null() {
+                return false;
+            }
+            let mut entry = data.cast::<Variable>();
+            with_host(|host| {
+                // Le tableau se termine par une entrée dont la clé est nulle.
+                while !(*entry).key.is_null() {
+                    let key = CStr::from_ptr((*entry).key).to_string_lossy().into_owned();
+                    let spec = CStr::from_ptr((*entry).value).to_string_lossy();
+
+                    // Forme attendue : « Description; valeur1|valeur2|valeur3 ».
+                    // La première valeur est celle par défaut.
+                    if let Some(default) = spec
+                        .split_once(';')
+                        .map(|(_, values)| values.trim())
+                        .and_then(|values| values.split('|').next())
+                    {
+                        if let Ok(value) = CString::new(default.trim()) {
+                            host.options.entry(key).or_insert(value);
+                        }
+                    }
+                    entry = entry.add(1);
+                }
+                host.options_dirty = true;
+            });
+            true
+        }
+
+        ENV_GET_VARIABLE => {
+            if data.is_null() {
+                return false;
+            }
+            let request = data.cast::<Variable>();
+            if (*request).key.is_null() {
+                return false;
+            }
+            let key = CStr::from_ptr((*request).key).to_string_lossy().into_owned();
+
+            with_host(|host| match host.options.get(&key) {
+                Some(value) => {
+                    (*request).value = value.as_ptr();
+                    true
+                }
+                None => false,
+            })
+        }
+
+        ENV_GET_VARIABLE_UPDATE => {
+            if data.is_null() {
+                return false;
+            }
+            with_host(|host| {
+                data.cast::<bool>().write(host.options_dirty);
+                host.options_dirty = false;
+            });
+            true
+        }
+
+        ENV_GET_CORE_OPTIONS_VERSION => {
+            if data.is_null() {
+                return false;
+            }
+            // Version 0 : on ne gère que l'ancien `SET_VARIABLES`, sur lequel
+            // les cœurs se rabattent d'eux-mêmes.
+            data.cast::<c_uint>().write(0);
+            true
+        }
+
+        ENV_SET_GEOMETRY => {
+            if data.is_null() {
+                return false;
+            }
+            let geometry = data.cast::<GameGeometry>().read();
+            with_host(|host| host.geometry = Some(geometry));
+            true
+        }
+
+        ENV_SET_MESSAGE => {
+            // La structure commence par le message ; on ne lit que lui.
+            if data.is_null() {
+                return false;
+            }
+            let text = data.cast::<*const c_char>().read();
+            if !text.is_null() {
+                let message = CStr::from_ptr(text).to_string_lossy().into_owned();
+                with_host(|host| host.messages.push(message));
+            }
+            true
+        }
+
+        ENV_SHUTDOWN => {
+            with_host(|host| host.shutdown = true);
+            true
+        }
+
+        // Acceptées sans effet : le cœur s'en accommode.
+        ENV_SET_PERFORMANCE_LEVEL | ENV_SET_INPUT_DESCRIPTORS | ENV_SET_SUPPORT_NO_GAME
+        | ENV_SET_ROTATION => true,
+
+        ENV_GET_LOG_INTERFACE => {
+            if data.is_null() {
+                return false;
+            }
+            // Le refus n'était pas une option neutre : plusieurs cœurs
+            // appellent cette commande puis se servent du pointeur sans
+            // vérifier qu'on l'a rempli, et sautent alors sur une adresse non
+            // initialisée. Fournir un rappel inerte les fait vivre.
+            data.cast::<LogCallback>().write(LogCallback {
+                log: std::mem::transmute::<
+                    unsafe extern "C" fn(c_uint, *const c_char),
+                    LogPrintfFn,
+                >(log_printf),
+            });
+            true
+        }
+
+        // Refusées volontairement : les options v2 et les masques de bits
+        // d'entrée ont chacun un chemin de repli que les cœurs empruntent
+        // d'eux-mêmes.
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Convertit un tampon de test et rend le RGBA obtenu.
+    fn convert_rows<T: Copy>(rows: &[Vec<T>], width: u32, format: PixelFormat) -> Vec<u8> {
+        // Chaque ligne est allouée à sa taille propre : `pitch` vaut donc la
+        // longueur réelle d'une ligne, marge comprise.
+        let pitch = rows[0].len() * std::mem::size_of::<T>();
+        let mut flat: Vec<T> = Vec::new();
+        for row in rows {
+            assert_eq!(row.len() * std::mem::size_of::<T>(), pitch, "lignes inégales");
+            flat.extend_from_slice(row);
+        }
+
+        let mut out = Vec::new();
+        unsafe {
+            convert(
+                flat.as_ptr().cast(),
+                width,
+                rows.len() as u32,
+                pitch,
+                format,
+                &mut out,
+            );
+        }
+        out
+    }
+
+    #[test]
+    fn xrgb8888_place_les_canaux_dans_le_bon_ordre() {
+        // En petit-boutiste, 0x00RRGGBB arrive octet par octet en B, G, R, X :
+        // c'est l'inversion que cette conversion doit défaire.
+        let rows = vec![vec![0x00ff_0000u32, 0x0000_ff00, 0x0000_00ff, 0x00ff_ffff]];
+        let rgba = convert_rows(&rows, 4, PixelFormat::Xrgb8888);
+
+        assert_eq!(&rgba[0..4], &[0xff, 0x00, 0x00, 0xff], "rouge");
+        assert_eq!(&rgba[4..8], &[0x00, 0xff, 0x00, 0xff], "vert");
+        assert_eq!(&rgba[8..12], &[0x00, 0x00, 0xff, 0xff], "bleu");
+        assert_eq!(&rgba[12..16], &[0xff, 0xff, 0xff, 0xff], "blanc");
+    }
+
+    #[test]
+    fn rgb565_etend_les_canaux_jusqu_au_maximum() {
+        let rows = vec![vec![0xf800u16, 0x07e0, 0x001f, 0xffff]];
+        let rgba = convert_rows(&rows, 4, PixelFormat::Rgb565);
+
+        // 31 sur 5 bits et 63 sur 6 doivent donner 255, pas 248 ni 252 : c'est
+        // tout l'intérêt de répliquer les bits de poids fort.
+        assert_eq!(&rgba[0..4], &[0xff, 0x00, 0x00, 0xff], "rouge saturé");
+        assert_eq!(&rgba[4..8], &[0x00, 0xff, 0x00, 0xff], "vert saturé");
+        assert_eq!(&rgba[8..12], &[0x00, 0x00, 0xff, 0xff], "bleu saturé");
+        assert_eq!(&rgba[12..16], &[0xff, 0xff, 0xff, 0xff], "blanc");
+    }
+
+    #[test]
+    fn rgb1555_ignore_le_bit_de_poids_fort() {
+        let rows = vec![vec![0x7c00u16, 0x03e0, 0x001f, 0xffff]];
+        let rgba = convert_rows(&rows, 4, PixelFormat::Rgb1555);
+
+        assert_eq!(&rgba[0..4], &[0xff, 0x00, 0x00, 0xff], "rouge");
+        assert_eq!(&rgba[4..8], &[0x00, 0xff, 0x00, 0xff], "vert");
+        assert_eq!(&rgba[8..12], &[0x00, 0x00, 0xff, 0xff], "bleu");
+        // 0xFFFF : le bit 15 doit être ignoré, pas déborder sur le rouge.
+        assert_eq!(&rgba[12..16], &[0xff, 0xff, 0xff, 0xff], "blanc");
+    }
+
+    #[test]
+    fn le_rembourrage_de_ligne_est_saute() {
+        // Deux lignes utiles de deux pixels, chacune suivie de deux pixels de
+        // marge qui ne doivent jamais apparaître dans le résultat.
+        let rows = vec![
+            vec![0x00ff_0000u32, 0x0000_ff00, 0x00de_adbe, 0x00de_adbe],
+            vec![0x0000_00ff, 0x00ff_ffff, 0x00de_adbe, 0x00de_adbe],
+        ];
+        let rgba = convert_rows(&rows, 2, PixelFormat::Xrgb8888);
+
+        assert_eq!(rgba.len(), 2 * 2 * 4, "seuls les pixels utiles sont rendus");
+        assert_eq!(&rgba[0..4], &[0xff, 0x00, 0x00, 0xff]);
+        assert_eq!(&rgba[4..8], &[0x00, 0xff, 0x00, 0xff]);
+        assert_eq!(&rgba[8..12], &[0x00, 0x00, 0xff, 0xff], "deuxième ligne");
+        assert_eq!(&rgba[12..16], &[0xff, 0xff, 0xff, 0xff]);
+    }
+
+    #[test]
+    fn le_canal_alpha_est_toujours_opaque() {
+        let rows = vec![vec![0x0012_3456u32; 8]; 4];
+        let rgba = convert_rows(&rows, 8, PixelFormat::Xrgb8888);
+
+        for chunk in rgba.chunks_exact(4) {
+            assert_eq!(chunk[3], 0xff);
+        }
+    }
+
+    #[test]
+    fn une_trame_dupliquee_conserve_l_image_precedente() {
+        with_host(|host| *host = HostState::default());
+
+        unsafe {
+            with_host(|host| host.pixel_format = PixelFormat::Xrgb8888);
+            let pixels = [0x00ff_0000u32, 0x0000_ff00];
+            video_refresh(pixels.as_ptr().cast(), 2, 1, 8);
+        }
+
+        let (first, fresh) = with_host(|host| (host.video.rgba.clone(), host.video_fresh));
+        assert!(fresh, "la première trame est neuve");
+        assert_eq!(&first[0..4], &[0xff, 0x00, 0x00, 0xff]);
+
+        // Un pointeur nul signifie « rejoue la trame précédente ».
+        unsafe { video_refresh(std::ptr::null(), 2, 1, 8) };
+
+        let (second, fresh) = with_host(|host| (host.video.rgba.clone(), host.video_fresh));
+        assert!(!fresh, "la trame dupliquée n'est pas neuve");
+        assert_eq!(first, second, "l'image précédente est conservée");
+    }
+}

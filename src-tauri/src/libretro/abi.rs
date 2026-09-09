@@ -1,0 +1,178 @@
+//! Déclarations de l'ABI libretro, transcrites depuis `libretro.h`.
+//!
+//! libretro est une interface C stable : un cœur d'émulation est une
+//! bibliothèque dynamique qui exporte une trentaine de symboles connus. C'est
+//! ce qui permet à EvaChi d'héberger des cœurs très différents sans se brancher
+//! sur les entrailles de chacun.
+//!
+//! Rien ici n'est spécifique à une machine émulée : ce fichier ne décrit que la
+//! forme des appels et des structures échangées.
+
+#![allow(non_camel_case_types)]
+// Ce fichier transcrit une interface externe, pas seulement la part qu'EvaChi
+// consomme aujourd'hui : les commandes qu'on refuse volontairement sont
+// nommées ici pour que le refus soit lisible plutôt que muet.
+#![allow(dead_code)]
+
+use std::os::raw::{c_char, c_uint, c_void};
+
+/// Version de l'API que ce hôte sait piloter. Un cœur qui renvoie autre chose
+/// est refusé plutôt que d'être appelé au hasard.
+pub const RETRO_API_VERSION: c_uint = 1;
+
+// --- Commandes d'environnement ---------------------------------------------
+// Le cœur interroge et configure son hôte par un unique point d'entrée, en
+// distinguant les requêtes par un numéro. On n'implémente que celles dont les
+// cœurs ont réellement besoin pour démarrer.
+
+pub const ENV_SET_ROTATION: c_uint = 1;
+pub const ENV_GET_CAN_DUPE: c_uint = 3;
+pub const ENV_SET_MESSAGE: c_uint = 6;
+pub const ENV_SHUTDOWN: c_uint = 7;
+pub const ENV_SET_PERFORMANCE_LEVEL: c_uint = 8;
+pub const ENV_GET_SYSTEM_DIRECTORY: c_uint = 9;
+pub const ENV_SET_PIXEL_FORMAT: c_uint = 10;
+pub const ENV_SET_INPUT_DESCRIPTORS: c_uint = 11;
+pub const ENV_GET_VARIABLE: c_uint = 15;
+pub const ENV_SET_VARIABLES: c_uint = 16;
+pub const ENV_GET_VARIABLE_UPDATE: c_uint = 17;
+pub const ENV_SET_SUPPORT_NO_GAME: c_uint = 18;
+pub const ENV_GET_LIBRETRO_PATH: c_uint = 19;
+pub const ENV_GET_LOG_INTERFACE: c_uint = 27;
+pub const ENV_GET_CORE_ASSETS_DIRECTORY: c_uint = 30;
+pub const ENV_GET_SAVE_DIRECTORY: c_uint = 31;
+pub const ENV_SET_GEOMETRY: c_uint = 37;
+pub const ENV_GET_INPUT_BITMASKS: c_uint = 51 | ENV_EXPERIMENTAL;
+pub const ENV_GET_CORE_OPTIONS_VERSION: c_uint = 52;
+pub const ENV_SET_CORE_OPTIONS_V2: c_uint = 67;
+pub const ENV_SET_CORE_OPTIONS_V2_INTL: c_uint = 68;
+
+/// Marqueur des commandes encore expérimentales côté libretro.
+pub const ENV_EXPERIMENTAL: c_uint = 0x10000;
+
+// --- Format des pixels ------------------------------------------------------
+
+/// Format du tampon vidéo que le cœur remplit. Il l'annonce une fois pour
+/// toutes via `ENV_SET_PIXEL_FORMAT`, avant la première trame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PixelFormat {
+    /// 15 bits par pixel, bit de poids fort ignoré.
+    Rgb1555,
+    /// 32 bits par pixel, octet de poids fort ignoré. Le plus courant.
+    Xrgb8888,
+    /// 16 bits par pixel, 5-6-5.
+    Rgb565,
+}
+
+impl PixelFormat {
+    pub fn from_raw(value: c_uint) -> Option<Self> {
+        match value {
+            0 => Some(Self::Rgb1555),
+            1 => Some(Self::Xrgb8888),
+            2 => Some(Self::Rgb565),
+            _ => None,
+        }
+    }
+
+    /// Taille d'un pixel en octets dans le tampon source.
+    pub fn bytes_per_pixel(self) -> usize {
+        match self {
+            Self::Rgb1555 | Self::Rgb565 => 2,
+            Self::Xrgb8888 => 4,
+        }
+    }
+}
+
+impl Default for PixelFormat {
+    /// libretro impose ce format par défaut quand le cœur n'en demande aucun.
+    fn default() -> Self {
+        Self::Rgb1555
+    }
+}
+
+// --- Manette ----------------------------------------------------------------
+
+pub const RETRO_DEVICE_JOYPAD: c_uint = 1;
+
+/// Boutons de la manette libretro standard, dans l'ordre de leurs identifiants.
+/// C'est une disposition abstraite : chaque cœur y projette la sienne.
+pub const JOYPAD_BUTTONS: usize = 16;
+
+// --- Structures échangées ---------------------------------------------------
+
+/// Identité du cœur, disponible avant tout chargement de contenu.
+#[repr(C)]
+pub struct SystemInfo {
+    pub library_name: *const c_char,
+    pub library_version: *const c_char,
+    /// Extensions acceptées, séparées par des barres verticales.
+    pub valid_extensions: *const c_char,
+    /// Vrai si le cœur veut un chemin de fichier plutôt que le contenu en mémoire.
+    pub need_fullpath: bool,
+    pub block_extract: bool,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct GameGeometry {
+    pub base_width: c_uint,
+    pub base_height: c_uint,
+    pub max_width: c_uint,
+    pub max_height: c_uint,
+    /// Rapport d'affichage voulu ; 0 signifie « déduire de base_width/height ».
+    pub aspect_ratio: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SystemTiming {
+    pub fps: f64,
+    pub sample_rate: f64,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct SystemAvInfo {
+    pub geometry: GameGeometry,
+    pub timing: SystemTiming,
+}
+
+/// Contenu à charger. Selon `need_fullpath`, le cœur lit `path` ou `data`.
+#[repr(C)]
+pub struct GameInfo {
+    pub path: *const c_char,
+    pub data: *const c_void,
+    pub size: usize,
+    pub meta: *const c_char,
+}
+
+/// Une option de configuration exposée par le cœur, terminée par une entrée nulle.
+#[repr(C)]
+pub struct Variable {
+    pub key: *const c_char,
+    /// Description puis valeurs possibles, séparées par des barres verticales.
+    pub value: *const c_char,
+}
+
+// --- Signatures des rappels -------------------------------------------------
+//
+// Aucune de ces fonctions ne transporte de pointeur utilisateur : le cœur
+// appelle des fonctions globales. C'est la contrainte structurante de libretro,
+// et la raison pour laquelle l'hôte range son état dans une variable de thread.
+
+pub type EnvironmentFn = unsafe extern "C" fn(cmd: c_uint, data: *mut c_void) -> bool;
+pub type VideoRefreshFn =
+    unsafe extern "C" fn(data: *const c_void, width: c_uint, height: c_uint, pitch: usize);
+pub type AudioSampleFn = unsafe extern "C" fn(left: i16, right: i16);
+pub type AudioSampleBatchFn = unsafe extern "C" fn(data: *const i16, frames: usize) -> usize;
+pub type InputPollFn = unsafe extern "C" fn();
+pub type InputStateFn =
+    unsafe extern "C" fn(port: c_uint, device: c_uint, index: c_uint, id: c_uint) -> i16;
+
+/// Niveaux du journal que les cœurs émettent via `ENV_GET_LOG_INTERFACE`.
+pub type LogPrintfFn = unsafe extern "C" fn(level: c_uint, fmt: *const c_char, ...);
+
+#[repr(C)]
+pub struct LogCallback {
+    pub log: LogPrintfFn,
+}

@@ -1,0 +1,664 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>EvaChi</title>
+    <style>
+      /*
+       * Palette sombre teintée de rose. Le fond reste très bas en luminosité
+       * pour rester tenable dans le noir : c'est la teinte qui porte la couleur,
+       * pas la clarté. Les accents montent en saturation, jamais les surfaces.
+       */
+      :root {
+        color-scheme: dark;
+        --bg: #191317;
+        --panel: #201920;
+        --raised: #291f28;
+        --edge: #3a2c37;
+        --ink: #ece0e7;
+        --muted: #a4909d;
+        --accent: #e59bbb;
+        --accent-soft: #4a2e3d;
+        --warn: #e0a458;
+        --row: #241c23;
+        --font: "Segoe UI", system-ui, -apple-system, sans-serif;
+        --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body { height: 100%; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--font);
+        font-size: 13px;
+        overflow: hidden;
+      }
+
+      .app {
+        height: 100%;
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
+      }
+
+      /*
+       * Rangées assignées explicitement. Sans cela, masquer la barre d'outils
+       * la retire des éléments de la grille : tout remonte d'un cran, la barre
+       * d'état hérite du `1fr` et la zone de jeu s'effondre sur son contenu.
+       */
+      .menubar { grid-row: 1; }
+      .toolbar { grid-row: 2; }
+      main { grid-row: 3; }
+      .statusbar { grid-row: 4; }
+
+      /* --- Barre de menus --- */
+
+      .menubar {
+        display: flex;
+        align-items: stretch;
+        background: var(--panel);
+        border-bottom: 1px solid var(--edge);
+        user-select: none;
+      }
+
+      .menu { position: relative; }
+
+      .menu-title {
+        font: inherit;
+        color: var(--ink);
+        background: transparent;
+        border: 0;
+        padding: 7px 13px;
+        cursor: default;
+      }
+      .menu-title:hover, .menu[data-open] .menu-title { background: var(--raised); }
+
+      .menu-items {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        z-index: 20;
+        min-width: 236px;
+        padding: 4px;
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
+      }
+      .menu[data-open] .menu-items { display: block; }
+
+      .menu-items button {
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+        width: 100%;
+        font: inherit;
+        color: var(--ink);
+        background: transparent;
+        border: 0;
+        border-radius: 3px;
+        padding: 6px 10px;
+        text-align: left;
+        cursor: default;
+      }
+      .menu-items button:hover:not(:disabled) { background: var(--accent-soft); }
+      .menu-items button:disabled { color: var(--muted); }
+      .menu-items .shortcut { margin-left: auto; color: var(--muted); font-size: 11px; }
+      .menu-items hr { border: 0; border-top: 1px solid var(--edge); margin: 4px 2px; }
+
+      .menubar .title {
+        margin-left: auto;
+        align-self: center;
+        padding: 0 14px;
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      /* --- Barre d'outils --- */
+
+      .toolbar {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        padding: 8px 12px;
+        border-bottom: 1px solid var(--edge);
+      }
+      .toolbar[hidden] { display: none; }
+
+      input[type="search"], select, .toolbar button {
+        font: inherit;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 5px 9px;
+      }
+      input[type="search"] { flex: 0 1 280px; }
+      input[type="search"]:focus, select:focus { outline: 1px solid var(--accent); }
+      .toolbar button { cursor: pointer; }
+      .toolbar button:hover { border-color: var(--accent); }
+      .toolbar .count { margin-left: auto; color: var(--muted); }
+
+      /* --- Scène --- */
+
+      /*
+       * Les deux vues occupent la même case et sont étirées par la grille.
+       * Une hauteur en pourcentage se résoudrait contre un parent dont la
+       * hauteur dépend elle-même du contenu : la zone de jeu s'effondrait alors
+       * à la taille native de la console.
+       */
+      main {
+        min-height: 0;
+        display: grid;
+        grid-template: 1fr / 1fr;
+      }
+      main > * { grid-area: 1 / 1; min-height: 0; min-width: 0; }
+
+      .library { overflow: auto; }
+      .library[hidden] { display: none; }
+
+      .shelves { padding: 8px 0 24px; }
+      .shelves[hidden] { display: none; }
+
+      .shelf { border-bottom: 1px solid var(--edge); }
+      .shelf > summary {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        padding: 8px 12px;
+        cursor: default;
+        user-select: none;
+        background: var(--panel);
+        list-style: none;
+      }
+      .shelf > summary::-webkit-details-marker { display: none; }
+      .shelf > summary:hover { background: var(--raised); }
+      /* Chevron tourné vers le bas quand le volet est ouvert. */
+      .shelf > summary::before {
+        content: "›";
+        display: inline-block;
+        width: 10px;
+        color: var(--muted);
+        transition: transform 120ms;
+      }
+      .shelf[open] > summary::before { transform: rotate(90deg); }
+      .shelf .console { color: var(--accent); font-weight: 500; }
+      .shelf .tally { margin-left: auto; color: var(--muted); font-size: 12px; }
+      .shelf-core {
+        margin-left: 12px;
+        padding: 1px 6px;
+        font-size: 12px;
+        max-width: 190px;
+      }
+
+      table.games { width: 100%; border-collapse: collapse; }
+      table.games td {
+        padding: 6px 12px;
+        border-bottom: 1px solid #202429;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      table.games tbody tr:hover { background: var(--row); }
+      td.name { width: 55%; }
+      td.size, td.format { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+      td.system select { padding: 2px 6px; font-size: 12px; max-width: 190px; }
+      td.system .single { color: var(--muted); }
+
+      .placeholder {
+        display: grid;
+        place-content: center;
+        gap: 10px;
+        height: 100%;
+        text-align: center;
+        color: var(--muted);
+        padding: 24px;
+      }
+      .placeholder[hidden] { display: none; }
+      .placeholder strong { color: var(--ink); font-weight: 500; font-size: 15px; }
+      .placeholder code {
+        font-family: var(--mono);
+        font-size: 12px;
+        word-break: break-all;
+      }
+      .placeholder button {
+        justify-self: center;
+        font: inherit;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--accent);
+        border-radius: 4px;
+        padding: 7px 14px;
+        cursor: pointer;
+      }
+
+      .player {
+        display: grid;
+        place-items: center;
+        background: #0d090c;
+        overflow: hidden;
+      }
+      .player[hidden] { display: none; }
+
+      /*
+       * La taille est posée en pixels par le code : `max-width` ne fait que
+       * limiter, il n'agrandit pas, et une Game Boy s'afficherait donc en
+       * 160 pixels de large au milieu d'un écran vide.
+       */
+      #screen {
+        display: block;
+        image-rendering: pixelated;
+      }
+
+      /* --- Barre d'état --- */
+
+      .statusbar {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        padding: 5px 12px;
+        background: var(--panel);
+        border-top: 1px solid var(--edge);
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .statusbar .metric { font-family: var(--mono); }
+      .statusbar .push { margin-left: auto; }
+      #status.err { color: var(--warn); }
+
+      /* --- Boîtes de dialogue --- */
+
+      dialog {
+        background: var(--panel);
+        color: var(--ink);
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        padding: 0;
+        min-width: 440px;
+        max-width: min(720px, 92vw);
+      }
+      dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+
+      dialog h2 {
+        margin: 0;
+        padding: 12px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        border-bottom: 1px solid var(--edge);
+      }
+      .dialog-body { padding: 14px 16px; max-height: 60vh; overflow: auto; }
+      .dialog-foot {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        padding: 10px 16px;
+        border-top: 1px solid var(--edge);
+      }
+      .dialog-foot button, .dialog-body button {
+        font: inherit;
+        color: var(--ink);
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 6px 13px;
+        cursor: pointer;
+      }
+      .dialog-foot button:hover, .dialog-body button:hover { border-color: var(--accent); }
+
+      .folder-list { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 4px; }
+      .folder-list li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        padding: 6px 8px;
+        background: var(--row);
+        border-radius: 4px;
+      }
+      .folder-list .path {
+        font-family: var(--mono);
+        font-size: 12px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .folder-list .fixed { color: var(--muted); }
+      .folder-list button { margin-left: auto; padding: 2px 8px; font-size: 12px; }
+
+      .preset-list { list-style: none; margin: 0 0 14px; padding: 0; display: grid; gap: 5px; }
+      .preset-list li {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 4px 12px;
+        padding: 8px 10px;
+        background: var(--row);
+        border-radius: 4px;
+        align-items: center;
+      }
+      .preset-list .system { color: var(--ink); }
+      /* La liste d'installation n'a que deux colonnes : le nom, et l'état à
+         droite — pas de boutons par ligne, l'installation étant groupée. */
+      #install-list .system {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        cursor: pointer;
+      }
+      #install-list .state { grid-column: 2; text-align: right; }
+      .preset-list .state {
+        grid-column: 1;
+        font-family: var(--mono);
+        font-size: 11px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .preset-list .state.ready { color: var(--accent); }
+      .preset-list .actions { grid-row: 1 / 3; display: flex; gap: 6px; }
+      .preset-list button { padding: 4px 10px; font-size: 12px; }
+
+      .manual > summary {
+        cursor: default;
+        color: var(--muted);
+        padding: 6px 0;
+        border-top: 1px solid var(--edge);
+      }
+      .manual > summary:hover { color: var(--ink); }
+
+      .hint-text { color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
+      .hint-text code { font-family: var(--mono); color: var(--accent); }
+      .form { border-top: 1px solid var(--edge); padding-top: 12px; }
+      .form .field { display: grid; grid-template-columns: 92px 1fr auto; }
+      .form input[type="text"] {
+        font: inherit;
+        color: var(--ink);
+        background: var(--row);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        padding: 5px 8px;
+        min-width: 0;
+      }
+      .form input[type="text"]:focus { outline: 1px solid var(--accent); }
+
+      .field { display: flex; gap: 8px; align-items: center; margin: 0 0 12px; color: var(--muted); }
+      .field input[type="range"] { accent-color: var(--accent); }
+      #chip8-options[hidden] { display: none; }
+
+      .pad {
+        display: grid;
+        grid-template-columns: repeat(4, 56px);
+        gap: 5px;
+        justify-content: center;
+      }
+      .key {
+        aspect-ratio: 1;
+        display: grid;
+        place-content: center;
+        gap: 2px;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        background: var(--row);
+        padding: 0;
+        cursor: pointer;
+        user-select: none;
+        color: var(--ink);
+        font: inherit;
+      }
+      .key .label { font-size: 12px; }
+      .key .phys { font-size: 9px; color: var(--muted); }
+      .key.down { background: var(--accent-soft); border-color: var(--accent); }
+
+      .log {
+        font-family: var(--mono);
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--muted);
+        max-height: 46vh;
+        overflow: auto;
+      }
+      .log .err { color: var(--warn); }
+      .log .ok { color: var(--accent); }
+
+      .about dt { color: var(--muted); font-size: 12px; }
+      .about dd {
+        margin: 0 0 10px;
+        font-family: var(--mono);
+        font-size: 12px;
+        word-break: break-all;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app">
+      <nav class="menubar" id="menubar">
+        <div class="menu" data-menu>
+          <button class="menu-title" type="button">Fichier</button>
+          <div class="menu-items">
+            <button type="button" data-action="open">Ouvrir un jeu…</button>
+            <button type="button" data-action="add-folder">Ajouter un dossier de jeux…</button>
+            <button type="button" data-action="folders">Gérer les dossiers…</button>
+            <button type="button" data-action="install">Émulateurs…</button>
+            <button type="button" data-action="external">Émulateurs externes…</button>
+            <hr />
+            <button type="button" data-action="refresh">
+              Actualiser la bibliothèque<span class="shortcut">F5</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu>
+          <button class="menu-title" type="button">Émulation</button>
+          <div class="menu-items">
+            <button type="button" data-action="toggle" disabled>Pause</button>
+            <button type="button" data-action="reset" disabled>Réinitialiser</button>
+            <hr />
+            <button type="button" data-action="save" disabled>Sauvegarder l'état</button>
+            <button type="button" data-action="restore" disabled>Charger l'état</button>
+            <hr />
+            <button type="button" data-action="stop" disabled>Retour à la bibliothèque</button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu>
+          <button class="menu-title" type="button">Affichage</button>
+          <div class="menu-items">
+            <button type="button" data-action="fullscreen">
+              Plein écran<span class="shortcut">P</span>
+            </button>
+            <hr />
+            <button type="button" data-action="controls">Commandes…</button>
+            <button type="button" data-action="settings">Paramètres du cœur…</button>
+            <button type="button" data-action="log">Journal…</button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu>
+          <button class="menu-title" type="button">Aide</button>
+          <div class="menu-items">
+            <button type="button" data-action="about">À propos…</button>
+          </div>
+        </div>
+
+        <span class="title" id="now-playing">EvaChi</span>
+      </nav>
+
+      <div class="toolbar" id="toolbar">
+        <input type="search" id="search" placeholder="Rechercher un jeu…" />
+        <button type="button" id="add-folder">Ajouter un dossier…</button>
+        <span class="count" id="counts">—</span>
+      </div>
+
+      <main>
+        <div class="library" id="library">
+          <div class="shelves" id="games"></div>
+
+          <div class="placeholder" id="placeholder">
+            <strong>Aucun jeu</strong>
+            <span>Indiquez le dossier où se trouvent vos jeux.</span>
+            <button type="button" id="placeholder-add">Ajouter un dossier…</button>
+            <button type="button" id="placeholder-install" hidden>Installer les émulateurs…</button>
+            <code id="placeholder-path"></code>
+          </div>
+        </div>
+
+        <div class="player" id="player" hidden>
+          <canvas id="screen" width="64" height="32"></canvas>
+        </div>
+      </main>
+
+      <footer class="statusbar">
+        <span id="status">Prêt</span>
+        <span class="push metric" id="res">—</span>
+        <span class="metric" id="fps">—</span>
+      </footer>
+    </div>
+
+    <dialog id="folders-dialog">
+      <h2>Dossiers de jeux</h2>
+      <div class="dialog-body">
+        <ul class="folder-list" id="folder-list"></ul>
+        <button type="button" id="folders-add">Ajouter un dossier…</button>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="install-dialog">
+      <h2>Émulateurs</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Chaque console a besoin de son émulateur. EvaChi va les chercher sur la
+          forge officielle du projet libretro,
+          <code>buildbot.libretro.com</code>, et les installe dans son propre
+          dossier. Rien n'est redistribué : ce sont les versions publiées par
+          leurs auteurs.
+        </p>
+        <p class="hint-text">
+          Vous pouvez n'en installer qu'une partie — seules les consoles dont
+          l'émulateur est installé apparaissent dans la bibliothèque.
+        </p>
+        <ul class="preset-list" id="install-list"></ul>
+      </div>
+      <div class="dialog-foot">
+        <span class="hint-text" id="install-progress"></span>
+        <button type="button" id="install-selected">Installer la sélection</button>
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="external-dialog">
+      <h2>Émulateurs externes</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Pour les consoles sans cœur libretro. EvaChi lance le programme avec le
+          jeu en argument : l'émulateur démarre directement dans la partie, sans
+          passer par son propre menu.
+        </p>
+        <p class="hint-text">
+          Les émulateurs ci-dessous sont déjà configurés — arguments et formats
+          compris. EvaChi les cherche sur votre disque ; il ne les installe pas.
+        </p>
+
+        <ul class="preset-list" id="preset-list"></ul>
+
+        <details class="manual">
+          <summary>Déclarer un autre émulateur</summary>
+          <div class="form">
+          <label class="field">
+            Nom
+            <input type="text" id="ext-name" placeholder="Xbox 360" />
+          </label>
+          <label class="field">
+            Programme
+            <input type="text" id="ext-exe" placeholder="C:\…\xenia.exe" />
+            <button type="button" id="ext-browse">Parcourir…</button>
+          </label>
+          <label class="field">
+            Extensions
+            <input type="text" id="ext-ext" placeholder="iso xex zar" />
+          </label>
+          <label class="field">
+            Arguments
+            <input type="text" id="ext-args" placeholder="(vide) ou --fullscreen {rom}" />
+          </label>
+          <p class="hint-text">
+            <code>{rom}</code> sera remplacé par le chemin du jeu. Sans lui, le
+            chemin est ajouté à la fin — ce qu'attendent la plupart des émulateurs.
+          </p>
+            <button type="button" id="ext-save">Enregistrer</button>
+          </div>
+        </details>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="controls-dialog">
+      <h2>Commandes</h2>
+      <div class="dialog-body">
+        <p class="field" id="pad-status">Aucune manette détectée.</p>
+        <div class="pad" id="keypad"></div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="settings-dialog">
+      <h2>Paramètres du cœur</h2>
+      <div class="dialog-body">
+        <label class="field">
+          <input type="checkbox" id="sound" checked />
+          Son
+        </label>
+
+        <div id="chip8-options">
+          <label class="field">
+            Interpréteur
+            <select id="preset">
+              <option value="cosmac-vip">COSMAC VIP</option>
+              <option value="super-chip">SUPER-CHIP</option>
+              <option value="xo-chip">XO-CHIP</option>
+            </select>
+          </label>
+          <label class="field">
+            Vitesse
+            <input type="range" id="speed" min="1" max="60" value="11" />
+            <span id="speed-value">11</span> par trame
+          </label>
+        </div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="log-dialog">
+      <h2>Journal</h2>
+      <div class="dialog-body"><div class="log" id="log"></div></div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="about-dialog">
+      <h2>À propos d'EvaChi</h2>
+      <div class="dialog-body"><dl class="about" id="about-body"></dl></div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <input type="file" id="file" hidden />
+    <script type="module" src="./main.js"></script>
+  </body>
+</html>

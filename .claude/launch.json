@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "evachi",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["scripts/build.mjs", "--serve"],
+      "port": 5173
+    }
+  ]
+}

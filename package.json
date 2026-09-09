@@ -1,0 +1,31 @@
+{
+  "name": "evachi",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Hote d emulation multi-systemes : coeurs internes et coeurs libretro",
+  "scripts": {
+    "test": "node --test src/**/*.test.ts",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --serve",
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build",
+    "typecheck": "tsc --noEmit",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:all": "npm test && npm run typecheck && npm run test:rust"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^26.5.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2"
+  },
+  "license": "GPL-3.0-or-later"
+}
