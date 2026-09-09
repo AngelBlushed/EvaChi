@@ -14,6 +14,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
+mod emulators;
 mod install;
 
 use evachi::libretro::Session;
@@ -40,6 +41,9 @@ const LIST_FLAG: &str = "--list-cores";
 /// la trace même lancé d'un double-clic.
 const INSTALL_FLAG: &str = "--install-cores";
 
+/// Argument interne : installe les émulateurs autonomes manquants.
+const INSTALL_EMULATORS_FLAG: &str = "--install-emulators";
+
 fn main() {
     // Doit passer avant toute initialisation de Tauri : ce mode ne doit rien
     // afficher, seulement écrire sur la sortie standard.
@@ -57,6 +61,9 @@ fn main() {
     if args.iter().any(|arg| arg == INSTALL_FLAG) {
         std::process::exit(commands::install_cores_to_stdout());
     }
+    if args.iter().any(|arg| arg == INSTALL_EMULATORS_FLAG) {
+        std::process::exit(commands::install_emulators_to_stdout());
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -71,6 +78,11 @@ fn main() {
             commands::write_log(&paths, &format!("cœurs   {}", paths.cores.display()));
             commands::write_log(&paths, &format!("jeux    {}", paths.roms.display()));
             commands::write_log(&paths, &format!("réglages {}", paths.config.display()));
+            // Ce qui se lancera vraiment pour les consoles sans cœur libretro.
+            // Un chemin périmé ici ne se voit nulle part ailleurs.
+            for line in commands::declared_externals_summary(&paths) {
+                commands::write_log(&paths, &line);
+            }
 
             app.manage(paths);
             // Le thread d'émulation vit aussi longtemps que l'application.
@@ -104,6 +116,8 @@ fn main() {
             commands::adopt_external,
             commands::installable_cores,
             commands::install_core,
+            commands::installable_emulators,
+            commands::install_emulator,
             commands::note,
         ])
         .run(tauri::generate_context!())

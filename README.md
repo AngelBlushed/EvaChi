@@ -84,17 +84,25 @@ les chercher à leur source, `buildbot.libretro.com`, à la demande — un cœur
 console, une case à cocher par console.
 
 ```
-Fichier → Émulateurs…          depuis la fenêtre
-EvaChi.exe --install-cores     sans ouvrir la fenêtre
-EvaChi.exe --list-cores        ce que l'application voit réellement
+Fichier → Émulateurs…            depuis la fenêtre
+EvaChi.exe --install-cores       sans ouvrir la fenêtre
+EvaChi.exe --install-emulators   les consoles sans cœur libretro
+EvaChi.exe --list-cores          ce que l'application voit réellement
 ```
 
 [docs/coeurs.md](docs/coeurs.md) donne la liste complète et dit pourquoi ces
 cœurs-là.
 
-Les consoles sans portage libretro — Switch, Wii U, PS2, Xbox, Xbox 360, PS Vita —
-passent par leur émulateur autonome. EvaChi le cherche sur les disques de la
-machine et le déclare seule quand elle le trouve ; elle ne l'installe pas.
+Les consoles sans portage libretro — Wii U, PS2, Xbox, Xbox 360, PS Vita —
+passent par un émulateur autonome, qu'EvaChi installe dans
+`%APPDATA%\app.evachi\emulators\` depuis la forge de chaque projet, et qu'elle
+lance directement dans le jeu, en plein écran, sans montrer son menu.
+
+La Switch fait exception : la forge de Ryubing est protégée par un test
+anti-robot, qu'EvaChi ne cherche pas à contourner. Installez-le depuis
+<https://ryujinx.app> — EvaChi le trouvera ensuite toute seule, où qu'il soit.
+
+Ni jeux, ni BIOS, ni clés : ceux-là viennent de vos propres consoles.
 
 ## Architecture
 

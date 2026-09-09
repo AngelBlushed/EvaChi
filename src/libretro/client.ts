@@ -158,6 +158,34 @@ export async function installCore(name: string): Promise<number> {
   return invoke<number>('install_core', { name });
 }
 
+/**
+ * Un émulateur autonome qu'EvaChi sait installer.
+ *
+ * `downloadable` est faux pour ceux dont la forge se protège des robots : ils
+ * restent à installer soi-même, EvaChi les reconnaîtra ensuite.
+ */
+export interface EmulatorOffer {
+  readonly system: string;
+  readonly label: string;
+  readonly license: string;
+  readonly site: string;
+  readonly downloadable: boolean;
+  /** Chemin du programme si EvaChi s'en sert déjà, vide sinon. */
+  readonly declared: string;
+  /** Vrai si c'est EvaChi qui l'a installé. */
+  readonly owned: boolean;
+}
+
+/** Les émulateurs autonomes proposés, avec leur état. */
+export async function installableEmulators(): Promise<EmulatorOffer[]> {
+  return invoke<EmulatorOffer[]>('installable_emulators');
+}
+
+/** Télécharge, installe et déclare un émulateur autonome. */
+export async function installEmulator(system: string): Promise<ExternalSystem[]> {
+  return invoke<ExternalSystem[]>('install_emulator', { system });
+}
+
 /** Les émulateurs connus, avec leur état sur cette machine. */
 export async function knownExternals(): Promise<ExternalPreset[]> {
   return invoke<ExternalPreset[]>('known_externals');

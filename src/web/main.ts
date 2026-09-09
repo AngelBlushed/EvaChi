@@ -3,6 +3,7 @@ import { Chip8 } from '../chip8/chip8.ts';
 import { QUIRK_PRESETS } from '../chip8/quirks.ts';
 import type { QuirkPreset } from '../chip8/quirks.ts';
 import type {
+  EmulatorOffer,
   ExternalPreset,
   ExternalSystem,
   InstallableCore,
@@ -11,7 +12,9 @@ import type {
 import {
   addLibraryFolder,
   installCore,
+  installEmulator,
   installableCores,
+  installableEmulators,
   directories,
   libraryFolders,
   listRoms,
@@ -84,6 +87,7 @@ const aboutBody = $<HTMLDListElement>('about-body');
 const presetList = $<HTMLUListElement>('preset-list');
 const installOffer = $<HTMLButtonElement>('placeholder-install');
 const installList = $<HTMLUListElement>('install-list');
+const emulatorList = $<HTMLUListElement>('emulator-list');
 const installProgress = $<HTMLElement>('install-progress');
 const installButton = $<HTMLButtonElement>('install-selected');
 const extName = $<HTMLInputElement>('ext-name');
@@ -823,12 +827,95 @@ function renderInstall(): void {
   installProgress.textContent = waiting === 0 ? 'tout est installé' : '';
 }
 
-/** Recharge l'état des cœurs proposés. */
+let standalones: EmulatorOffer[] = [];
+
+/**
+ * Dessine les émulateurs autonomes : ceux des consoles sans cœur libretro.
+ *
+ * Trois états, et un bouton qui ne ment pas sur ce qu'il fera — installer,
+ * remplacer, ou rien du tout quand la forge de l'émulateur se protège des
+ * robots et qu'il faut passer par elle à la main.
+ */
+function renderEmulators(): void {
+  emulatorList.replaceChildren();
+
+  for (const offer of standalones) {
+    const item = document.createElement('li');
+
+    const name = document.createElement('span');
+    name.className = 'system';
+    name.textContent = `${offer.system} — ${offer.label}`;
+
+    const actions = document.createElement('div');
+    actions.className = 'actions';
+
+    const state = document.createElement('span');
+    state.className = 'state';
+
+    if (offer.downloadable) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = offer.owned ? 'Mettre à jour' : 'Installer';
+      button.addEventListener('click', () => void fetchEmulator(offer, button));
+      actions.append(button);
+    }
+
+    if (offer.owned) {
+      state.classList.add('ready');
+      state.textContent = `installé par EvaChi · ${offer.license}`;
+    } else if (offer.declared) {
+      state.classList.add('ready');
+      state.textContent = offer.declared;
+      state.title = offer.declared;
+    } else if (offer.downloadable) {
+      state.textContent = `à télécharger · ${offer.license}`;
+    } else {
+      // Sa forge refuse les robots : le dire, et dire où aller.
+      state.textContent = `à prendre sur ${offer.site.replace(/^https?:\/\//, '')}`;
+    }
+
+    item.append(name, actions, state);
+    emulatorList.append(item);
+  }
+}
+
+/** Installe un émulateur autonome et rafraîchit ce qui en dépend. */
+async function fetchEmulator(offer: EmulatorOffer, button: HTMLButtonElement): Promise<void> {
+  const before = button.textContent;
+  button.disabled = true;
+  button.textContent = 'Installation…';
+  installProgress.textContent = `${offer.label} — téléchargement…`;
+
+  try {
+    externals = await installEmulator(offer.system);
+    log(`${offer.label} installé et prêt`, 'ok');
+    installProgress.textContent = `${offer.label} installé`;
+    presets = await knownExternals();
+    renderExternals();
+    await reloadCatalog();
+    await refreshLibrary();
+  } catch (error) {
+    log(`${offer.label} — ${reason(error)}`, 'err');
+    installProgress.textContent = `${offer.label} : échec, voir le journal`;
+  } finally {
+    button.disabled = false;
+    button.textContent = before;
+    await refreshInstall();
+  }
+}
+
+/** Recharge l'état des cœurs et des émulateurs proposés. */
 async function refreshInstall(): Promise<void> {
   if (!inShell) return;
   try {
     offers = await installableCores();
     renderInstall();
+  } catch (error) {
+    log(`liste des cœurs indisponible — ${reason(error)}`, 'err');
+  }
+  try {
+    standalones = await installableEmulators();
+    renderEmulators();
   } catch (error) {
     log(`liste des émulateurs indisponible — ${reason(error)}`, 'err');
   }

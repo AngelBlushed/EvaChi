@@ -120,10 +120,54 @@ Un cœur par console, choisi pour sa fidélité :
 | WonderSwan | Beetle WonderSwan | Intellivision | FreeIntv |
 | | | Vectrex | VecX |
 
-Les consoles sans portage libretro — Switch, Wii U, PS2, Xbox, Xbox 360, PS Vita —
-passent par leur émulateur autonome, qu'EvaChi cherche sur les disques et déclare
-seule quand elle le trouve. Là non plus rien n'est installé : le programme doit
-déjà être là.
+## Les consoles sans cœur libretro
+
+Switch, Wii U, PS2, Xbox, Xbox 360, PS Vita : leur émulateur existe, mais comme
+programme séparé. EvaChi les installe de la même façon que les cœurs — elle
+demande à leur forge quelle est la dernière version, prend l'archive Windows, et
+la déballe dans `%APPDATA%\app.evachi\emulators\`.
+
+| Console | Émulateur | Source | Licence |
+|---|---|---|---|
+| Wii U | Cemu | `github.com/cemu-project/Cemu` | MPL-2.0 |
+| PlayStation 2 | PCSX2 | `github.com/PCSX2/pcsx2` | GPL-3.0 |
+| Xbox 360 | Xenia Canary | `github.com/xenia-canary/xenia-canary` | BSD-3-Clause |
+| Xbox | xemu | `github.com/xemu-project/xemu` | GPL-2.0 |
+| PS Vita | Vita3K | `github.com/Vita3K/Vita3K` | GPL-2.0 |
+| Switch | Ryubing | **à installer soi-même** — <https://ryujinx.app> | MIT |
+
+Ryubing fait exception : sa forge est protégée par un test anti-robot, qu'on ne
+cherche pas à contourner. EvaChi le reconnaît en revanche partout où il se
+trouve sur les disques, et s'en sert sans réglage.
+
+### Pourquoi télécharger plutôt qu'empaqueter
+
+Mettre ces programmes *dans* l'exécutable d'EvaChi les redistribuerait. Pour les
+émulateurs sous GPL, cela obligerait à fournir avec chaque copie d'EvaChi le
+source correspondant à la version exacte incluse — et à le refaire à chaque mise
+à jour de l'un d'eux. Aller les chercher à leur source donne le même résultat
+pour qui s'en sert — rien à installer soi-même — sans rien redistribuer.
+
+### Le jeu, pas le menu
+
+Chaque émulateur est lancé avec les arguments qui l'amènent directement dans la
+partie, en plein écran :
+
+| Émulateur | Arguments |
+|---|---|
+| Cemu | `-f -g <jeu>` |
+| PCSX2 | `-batch -fullscreen <jeu>` — `-batch` supprime sa bibliothèque |
+| Xenia | `--fullscreen <jeu>` |
+| xemu | `-full-screen -dvd_path <jeu>` |
+| Ryubing | `--fullscreen <jeu>` |
+
+Cemu et PCSX2 sont installés en mode portable — un dossier `portable`, un
+fichier `portable.ini` — pour que leurs réglages restent chez EvaChi plutôt que
+dans le profil Windows.
+
+Ce qu'EvaChi ne fournit pas et ne fournira pas : les jeux, les BIOS, les clés et
+les micrologiciels. Cemu réclame ses fichiers système Wii U, Ryubing ses clés
+Switch, PCSX2 son BIOS PS2 — ils viennent de vos propres consoles.
 
 ## Sources
 

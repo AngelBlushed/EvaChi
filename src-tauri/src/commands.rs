@@ -24,6 +24,11 @@ pub struct Paths {
     pub saves: PathBuf,
     /// Bibliothèque de jeux par défaut.
     pub roms: PathBuf,
+    /// Émulateurs autonomes installés par EvaChi.
+    ///
+    /// Chez elle plutôt que dans `Program Files` : rien à désinstaller, rien
+    /// qui traîne ailleurs, et l'ensemble se déplace d'un bloc.
+    pub emulators: PathBuf,
     /// Réglages conservés entre deux lancements.
     pub config: PathBuf,
 }
@@ -40,10 +45,17 @@ impl Paths {
             system: base.join("system"),
             saves: base.join("saves"),
             roms: base.join("roms"),
+            emulators: base.join("emulators"),
             config: base.join("config.json"),
         };
 
-        for directory in [&paths.cores, &paths.system, &paths.saves, &paths.roms] {
+        for directory in [
+            &paths.cores,
+            &paths.system,
+            &paths.saves,
+            &paths.roms,
+            &paths.emulators,
+        ] {
             fs::create_dir_all(directory)
                 .map_err(|error| format!("{} : {error}", directory.display()))?;
         }
@@ -82,6 +94,14 @@ pub struct ExternalSystem {
     /// Extensions prises en charge, en minuscules et sans le point.
     #[serde(default)]
     pub extensions: Vec<String>,
+    /// Vrai si l'utilisateur a saisi ces arguments lui-même.
+    ///
+    /// Ce qu'EvaChi a rempli d'après son préréglage, elle peut le corriger d'un
+    /// lancement à l'autre — c'est ainsi que la Switch a récupéré son plein
+    /// écran sans qu'on redéclare quoi que ce soit. Ce que l'utilisateur a
+    /// écrit reste intouché.
+    #[serde(default)]
+    pub custom_args: bool,
 }
 
 /// Réglages conservés d'un lancement à l'autre.
@@ -284,25 +304,28 @@ const KNOWN_EXTERNALS: &[KnownExternal] = &[
             "citron.exe",
             "eden.exe",
         ],
-        args: &[],
+        // Ryujinx prend le jeu en dernier argument et démarre dedans.
+        args: &["--fullscreen", "{rom}"],
         extensions: &["nsp", "xci", "nca", "nro", "nso"],
     },
     KnownExternal {
         system: "Wii U",
         executables: &["Cemu.exe"],
-        args: &["-g", "{rom}"],
+        args: &["-f", "-g", "{rom}"],
         extensions: &["wud", "wux", "wua", "rpx", "wad"],
     },
     KnownExternal {
         system: "Xbox 360",
         executables: &["xenia_canary.exe", "xenia.exe"],
-        args: &[],
+        args: &["--fullscreen", "{rom}"],
         extensions: &["iso", "xex", "zar"],
     },
     KnownExternal {
         system: "PlayStation 2",
         executables: &["pcsx2-qt.exe", "pcsx2.exe", "pcsx2x64.exe"],
-        args: &[],
+        // `-batch` supprime la fenêtre de bibliothèque et rend la main à la
+        // fermeture du jeu ; sans lui, PCSX2 revient à son propre menu.
+        args: &["-batch", "-fullscreen", "{rom}"],
         extensions: &["iso", "chd", "cso", "gz", "bin", "mdf", "nrg"],
     },
     KnownExternal {
@@ -314,10 +337,20 @@ const KNOWN_EXTERNALS: &[KnownExternal] = &[
     KnownExternal {
         system: "Xbox",
         executables: &["xemu.exe"],
-        args: &["-dvd_path", "{rom}"],
+        args: &["-full-screen", "-dvd_path", "{rom}"],
         extensions: &["iso", "xiso"],
     },
 ];
+
+/// Les consoles qui ont un préréglage de lancement.
+///
+/// Sert au tableau des émulateurs installables à vérifier qu'il parle des mêmes
+/// consoles : les deux listes se répondent, et un nom qui diverge ferait
+/// installer un programme qu'on ne saurait plus lancer.
+#[cfg(test)]
+pub fn external_preset_names() -> Vec<&'static str> {
+    KNOWN_EXTERNALS.iter().map(|known| known.system).collect()
+}
 
 /// Un préréglage tel que l'interface le voit, avec ce qu'on a trouvé.
 #[derive(Debug, Serialize)]
@@ -524,6 +557,7 @@ fn install_detected(paths: &Paths, forced: bool) {
         return;
     }
     SWEPT.store(true, Ordering::SeqCst);
+    refresh_preset_args(paths);
 
     let Ok(config) = load_config(paths) else {
         // Réglages illisibles : surtout ne rien déclarer, l'écriture
@@ -562,6 +596,7 @@ fn install_detected(paths: &Paths, forced: bool) {
                 executable: executable.to_string_lossy().into_owned(),
                 args: known.args.iter().map(|a| (*a).to_owned()).collect(),
                 extensions: known.extensions.iter().map(|e| (*e).to_owned()).collect(),
+            custom_args: false,
             },
         );
         match outcome {
@@ -595,6 +630,7 @@ pub fn adopt_external(
             executable,
             args: known.args.iter().map(|a| (*a).to_owned()).collect(),
             extensions: known.extensions.iter().map(|e| (*e).to_owned()).collect(),
+            custom_args: false,
         },
         paths,
     )
@@ -662,6 +698,93 @@ pub async fn install_core(name: String, paths: State<'_, Paths>) -> Result<u64, 
     outcome
 }
 
+/// Un émulateur autonome proposé, avec son état sur cette machine.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmulatorOffer {
+    #[serde(flatten)]
+    pub offer: crate::emulators::StandaloneOffer,
+    /// Chemin du programme si EvaChi s'en sert déjà, vide sinon.
+    pub declared: String,
+    /// Vrai si c'est EvaChi qui l'a installé, et non une copie trouvée ailleurs.
+    pub owned: bool,
+}
+
+/// Les émulateurs autonomes qu'EvaChi sait installer, et leur état.
+#[tauri::command]
+pub fn installable_emulators(paths: State<'_, Paths>) -> Vec<EmulatorOffer> {
+    let declared = read_config(&paths).external;
+
+    crate::emulators::catalogue()
+        .into_iter()
+        .map(|offer| {
+            let known = declared.iter().find(|system| system.name == offer.system);
+            EmulatorOffer {
+                declared: known.map(|s| s.executable.clone()).unwrap_or_default(),
+                owned: known.is_some_and(|s| Path::new(&s.executable).starts_with(&paths.emulators)),
+                offer,
+            }
+        })
+        .collect()
+}
+
+/// Télécharge un émulateur autonome, l'installe, et le déclare.
+///
+/// L'installation vaut déclaration : un programme qu'EvaChi vient de poser chez
+/// elle n'a pas besoin qu'on lui dise ensuite de s'en servir.
+#[tauri::command]
+pub async fn install_emulator(
+    system: String,
+    paths: State<'_, Paths>,
+) -> Result<Vec<ExternalSystem>, String> {
+    let Some(known) = crate::emulators::STANDALONES
+        .iter()
+        .find(|known| known.system == system)
+    else {
+        return Err(format!("émulateur inconnu : {system}"));
+    };
+    let Some(preset) = KNOWN_EXTERNALS.iter().find(|k| k.system == system) else {
+        return Err(format!("aucun préréglage de lancement pour {system}"));
+    };
+
+    let journal = (*paths).clone();
+    let into = journal.emulators.join(system.replace(' ', "-"));
+
+    let installed = tauri::async_runtime::spawn_blocking(move || {
+        crate::emulators::install(known, &into)
+    })
+    .await
+    .map_err(|error| format!("installation interrompue : {error}"))?;
+
+    match installed {
+        Ok(done) => {
+            write_log(
+                &journal,
+                &format!(
+                    "{} {} installé : {}",
+                    known.label,
+                    done.version,
+                    done.executable.display()
+                ),
+            );
+            declare_external(
+                &journal,
+                ExternalSystem {
+                    name: system,
+                    executable: done.executable.to_string_lossy().into_owned(),
+                    args: preset.args.iter().map(|a| (*a).to_owned()).collect(),
+                    extensions: preset.extensions.iter().map(|e| (*e).to_owned()).collect(),
+                    custom_args: false,
+                },
+            )
+        }
+        Err(error) => {
+            write_log(&journal, &format!("{} : {error}", known.label));
+            Err(error)
+        }
+    }
+}
+
 /// Les émulateurs autonomes déclarés.
 ///
 /// Premier appel du lancement : c'est ici que les émulateurs présents sur la
@@ -680,7 +803,53 @@ pub fn set_external_system(
     system: ExternalSystem,
     paths: State<'_, Paths>,
 ) -> Result<Vec<ExternalSystem>, String> {
-    declare_external(&paths, system)
+    // Saisie à la main : ces arguments-là sont un choix, pas un défaut.
+    declare_external(
+        &paths,
+        ExternalSystem {
+            custom_args: true,
+            ..system
+        },
+    )
+}
+
+/// Remet à jour les arguments qu'EvaChi a elle-même remplis.
+///
+/// Une déclaration survit aux versions ; le préréglage évolue. Sans ce
+/// rattrapage, une console déclarée avant qu'on sache la lancer en plein écran
+/// garderait pour toujours ses anciens arguments — c'est exactement ce qui est
+/// arrivé à la Switch, déclarée sans arguments et restée ainsi.
+fn refresh_preset_args(paths: &Paths) {
+    let Ok(config) = load_config(paths) else {
+        return;
+    };
+
+    let stale = config.external.iter().any(|system| {
+        !system.custom_args
+            && KNOWN_EXTERNALS
+                .iter()
+                .find(|known| known.system == system.name)
+                .is_some_and(|known| known.args != system.args.as_slice())
+    });
+    if !stale {
+        return;
+    }
+
+    let outcome = update_config(paths, |config| {
+        for system in &mut config.external {
+            if system.custom_args {
+                continue;
+            }
+            let Some(known) = KNOWN_EXTERNALS.iter().find(|k| k.system == system.name) else {
+                continue;
+            };
+            system.args = known.args.iter().map(|a| (*a).to_owned()).collect();
+        }
+    });
+    match outcome {
+        Ok(_) => write_log(paths, "arguments de lancement remis à jour"),
+        Err(error) => write_log(paths, &format!("arguments non mis à jour : {error}")),
+    }
 }
 
 /// Enregistre un émulateur autonome. Cœur commun aux deux voies de déclaration.
@@ -797,6 +966,7 @@ pub fn list_cores_to_stdout() -> i32 {
         system: base.join("system"),
         saves: base.join("saves"),
         roms: base.join("roms"),
+            emulators: base.join("emulators"),
         config: base.join("config.json"),
     };
 
@@ -848,6 +1018,7 @@ pub fn install_cores_to_stdout() -> i32 {
         system: base.join("system"),
         saves: base.join("saves"),
         roms: base.join("roms"),
+            emulators: base.join("emulators"),
         config: base.join("config.json"),
     };
 
@@ -897,6 +1068,109 @@ pub fn install_cores_to_stdout() -> i32 {
     println!("{summary}");
     write_log(&paths, &summary);
 
+    i32::from(failures > 0)
+}
+
+/// Décrit les émulateurs autonomes déclarés, une ligne chacun.
+///
+/// Destiné au journal de démarrage : c'est le seul endroit où l'on voit quel
+/// programme sera réellement lancé, et avec quels arguments.
+pub fn declared_externals_summary(paths: &Paths) -> Vec<String> {
+    let declared = read_config(paths).external;
+    if declared.is_empty() {
+        return vec!["aucun émulateur autonome déclaré".to_owned()];
+    }
+
+    declared
+        .iter()
+        .map(|system| {
+            format!(
+                "externe {} → {} [{}]",
+                system.name,
+                system.executable,
+                system.args.join(" ")
+            )
+        })
+        .collect()
+}
+
+/// Installe les émulateurs autonomes manquants, puis ressort.
+///
+/// Le pendant de `--install-cores` pour les consoles sans cœur libretro. Ceux
+/// dont la forge se protège des robots sont nommés, pas contournés.
+pub fn install_emulators_to_stdout() -> i32 {
+    let Some(base) = dirs_app_data() else {
+        eprintln!("dossier de données introuvable");
+        return 1;
+    };
+
+    let paths = Paths {
+        cores: base.join("cores"),
+        system: base.join("system"),
+        saves: base.join("saves"),
+        roms: base.join("roms"),
+        emulators: base.join("emulators"),
+        config: base.join("config.json"),
+    };
+    let _ = fs::create_dir_all(&paths.emulators);
+
+    let declared = read_config(&paths).external;
+    let mut failures = 0;
+
+    for known in crate::emulators::STANDALONES {
+        let already = declared
+            .iter()
+            .find(|system| system.name == known.system)
+            .is_some_and(|system| Path::new(&system.executable).starts_with(&paths.emulators));
+        if already {
+            let line = format!("{} : déjà installé", known.label);
+            println!("{line}");
+            write_log(&paths, &line);
+            continue;
+        }
+        if known.repository.is_empty() {
+            let line = format!("{} : à installer depuis {}", known.label, known.site);
+            println!("{line}");
+            write_log(&paths, &line);
+            continue;
+        }
+
+        let into = paths.emulators.join(known.system.replace(' ', "-"));
+        match crate::emulators::install(known, &into) {
+            Ok(done) => {
+                let line = format!("{} {} — {}", known.label, done.version, done.executable.display());
+                println!("{line}");
+                write_log(&paths, &line);
+
+                if let Some(preset) = KNOWN_EXTERNALS.iter().find(|k| k.system == known.system) {
+                    let outcome = declare_external(
+                        &paths,
+                        ExternalSystem {
+                            name: known.system.to_owned(),
+                            executable: done.executable.to_string_lossy().into_owned(),
+                            args: preset.args.iter().map(|a| (*a).to_owned()).collect(),
+                            extensions: preset.extensions.iter().map(|e| (*e).to_owned()).collect(),
+                    custom_args: false,
+                        },
+                    );
+                    if let Err(error) = outcome {
+                        failures += 1;
+                        write_log(&paths, &format!("{} : {error}", known.label));
+                    }
+                }
+            }
+            Err(error) => {
+                failures += 1;
+                let line = format!("{} — ÉCHEC {error}", known.label);
+                println!("{line}");
+                write_log(&paths, &line);
+            }
+        }
+    }
+
+    let summary = format!("émulateurs autonomes : terminé, {failures} échec(s)");
+    println!("{summary}");
+    write_log(&paths, &summary);
     i32::from(failures > 0)
 }
 
@@ -1561,6 +1835,7 @@ mod config_tests {
             system: base.join("system"),
             saves: base.join("saves"),
             roms: base.join("roms"),
+            emulators: base.join("emulators"),
             config: base.join("config.json"),
         };
         (base, paths)
@@ -1617,6 +1892,7 @@ mod config_tests {
                 executable: "C:/Ryubing/Ryujinx.exe".into(),
                 args: Vec::new(),
                 extensions: vec!["nsp".into()],
+                custom_args: false,
             });
         })
         .expect("première écriture");
@@ -1862,6 +2138,154 @@ mod detect_tests {
         assert!(!is_documentation("Sonic the Hedgehog.md"));
         assert!(!is_documentation("Readme Racing.md"));
         assert!(!is_documentation("notes de version.md"));
+    }
+}
+
+
+/// Mise à jour des arguments de lancement.
+///
+/// Une déclaration vit d'une version à l'autre ; le préréglage, lui, change. La
+/// Switch en a fait les frais : déclarée avant qu'EvaChi sache la lancer en
+/// plein écran, elle serait restée sans arguments pour toujours.
+#[cfg(test)]
+mod preset_args_tests {
+    use super::*;
+
+    fn scratch() -> (PathBuf, Paths) {
+        use std::sync::atomic::{AtomicU32, Ordering};
+        static COUNTER: AtomicU32 = AtomicU32::new(0);
+
+        let base = std::env::temp_dir().join(format!(
+            "evachi-args-{}-{}",
+            std::process::id(),
+            COUNTER.fetch_add(1, Ordering::SeqCst)
+        ));
+        fs::create_dir_all(&base).expect("répertoire temporaire");
+
+        let paths = Paths {
+            cores: base.join("cores"),
+            system: base.join("system"),
+            saves: base.join("saves"),
+            roms: base.join("roms"),
+            emulators: base.join("emulators"),
+            config: base.join("config.json"),
+        };
+        (base, paths)
+    }
+
+    /// Déclare un système avec les arguments donnés, sans passer par le disque.
+    fn declare(paths: &Paths, name: &str, args: &[&str], custom: bool) {
+        update_config(paths, |config| {
+            config.external.push(ExternalSystem {
+                name: name.to_owned(),
+                executable: "C:\\rien.exe".to_owned(),
+                args: args.iter().map(|a| (*a).to_owned()).collect(),
+                extensions: Vec::new(),
+                custom_args: custom,
+            });
+        })
+        .expect("déclaration");
+    }
+
+    fn args_of(paths: &Paths, name: &str) -> Vec<String> {
+        load_config(paths)
+            .expect("relecture")
+            .external
+            .into_iter()
+            .find(|system| system.name == name)
+            .expect("système déclaré")
+            .args
+    }
+
+    fn preset_args(name: &str) -> Vec<String> {
+        KNOWN_EXTERNALS
+            .iter()
+            .find(|known| known.system == name)
+            .expect("préréglage")
+            .args
+            .iter()
+            .map(|a| (*a).to_owned())
+            .collect()
+    }
+
+    #[test]
+    fn une_declaration_sans_arguments_recupere_ceux_du_prereglage() {
+        let (base, paths) = scratch();
+        declare(&paths, "Nintendo Switch", &[], false);
+
+        refresh_preset_args(&paths);
+        let found = args_of(&paths, "Nintendo Switch");
+        let _ = fs::remove_dir_all(&base);
+
+        assert_eq!(found, preset_args("Nintendo Switch"));
+        assert!(
+            found.iter().any(|a| a == "{rom}"),
+            "le jeu doit être passé au programme"
+        );
+    }
+
+    #[test]
+    fn les_arguments_saisis_a_la_main_ne_sont_jamais_remplaces() {
+        let (base, paths) = scratch();
+        declare(&paths, "Wii U", &["--mon-option", "{rom}"], true);
+
+        refresh_preset_args(&paths);
+        let found = args_of(&paths, "Wii U");
+        let _ = fs::remove_dir_all(&base);
+
+        assert_eq!(found, vec!["--mon-option", "{rom}"]);
+    }
+
+    #[test]
+    fn un_systeme_inconnu_du_tableau_est_laisse_tel_quel() {
+        let (base, paths) = scratch();
+        declare(&paths, "Console maison", &["-x"], false);
+
+        refresh_preset_args(&paths);
+        let found = args_of(&paths, "Console maison");
+        let _ = fs::remove_dir_all(&base);
+
+        assert_eq!(found, vec!["-x"]);
+    }
+
+    #[test]
+    fn rien_n_est_reecrit_quand_tout_est_deja_a_jour() {
+        let (base, paths) = scratch();
+        let expected = preset_args("Xbox");
+        declare(
+            &paths,
+            "Xbox",
+            &expected.iter().map(String::as_str).collect::<Vec<_>>(),
+            false,
+        );
+        let stamp = fs::metadata(&paths.config)
+            .and_then(|meta| meta.modified())
+            .expect("date du fichier");
+
+        refresh_preset_args(&paths);
+        let after = fs::metadata(&paths.config)
+            .and_then(|meta| meta.modified())
+            .expect("date du fichier");
+        let _ = fs::remove_dir_all(&base);
+
+        assert_eq!(stamp, after, "un fichier déjà juste ne doit pas être réécrit");
+    }
+
+    #[test]
+    fn chaque_prereglage_passe_le_jeu_au_programme() {
+        // Sans `{rom}`, le chemin est simplement ajouté à la fin — ce qui marche
+        // aussi. Ce qui ne marcherait pas, c'est un préréglage qui oublie l'un
+        // et l'autre : le programme s'ouvrirait sur son propre menu.
+        for known in KNOWN_EXTERNALS {
+            if known.args.is_empty() {
+                continue;
+            }
+            assert!(
+                known.args.contains(&"{rom}"),
+                "{} : des arguments sans le jeu",
+                known.system
+            );
+        }
     }
 }
 

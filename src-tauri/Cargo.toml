@@ -31,6 +31,8 @@ tauri-plugin-dialog = "2"
 # redistribue aucun émulateur : elle va les chercher à leur source, à la demande.
 ureq = "2"
 zip = { version = "2", default-features = false, features = ["deflate"] }
+# PCSX2 et Xenia ne publient qu'en 7z.
+sevenz-rust = "0.6"
 
 # Pas de dépendance vers `test-core` : il est chargé dynamiquement par les tests,
 # et le lier en plus ferait entrer ses symboles `retro_*` dans le binaire de test.
