@@ -151,6 +151,8 @@ let defaultRomsPath = '';
  * canvas le temps qu'une trame en vol se termine.
  */
 let loopToken = 0;
+/** Taille annoncée dans la barre d’état, pour ne la réécrire qu’au besoin. */
+let shownSize = '';
 
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
@@ -288,8 +290,16 @@ function present(frame: Frame): void {
     canvas.height = frame.height;
     frameImage = new ImageData(frame.width, frame.height);
     context!.imageSmoothingEnabled = false;
-    resOut.textContent = `${frame.width}×${frame.height}`;
     fitScreen();
+  }
+
+  // L'étiquette suit sa propre mémoire, et non le redimensionnement du canevas.
+  // Deux jeux de même taille s'enchaînant, le second n'aurait rien réécrit :
+  // la barre restait sur le tiret laissé par le retour à la bibliothèque.
+  const taille = `${frame.width}×${frame.height}`;
+  if (taille !== shownSize) {
+    shownSize = taille;
+    resOut.textContent = taille;
   }
 
   frameImage.data.set(frame.video);
@@ -449,17 +459,36 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
 }
 
 /** Repose le jeu et revient à la bibliothèque. */
-function stopPlaying(): void {
+async function stopPlaying(): Promise<void> {
   loopToken += 1;
   running = false;
   audio.flush();
+
+  // Revenir à la bibliothèque doit tout relâcher. Une première version se
+  // contentait de masquer l'écran : le cœur restait chargé derrière, avec sa
+  // bibliothèque, ses fils d'exécution, son contexte graphique et, pour un jeu
+  // GameCube, quatre-vingt-dix mégaoctets d'état. Rien ne le disait, et rien ne
+  // le rendait avant le jeu suivant.
+  const partant = core;
+  core = null;
+  entry = null;
+
   contentName = '';
+  contentBytes = null;
+  contentPath = null;
   savedState = null;
   nowPlaying.textContent = 'EvaChi';
   fpsOut.textContent = '—';
   resOut.textContent = '—';
+  shownSize = '';
   showLibrary(true);
   refreshMenus();
+
+  try {
+    await partant?.close?.();
+  } catch (error) {
+    log(`déchargement incomplet — ${reason(error)}`, 'err');
+  }
 }
 
 /** Lance un jeu de la bibliothèque avec le cœur choisi pour lui. */

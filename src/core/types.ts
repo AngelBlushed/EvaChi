@@ -111,6 +111,15 @@ export interface AsyncEmulatorCore {
   runFrame(input: InputState): Promise<Frame>;
   saveState(): Promise<Uint8Array>;
   loadState(state: Uint8Array): Promise<void>;
+  /**
+   * Rend ce que le cœur tient hors de la page.
+   *
+   * Optionnel : un cœur écrit ici ne détient que de la mémoire, que le
+   * ramasse-miettes reprendra. Un cœur libretro, lui, garde une bibliothèque
+   * chargée, des fils d'exécution et parfois un contexte graphique — autant de
+   * choses qu'il faut lui demander de relâcher.
+   */
+  close?(): Promise<void>;
 }
 
 /** Présente un cœur synchrone sous la forme asynchrone attendue par l'interface. */
