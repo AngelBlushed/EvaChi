@@ -100,7 +100,10 @@ pub struct Core {
     api: Api,
     /// Doit vivre aussi longtemps que `api`, et donc être déclaré après lui :
     /// Rust détruit les champs dans l'ordre de déclaration.
-    _lib: Library,
+    ///
+    /// En `Option` pour pouvoir choisir, à la destruction, entre rendre la
+    /// bibliothèque au système et la laisser en place. Voir [`Core::drop`].
+    lib: Option<Library>,
     info: CoreInfo,
     content_loaded: bool,
     initialised: bool,
@@ -201,7 +204,7 @@ impl Core {
 
         Ok(Self {
             api,
-            _lib: lib,
+            lib: Some(lib),
             info,
             content_loaded: false,
             initialised: true,
@@ -236,8 +239,89 @@ impl Core {
         }
         self.content_loaded = true;
 
-        Ok(self.av_info())
+        let av = self.av_info();
+        self.start_hw_render(&av);
+        Ok(av)
     }
+
+    /// Met en place le contexte graphique quand le cœur en a réclamé un.
+    ///
+    /// L'ordre importe et n'est pas évident : le cœur demande son contexte
+    /// pendant `retro_set_environment`, bien avant qu'on sache quelle taille
+    /// lui donner. La géométrie n'arrive qu'avec le contenu — c'est donc ici,
+    /// et pas plus tôt, qu'on peut créer le tampon puis prévenir le cœur que
+    /// son contexte existe.
+    ///
+    /// Un échec n'interrompt rien : le cœur tournera sans image plutôt que de
+    /// refuser de démarrer, et le message part dans le journal.
+    #[cfg(windows)]
+    fn start_hw_render(&mut self, av: &AvInfo) {
+        let Some(request) = with_host(|host| host.hw) else {
+            return;
+        };
+
+        // Les cœurs annoncent souvent une taille maximale généreuse ; c'est
+        // elle qu'il faut allouer, la résolution interne pouvant monter en
+        // cours de partie.
+        let width = av.max_width.max(av.width).max(1);
+        let height = av.max_height.max(av.height).max(1);
+
+        // SAFETY : appelé depuis le thread propriétaire du cœur, celui-là même
+        // qui appellera `retro_run`.
+        let context = unsafe {
+            super::gl::GlContext::create(
+                width,
+                height,
+                request.depth,
+                request.stencil,
+                request.core_profile(),
+                request.major,
+                request.minor,
+            )
+        };
+
+        match context {
+            Ok(mut context) => {
+                context.bottom_left_origin = request.bottom_left_origin;
+                with_host(|host| host.gl = Some(context));
+
+                // Le cœur ne construit ses ressources graphiques qu'à cet
+                // appel : sans lui, il dessinerait dans le vide.
+                if let Some(reset) = request.reset {
+                    // SAFETY : le contexte est courant sur ce thread.
+                    unsafe { reset() };
+                }
+            }
+            Err(error) => {
+                with_host(|host| {
+                    host.messages
+                        .push(format!("rendu matériel indisponible : {error}"))
+                });
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    fn start_hw_render(&mut self, _av: &AvInfo) {}
+
+    /// Prévient le cœur que son contexte disparaît, puis le détruit.
+    #[cfg(windows)]
+    fn stop_hw_render(&mut self) {
+        let destroy = with_host(|host| host.hw.and_then(|hw| hw.destroy));
+        let had_context = with_host(|host| host.gl.is_some());
+
+        if had_context {
+            if let Some(destroy) = destroy {
+                // SAFETY : le contexte est encore courant, comme l'exige
+                // l'ABI : le cœur y libère ses textures et ses nuanceurs.
+                unsafe { destroy() };
+            }
+        }
+        with_host(|host| host.gl = None);
+    }
+
+    #[cfg(not(windows))]
+    fn stop_hw_render(&mut self) {}
 
     /// Relit les caractéristiques audiovisuelles, qui ne sont valides qu'une
     /// fois le contenu chargé.
@@ -270,16 +354,32 @@ impl Core {
 
         with_host(|host| {
             host.input = input;
-            host.audio.clear();
             host.video_fresh = false;
+        });
+        // La file audio est partagée entre threads : on la vide ici, et on la
+        // relève après la trame.
+        host::clear_audio();
+
+        // Le cœur dessine dans notre tampon : il faut le lier avant qu'il ne
+        // commence, sinon ses commandes partent vers la fenêtre invisible.
+        #[cfg(windows)]
+        with_host(|host| {
+            if let Some(gl) = host.gl.as_ref() {
+                // SAFETY : même thread que la création du contexte.
+                unsafe {
+                    gl.make_current();
+                    gl.begin_frame();
+                }
+            }
         });
 
         // SAFETY : contenu chargé, rappels posés, même thread qu'au chargement.
         unsafe { (self.api.run)() };
 
+        let audio = host::take_audio();
         Ok(with_host(|host| Frame {
             video: host.video_fresh.then(|| host.video.clone()),
-            audio: std::mem::take(&mut host.audio),
+            audio,
             messages: std::mem::take(&mut host.messages),
             shutdown: host.shutdown,
         }))
@@ -348,6 +448,25 @@ impl Drop for Core {
                 (self.api.deinit)();
                 self.initialised = false;
             }
+        }
+
+        // Le contexte graphique part en dernier, et l'ordre n'est pas
+        // indifférent : un cœur comme Dolphin fait tourner son propre fil
+        // graphique jusqu'au bout de `retro_unload_game`. Le prévenir avant
+        // qu'il ait fini le laissait attendre un contexte déjà démonté, et
+        // l'arrêt d'un jeu ne rendait jamais la main.
+        self.stop_hw_render();
+
+        // Rendre la bibliothèque au système la décharge, et décharger un cœur
+        // qui a laissé des fils en vie fige le processus : Windows attend, la
+        // main ne revient jamais. Dolphin est dans ce cas.
+        //
+        // On la garde donc en mémoire. Ce n'est pas une fuite qui grandit : un
+        // second chargement du même fichier ne fait qu'incrémenter un compteur
+        // côté système, et `retro_init` / `retro_deinit` restent la vraie
+        // frontière entre deux parties.
+        if let Some(lib) = self.lib.take() {
+            std::mem::forget(lib);
         }
     }
 }

@@ -818,6 +818,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "thiserror 2.0.20",
  "ureq",
+ "windows-sys 0.59.0",
  "zip",
 ]
 

@@ -3,12 +3,16 @@
 //!
 //! libretro ne transporte aucun pointeur utilisateur dans ses rappels : le cœur
 //! appelle des fonctions globales. L'état vit donc dans une variable de thread,
-//! ce qui est exact ici puisque tous les rappels sont déclenchés depuis
-//! `retro_run`, sur le thread qui l'appelle.
+//! ce qui convient tant que les rappels partent de `retro_run`.
+//!
+//! L'audio fait exception et vit dans un verrou partagé : certains cœurs — dont
+//! Dolphin — font tourner leur son sur un thread à eux, et leurs échantillons se
+//! perdaient dans une file que personne ne relisait.
 
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString};
+use std::sync::Mutex;
 use std::os::raw::{c_char, c_uint, c_void};
 
 use super::abi::*;
@@ -27,8 +31,6 @@ pub struct HostState {
     pub video: VideoFrame,
     /// Faux quand le cœur a demandé de réafficher la trame précédente.
     pub video_fresh: bool,
-    /// Échantillons stéréo entrelacés accumulés pendant la trame.
-    pub audio: Vec<i16>,
     /// État des boutons du port 0. Les autres ports renvoient zéro.
     pub input: [i16; JOYPAD_BUTTONS],
     pub system_dir: CString,
@@ -44,6 +46,39 @@ pub struct HostState {
     pub options: HashMap<String, CString>,
     /// Vrai tant que le cœur n'a pas relu les options modifiées.
     pub options_dirty: bool,
+    /// Le contexte graphique réclamé par le cœur, s'il dessine en 3D.
+    ///
+    /// Renseigné pendant `retro_set_environment`, donc bien avant que le
+    /// contenu soit chargé : c'est la seule occasion qu'a le cœur de le
+    /// demander, et la taille du tampon n'est connue qu'après.
+    pub hw: Option<HwRequest>,
+    /// Le contexte OpenGL, créé une fois la géométrie connue.
+    #[cfg(windows)]
+    pub gl: Option<super::gl::GlContext>,
+}
+
+/// Ce qu'un cœur réclame comme contexte graphique.
+///
+/// Recopié de la structure que le cœur nous tend : celle-ci ne vit que le temps
+/// de l'appel, et il faudra la relire longtemps après.
+#[derive(Debug, Clone, Copy)]
+pub struct HwRequest {
+    pub context_type: c_uint,
+    pub reset: Option<unsafe extern "C" fn()>,
+    pub destroy: Option<unsafe extern "C" fn()>,
+    pub depth: bool,
+    pub stencil: bool,
+    pub bottom_left_origin: bool,
+    pub major: u32,
+    pub minor: u32,
+}
+
+impl HwRequest {
+    /// Vrai si le cœur veut le profil moderne d'OpenGL, sans les fonctions
+    /// héritées.
+    pub fn core_profile(&self) -> bool {
+        self.context_type == HW_CONTEXT_OPENGL_CORE
+    }
 }
 
 impl Default for HostState {
@@ -52,7 +87,6 @@ impl Default for HostState {
             pixel_format: PixelFormat::default(),
             video: VideoFrame::default(),
             video_fresh: false,
-            audio: Vec::new(),
             input: [0; JOYPAD_BUTTONS],
             system_dir: CString::default(),
             save_dir: CString::default(),
@@ -61,6 +95,9 @@ impl Default for HostState {
             messages: Vec::new(),
             options: HashMap::new(),
             options_dirty: false,
+            hw: None,
+            #[cfg(windows)]
+            gl: None,
         }
     }
 }
@@ -169,6 +206,28 @@ pub unsafe extern "C" fn video_refresh(
             return;
         }
 
+        // Trame dessinée par le processeur graphique : il n'y a pas de tableau
+        // de pixels à convertir, mais un tampon de rendu à relire.
+        if data as usize == usize::MAX {
+            #[cfg(windows)]
+            {
+                let mut rgba = std::mem::take(&mut host.video.rgba);
+                match host.gl.as_ref() {
+                    // SAFETY : le contexte est courant, `retro_run` s'exécutant
+                    // sur le thread qui l'a créé.
+                    Some(gl) => unsafe { gl.read_frame(width, height, &mut rgba) },
+                    None => rgba.clear(),
+                }
+                host.video = VideoFrame { rgba, width, height };
+                host.video_fresh = !host.video.rgba.is_empty();
+            }
+            #[cfg(not(windows))]
+            {
+                host.video_fresh = false;
+            }
+            return;
+        }
+
         let format = host.pixel_format;
         let mut rgba = std::mem::take(&mut host.video.rgba);
         convert(data, width, height, pitch, format, &mut rgba);
@@ -178,10 +237,79 @@ pub unsafe extern "C" fn video_refresh(
     });
 }
 
+/// Rend au cœur l'identifiant du tampon où il doit dessiner.
+///
+/// Appelé à chaque trame, parfois plusieurs fois : le cœur ne suppose jamais
+/// que le tampon reste le même, ce qui nous laisse libres de le réallouer.
+///
 /// # Safety
-/// Appelé par le cœur pendant `retro_run`.
+/// Appelé par le cœur, sur le thread qui pilote la session.
+unsafe extern "C" fn current_framebuffer() -> usize {
+    #[cfg(windows)]
+    {
+        with_host(|host| host.gl.as_ref().map_or(0, |gl| gl.framebuffer()))
+    }
+    #[cfg(not(windows))]
+    {
+        0
+    }
+}
+
+/// Résout un symbole OpenGL pour le cœur.
+///
+/// # Safety
+/// `name` doit être une chaîne terminée par zéro.
+unsafe extern "C" fn gl_proc_address(name: *const c_char) -> *const c_void {
+    if name.is_null() {
+        return std::ptr::null();
+    }
+    #[cfg(windows)]
+    {
+        let symbol = CStr::from_ptr(name).to_string_lossy();
+        super::gl::proc_address(&symbol)
+    }
+    #[cfg(not(windows))]
+    {
+        std::ptr::null()
+    }
+}
+
+/// Les échantillons remis par le cœur, quel que soit le thread appelant.
+///
+/// Tout le reste de l'état hôte vit dans une variable de thread, ce qui est
+/// juste tant que le cœur rappelle depuis `retro_run`. L'audio fait exception :
+/// Dolphin, et les cœurs qui font tourner leur son à part, appellent depuis un
+/// thread à eux. Leurs échantillons atterrissaient alors dans une file que
+/// personne ne relisait — l'image tournait, le son manquait, et rien ne le
+/// disait.
+///
+/// Un verrou par lot coûte quelques dizaines de nanosecondes ; à la fréquence
+/// où ces rappels arrivent, cela ne se mesure pas.
+static AUDIO: Mutex<Vec<i16>> = Mutex::new(Vec::new());
+
+/// Applique une closure à la file audio, en survivant à un verrou empoisonné.
+///
+/// Un cœur qui panique en tenant le verrou ne doit pas rendre le son
+/// définitivement muet : les données restent lisibles, on continue.
+fn with_audio<R>(f: impl FnOnce(&mut Vec<i16>) -> R) -> R {
+    let mut guard = AUDIO.lock().unwrap_or_else(|poison| poison.into_inner());
+    f(&mut guard)
+}
+
+/// Vide la file audio et rend ce qu'elle contenait.
+pub fn take_audio() -> Vec<i16> {
+    with_audio(std::mem::take)
+}
+
+/// Jette ce qui reste, avant une nouvelle trame ou un nouveau contenu.
+pub fn clear_audio() {
+    with_audio(Vec::clear);
+}
+
+/// # Safety
+/// Appelé par le cœur, éventuellement depuis un thread à lui.
 pub unsafe extern "C" fn audio_sample(left: i16, right: i16) {
-    with_host(|host| host.audio.extend_from_slice(&[left, right]));
+    with_audio(|audio| audio.extend_from_slice(&[left, right]));
 }
 
 /// # Safety
@@ -191,7 +319,7 @@ pub unsafe extern "C" fn audio_sample_batch(data: *const i16, frames: usize) -> 
         return frames;
     }
     let samples = std::slice::from_raw_parts(data, frames * 2);
-    with_host(|host| host.audio.extend_from_slice(samples));
+    with_audio(|audio| audio.extend_from_slice(samples));
     frames
 }
 
@@ -393,6 +521,55 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 
         ENV_SHUTDOWN => {
             with_host(|host| host.shutdown = true);
+            true
+        }
+
+        ENV_SET_HW_RENDER => {
+            if data.is_null() {
+                return false;
+            }
+            let request = data.cast::<HwRenderCallback>();
+
+            // Seul OpenGL de bureau est servi. Refuser proprement les autres
+            // laisse le cœur essayer autre chose : Dolphin descend ainsi de
+            // OpenGL Core à OpenGL 3.0, et Mupen64Plus de Vulkan à OpenGL.
+            let kind = (*request).context_type;
+            if kind != HW_CONTEXT_OPENGL && kind != HW_CONTEXT_OPENGL_CORE {
+                return false;
+            }
+            if !cfg!(windows) {
+                return false;
+            }
+
+            with_host(|host| {
+                host.hw = Some(HwRequest {
+                    context_type: kind,
+                    reset: (*request).context_reset,
+                    destroy: (*request).context_destroy,
+                    depth: (*request).depth,
+                    stencil: (*request).stencil,
+                    bottom_left_origin: (*request).bottom_left_origin,
+                    major: (*request).version_major,
+                    minor: (*request).version_minor,
+                });
+            });
+
+            // La moitié de l'échange va dans l'autre sens : c'est l'hôte qui
+            // remplit ces deux fonctions, et le cœur s'en servira à chaque
+            // trame.
+            (*request).get_current_framebuffer = Some(current_framebuffer);
+            (*request).get_proc_address = Some(gl_proc_address);
+            true
+        }
+
+        ENV_GET_PREFERRED_HW_RENDER => {
+            if data.is_null() {
+                return false;
+            }
+            // Les cœurs qui savent faire les deux — Mupen64Plus-Next par
+            // exemple — demandent ici quoi choisir. Vulkan n'étant pas servi,
+            // autant le dire avant qu'ils ne s'y engagent.
+            data.cast::<c_uint>().write(HW_CONTEXT_OPENGL);
             true
         }
 

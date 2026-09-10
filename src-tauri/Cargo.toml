@@ -34,6 +34,17 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 # PCSX2 et Xenia ne publient qu'en 7z.
 sevenz-rust = "0.6"
 
+# Contexte OpenGL pour les coeurs 3D. WGL directement plutot qu une couche
+# de fenetrage : la fenetre est cachee et ne sert qu a porter le contexte.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_Graphics_OpenGL",
+    "Win32_System_LibraryLoader",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
 # Pas de dépendance vers `test-core` : il est chargé dynamiquement par les tests,
 # et le lier en plus ferait entrer ses symboles `retro_*` dans le binaire de test.
 

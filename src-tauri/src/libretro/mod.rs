@@ -7,6 +7,10 @@
 
 pub mod abi;
 pub mod core;
+/// Contexte OpenGL pour les cœurs 3D. Windows seulement : c'est WGL qui le
+/// porte, et la seule plateforme que l'application vise aujourd'hui.
+#[cfg(windows)]
+pub mod gl;
 pub mod host;
 pub mod session;
 

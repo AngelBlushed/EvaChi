@@ -33,6 +33,7 @@ pub const ENV_SET_PERFORMANCE_LEVEL: c_uint = 8;
 pub const ENV_GET_SYSTEM_DIRECTORY: c_uint = 9;
 pub const ENV_SET_PIXEL_FORMAT: c_uint = 10;
 pub const ENV_SET_INPUT_DESCRIPTORS: c_uint = 11;
+pub const ENV_SET_HW_RENDER: c_uint = 14;
 pub const ENV_GET_VARIABLE: c_uint = 15;
 pub const ENV_SET_VARIABLES: c_uint = 16;
 pub const ENV_GET_VARIABLE_UPDATE: c_uint = 17;
@@ -46,9 +47,59 @@ pub const ENV_GET_INPUT_BITMASKS: c_uint = 51 | ENV_EXPERIMENTAL;
 pub const ENV_GET_CORE_OPTIONS_VERSION: c_uint = 52;
 pub const ENV_SET_CORE_OPTIONS_V2: c_uint = 67;
 pub const ENV_SET_CORE_OPTIONS_V2_INTL: c_uint = 68;
+pub const ENV_GET_PREFERRED_HW_RENDER: c_uint = 69;
 
 /// Marqueur des commandes encore expérimentales côté libretro.
 pub const ENV_EXPERIMENTAL: c_uint = 0x10000;
+
+// --- Rendu par le processeur graphique --------------------------------------
+
+/// Genre de contexte graphique qu'un cœur peut réclamer.
+///
+/// EvaChi n'en sert que les variantes OpenGL de bureau : ce sont celles que les
+/// cœurs 3D demandent en premier, et Windows les fournit sans couche
+/// intermédiaire.
+pub const HW_CONTEXT_NONE: c_uint = 0;
+pub const HW_CONTEXT_OPENGL: c_uint = 1;
+pub const HW_CONTEXT_OPENGLES2: c_uint = 2;
+pub const HW_CONTEXT_OPENGL_CORE: c_uint = 3;
+pub const HW_CONTEXT_OPENGLES3: c_uint = 4;
+pub const HW_CONTEXT_OPENGLES_VERSION: c_uint = 5;
+pub const HW_CONTEXT_VULKAN: c_uint = 6;
+
+/// Valeur que le cœur passe à `video_refresh` quand la trame est déjà dans le
+/// tampon de rendu, et non dans un tableau de pixels.
+///
+/// libretro la définit comme `(void*)-1` : une adresse impossible, choisie pour
+/// ne jamais être confondue avec un vrai tampon.
+pub const HW_FRAME_BUFFER_VALID: *const c_void = usize::MAX as *const c_void;
+
+/// Ce que le cœur demande et ce que l'hôte lui rend, pour le rendu matériel.
+///
+/// L'ordre des champs est celui de `libretro.h` et ne souffre aucune liberté :
+/// le cœur écrit dans cette structure et relit ce qu'on y a mis.
+#[repr(C)]
+pub struct HwRenderCallback {
+    /// Genre de contexte réclamé, parmi les `HW_CONTEXT_*`.
+    pub context_type: c_uint,
+    /// À appeler une fois le contexte prêt, et après chaque recréation.
+    pub context_reset: Option<unsafe extern "C" fn()>,
+    /// Rempli par l'hôte : rend l'identifiant du tampon de rendu courant.
+    pub get_current_framebuffer: Option<unsafe extern "C" fn() -> usize>,
+    /// Rempli par l'hôte : résout un symbole OpenGL par son nom.
+    pub get_proc_address: Option<unsafe extern "C" fn(*const c_char) -> *const c_void>,
+    pub depth: bool,
+    pub stencil: bool,
+    /// Vrai si le cœur dessine à la manière d'OpenGL, origine en bas à gauche.
+    pub bottom_left_origin: bool,
+    pub version_major: c_uint,
+    pub version_minor: c_uint,
+    /// Le cœur souhaite que le contexte survive à une réinitialisation.
+    pub cache_context: bool,
+    /// À appeler avant de détruire le contexte.
+    pub context_destroy: Option<unsafe extern "C" fn()>,
+    pub debug_context: bool,
+}
 
 // --- Format des pixels ------------------------------------------------------
 
