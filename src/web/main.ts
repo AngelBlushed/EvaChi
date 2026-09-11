@@ -8,6 +8,7 @@ import type {
   ExternalSystem,
   InstallableCore,
   RomEntry,
+  SystemFile,
 } from '../libretro/client.ts';
 import {
   addLibraryFolder,
@@ -15,6 +16,8 @@ import {
   installEmulator,
   installableCores,
   installableEmulators,
+  systemFiles,
+  revealSystemDir,
   directories,
   libraryFolders,
   listRoms,
@@ -88,6 +91,9 @@ const presetList = $<HTMLUListElement>('preset-list');
 const installOffer = $<HTMLButtonElement>('placeholder-install');
 const installList = $<HTMLUListElement>('install-list');
 const emulatorList = $<HTMLUListElement>('emulator-list');
+const biosList = $<HTMLUListElement>('bios-list');
+const biosSummary = $<HTMLElement>('bios-summary');
+const biosFolder = $<HTMLButtonElement>('bios-folder');
 const installProgress = $<HTMLElement>('install-progress');
 const installButton = $<HTMLButtonElement>('install-selected');
 const extName = $<HTMLInputElement>('ext-name');
@@ -933,6 +939,64 @@ async function fetchEmulator(offer: EmulatorOffer, button: HTMLButtonElement): P
   }
 }
 
+let systemeFichiers: SystemFile[] = [];
+
+/**
+ * Dessine les fichiers système attendus, les plus pressants en tête.
+ *
+ * L'ordre porte le message : ce qui bloque une console installée passe avant
+ * ce qui l'améliore, et ce qui concerne un cœur absent ferme la marche. Sans ce
+ * classement, la ligne qui explique un écran noir se perdrait au milieu de
+ * vingt autres.
+ */
+function renderBios(): void {
+  biosList.replaceChildren();
+
+  const rang = (fichier: SystemFile): number => {
+    if (fichier.present) return 3;
+    if (!fichier.coreInstalled) return 2;
+    return fichier.need === 'required' ? 0 : 1;
+  };
+
+  const triés = [...systemeFichiers].sort(
+    (a, b) => rang(a) - rang(b) || a.system.localeCompare(b.system, 'fr'),
+  );
+
+  for (const fichier of triés) {
+    const item = document.createElement('li');
+
+    const nom = document.createElement('span');
+    nom.className = 'system';
+    nom.textContent = `${fichier.system} — ${fichier.file}`;
+
+    const état = document.createElement('span');
+    état.className = 'state';
+    état.title = fichier.path;
+
+    if (fichier.present) {
+      état.classList.add('ready');
+      état.textContent = `en place · ${fichier.note}`;
+    } else if (!fichier.coreInstalled) {
+      état.textContent = `cœur non installé · ${fichier.note}`;
+    } else if (fichier.need === 'required') {
+      état.classList.add('manque');
+      état.textContent = `MANQUANT · ${fichier.note}`;
+    } else {
+      état.textContent = `absent, facultatif · ${fichier.note}`;
+    }
+
+    item.append(nom, état);
+    biosList.append(item);
+  }
+
+  const bloquants = systemeFichiers.filter(
+    (f) => !f.present && f.coreInstalled && f.need === 'required',
+  ).length;
+  biosSummary.textContent = bloquants
+    ? `${plural(bloquants, 'fichier')} manque${bloquants > 1 ? 'nt' : ''} à des consoles installées`
+    : 'rien ne bloque';
+}
+
 /** Recharge l'état des cœurs et des émulateurs proposés. */
 async function refreshInstall(): Promise<void> {
   if (!inShell) return;
@@ -948,7 +1012,21 @@ async function refreshInstall(): Promise<void> {
   } catch (error) {
     log(`liste des émulateurs indisponible — ${reason(error)}`, 'err');
   }
+  try {
+    systemeFichiers = await systemFiles();
+    renderBios();
+  } catch (error) {
+    log(`fichiers système illisibles — ${reason(error)}`, 'err');
+  }
 }
+
+biosFolder.addEventListener('click', async () => {
+  try {
+    log(`dossier ouvert : ${await revealSystemDir()}`);
+  } catch (error) {
+    log(`ouverture impossible — ${reason(error)}`, 'err');
+  }
+});
 
 /**
  * Installe les cœurs cochés, un par un.

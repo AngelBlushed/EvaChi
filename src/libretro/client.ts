@@ -159,6 +159,37 @@ export async function installCore(name: string): Promise<number> {
 }
 
 /**
+ * Un fichier système qu'un cœur réclame.
+ *
+ * EvaChi n'en fournit aucun : ce sont les micrologiciels des machines
+ * d'origine. Elle dit lesquels manquent, sous quel nom, et à quel endroit —
+ * faute de quoi un cœur privé du sien se contente d'un écran noir.
+ */
+export interface SystemFile {
+  readonly system: string;
+  /** Chemin attendu sous le dossier système, séparateurs en avant. */
+  readonly file: string;
+  readonly need: 'required' | 'optional';
+  /** Ce que change sa présence, en une phrase. */
+  readonly note: string;
+  readonly present: boolean;
+  /** Faux quand le cœur concerné n'est pas installé : la ligne ne presse pas. */
+  readonly coreInstalled: boolean;
+  /** Chemin complet où le déposer. */
+  readonly path: string;
+}
+
+/** Fait le tour des fichiers système attendus, et dit lesquels manquent. */
+export async function systemFiles(): Promise<SystemFile[]> {
+  return invoke<SystemFile[]>('system_files');
+}
+
+/** Ouvre le dossier des fichiers système dans l'explorateur. */
+export async function revealSystemDir(): Promise<string> {
+  return invoke<string>('reveal_system_dir');
+}
+
+/**
  * Un émulateur autonome qu'EvaChi sait installer.
  *
  * `downloadable` est faux pour ceux dont la forge se protège des robots : ils

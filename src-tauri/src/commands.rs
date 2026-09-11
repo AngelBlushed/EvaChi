@@ -704,6 +704,48 @@ pub async fn install_core(name: String, paths: State<'_, Paths>) -> Result<u64, 
     outcome
 }
 
+/// Les fichiers système attendus par les cœurs, et lesquels manquent.
+///
+/// L'absence d'un micrologiciel ne se voit nulle part ailleurs : le cœur
+/// démarre, produit du son, et n'affiche rien. Cette liste est le seul endroit
+/// qui le dise.
+#[tauri::command]
+pub fn system_files(paths: State<'_, Paths>) -> Vec<crate::bios::SystemFile> {
+    let installed: Vec<String> = scan_cores(&paths.cores)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|path| path.file_stem().and_then(|s| s.to_str()).map(str::to_owned))
+        .collect();
+
+    crate::bios::survey(&paths.system, &installed)
+}
+
+/// Ouvre le dossier des fichiers système dans l'explorateur.
+///
+/// Dire où déposer un fichier ne suffit pas : encore faut-il y arriver. Le
+/// chemin passe par `%APPDATA%`, que personne ne tape à la main.
+#[tauri::command]
+pub fn reveal_system_dir(paths: State<'_, Paths>) -> Result<String, String> {
+    let target = &paths.system;
+    fs::create_dir_all(target).map_err(|error| format!("{} : {error}", target.display()))?;
+
+    #[cfg(windows)]
+    let opener = "explorer";
+    #[cfg(target_os = "macos")]
+    let opener = "open";
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let opener = "xdg-open";
+
+    // L'explorateur Windows rend 1 même quand il a bien ouvert la fenêtre :
+    // on ne juge donc pas du code de sortie, seulement du lancement.
+    std::process::Command::new(opener)
+        .arg(target)
+        .spawn()
+        .map_err(|error| format!("ouverture impossible : {error}"))?;
+
+    Ok(target.to_string_lossy().into_owned())
+}
+
 /// Un émulateur autonome proposé, avec son état sur cette machine.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]

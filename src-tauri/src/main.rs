@@ -13,6 +13,7 @@
 // Empêche l'ouverture d'une console derrière la fenêtre sur Windows, hors debug.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bios;
 mod commands;
 mod emulators;
 mod install;
@@ -121,6 +122,8 @@ fn main() {
             commands::adopt_external,
             commands::installable_cores,
             commands::install_core,
+            commands::system_files,
+            commands::reveal_system_dir,
             commands::installable_emulators,
             commands::install_emulator,
             commands::note,

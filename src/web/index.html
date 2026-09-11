@@ -355,6 +355,20 @@
         cursor: pointer;
       }
       #install-list .state { grid-column: 2; grid-row: 1; text-align: right; }
+      /* Un bouton qui se lit comme un lien : l'action est secondaire, la phrase
+         qui la porte compte plus que le bouton lui-même. */
+      button.lien {
+        background: none;
+        border: 0;
+        padding: 0;
+        font: inherit;
+        color: var(--accent);
+        text-decoration: underline;
+        cursor: pointer;
+      }
+      /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
+         cette fenêtre : tout le reste peut attendre. */
+      .preset-list .state.manque { color: #e58b8b; }
       .dialog-body h3.section {
         margin: 18px 0 8px;
         font-size: 12px;
@@ -362,6 +376,14 @@
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--accent);
+      }
+      /* Le décompte accompagne le titre sans en prendre le ton. */
+      .dialog-body h3.section > span {
+        margin-left: 10px;
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--muted);
       }
       .preset-list .state {
         grid-column: 1;
@@ -568,6 +590,19 @@
           fichiers système restent à votre charge.
         </p>
         <ul class="preset-list" id="emulator-list"></ul>
+
+        <h3 class="section">
+          Fichiers système à installer soi-même
+          <span id="bios-summary"></span>
+        </h3>
+        <p class="hint-text">
+          Certaines consoles ne démarrent pas sans leur micrologiciel d'origine.
+          EvaChi ne peut pas le fournir : c'est du code sous copyright, qui se
+          copie depuis la machine qu'on possède. Elle dit en revanche lequel
+          manque, sous quel nom, et où le déposer.
+          <button type="button" id="bios-folder" class="lien">Ouvrir le dossier</button>
+        </p>
+        <ul class="preset-list" id="bios-list"></ul>
       </div>
       <div class="dialog-foot">
         <span class="hint-text" id="install-progress"></span>
