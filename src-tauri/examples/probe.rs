@@ -76,8 +76,9 @@ fn main() {
     let bytes = match std::fs::read(&content) {
         Ok(bytes) => bytes,
         Err(error) => {
+            // Même raison : le cœur est déjà chargé à ce stade.
             eprintln!("{} : {error}", content.display());
-            std::process::exit(1);
+            return;
         }
     };
 
@@ -86,7 +87,11 @@ fn main() {
         Err(error) => {
             eprintln!("contenu refusé : {error}");
             report_messages(&session);
-            std::process::exit(1);
+            // Sortie ordinaire, et non `process::exit` : le cœur est chargé, et
+            // le quitter sans le décharger laisse un processus que le système
+            // ne récupère plus. Les cœurs graphiques y sont particulièrement
+            // sujets — Citra et Flycast s'y bloquaient tous les deux.
+            return;
         }
     };
 

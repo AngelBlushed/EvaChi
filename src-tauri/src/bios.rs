@@ -150,9 +150,11 @@ const EXPECTED: &[Expected] = &[
     Expected {
         system: "MSX · ColecoVision",
         core: "bluemsx_libretro",
-        file: "bluemsx/Machines",
+        // Éprouvé : à la racine du dossier système, et non sous `bluemsx/`.
+        // Rangé ailleurs, le cœur refuse le contenu sans un mot d'explication.
+        file: "Machines",
         need: Need::Required,
-        note: "dossier des machines, copié depuis la distribution blueMSX",
+        note: "dossier des machines de la distribution blueMSX, avec Databases à côté",
     },
     Expected {
         system: "Dreamcast",
@@ -187,7 +189,10 @@ const EXPECTED: &[Expected] = &[
         core: "melonds_libretro",
         file: "firmware.bin",
         need: Need::Optional,
-        note: "nécessaire pour démarrer sur le menu de la console",
+        // melonDS y écrit les réglages de la console à chaque partie, et garde
+        // l'original sous `firmware.bin.bak`. Le dépôt d'origine n'est donc plus
+        // celui du fichier au bout d'une session : c'est voulu, pas une avarie.
+        note: "modifié par melonDS, qui préserve l'original en .bak",
     },
     Expected {
         system: "Game Boy Advance",
