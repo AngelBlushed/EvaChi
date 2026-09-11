@@ -205,6 +205,22 @@ const EXPECTED: &[Expected] = &[
         need: Need::Optional,
         note: "indispensable aux jeux Mega-CD, inutile aux cartouches",
     },
+    // Les trois régions coexistent : un jeu japonais refuse le micrologiciel
+    // européen. Qui n'a que des jeux d'une région n'a besoin que du sien.
+    Expected {
+        system: "Mega-CD · Sega CD",
+        core: "genesis_plus_gx_libretro",
+        file: "bios_CD_U.bin",
+        need: Need::Optional,
+        note: "variante américaine, pour les jeux Sega CD des États-Unis",
+    },
+    Expected {
+        system: "Mega-CD · Sega CD",
+        core: "genesis_plus_gx_libretro",
+        file: "bios_CD_J.bin",
+        need: Need::Optional,
+        note: "variante japonaise, pour les jeux Mega-CD japonais",
+    },
     Expected {
         system: "PC Engine · TurboGrafx",
         core: "mednafen_pce_fast_libretro",
@@ -218,6 +234,13 @@ const EXPECTED: &[Expected] = &[
         file: "kick34005.A500",
         need: Need::Optional,
         note: "Kickstart 1.3 ; PUAE se rabat sinon sur AROS, libre mais moins compatible",
+    },
+    Expected {
+        system: "Amiga",
+        core: "puae_libretro",
+        file: "kick40068.A1200",
+        need: Need::Optional,
+        note: "Kickstart 3.1 ; nécessaire aux jeux AGA, que l'A500 ne sait pas faire tourner",
     },
     Expected {
         system: "Nintendo 3DS",

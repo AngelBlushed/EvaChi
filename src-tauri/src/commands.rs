@@ -790,6 +790,7 @@ fn system_targets(paths: &Paths) -> crate::adopt::Targets {
             }
         }),
         xbox_home: external_home(&declared, "Xbox"),
+        ps2_bios: external_home(&declared, "PlayStation 2").map(|home| home.join("bios")),
         threeds_sysdata: external_home(&declared, "Nintendo 3DS").and_then(|home| {
             let portable = home.join("user");
             match portable.is_dir() {
@@ -1329,6 +1330,7 @@ pub fn adopt_to_stdout(source: &Path) -> i32 {
         ("wii u", &targets.wiiu_home),
         ("xbox", &targets.xbox_home),
         ("3ds", &targets.threeds_sysdata),
+        ("ps2", &targets.ps2_bios),
     ] {
         match dossier {
             Some(dossier) => println!("{nom:9} {}", dossier.display()),

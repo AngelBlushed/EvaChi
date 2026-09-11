@@ -52,6 +52,8 @@ pub struct Targets {
     pub xbox_home: Option<PathBuf>,
     /// Dossier `sysdata` d'Azahar.
     pub threeds_sysdata: Option<PathBuf>,
+    /// Dossier `bios` de PCSX2.
+    pub ps2_bios: Option<PathBuf>,
 }
 
 /// Où va un fichier reconnu.
@@ -59,6 +61,18 @@ struct Landing {
     system: String,
     /// Emplacements à remplir ; le premier est celui qu'on affiche.
     paths: Vec<PathBuf>,
+}
+
+/// Ce qu'on a compris d'un fichier.
+enum Recognised {
+    /// On sait où il va.
+    Goes(Landing),
+    /// On sait à qui il appartient, mais cet émulateur n'est pas installé.
+    ///
+    /// Le distinguer du fichier inconnu n'est pas un détail : l'un se répare en
+    /// installant l'émulateur, l'autre veut dire qu'on tient un fichier
+    /// qu'EvaChi ne connaît pas. Les confondre, c'est laisser chercher.
+    Homeless(&'static str),
 }
 
 /// Les fichiers propres aux émulateurs autonomes, reconnus à leur nom.
@@ -78,6 +92,45 @@ const STANDALONE: &[(&str, &str)] = &[
 /// Ce fichier ne porte pas de nom convenu — les uns l'appellent `flash.bin`,
 /// les autres du nom de leur version. Sa taille, elle, ne varie pas.
 const XBOX_FLASH: u64 = 1024 * 1024;
+
+/// Taille exacte d'un micrologiciel de PlayStation 2.
+///
+/// Les noms varient autant que les dumps — `ps2-0200a-20040614.bin`,
+/// `SCPH-70012_BIOS_V12_USA_200.BIN`. Quatre mégaoctets pile, en revanche,
+/// c'est toujours ça, et un BIOS de PlayStation première du nom n'en fait que
+/// cinq cent douze kilos : la taille les départage sans se tromper.
+const PS2_BIOS: u64 = 4 * 1024 * 1024;
+
+/// Fichiers qui accompagnent un micrologiciel de PlayStation 2.
+///
+/// PCSX2 les cherche à côté de lui, sous le même nom de base. Ils n'ont pas de
+/// taille fixe, mais ils héritent du nom du micrologiciel.
+const PS2_COMPANIONS: &[&str] = &["erom", "rom1", "rom2", "nvm", "mec"];
+
+/// Vrai si le nom est celui d'une puce du micrologiciel Neo Geo.
+///
+/// Ces fichiers ne se rangent nulle part : ils vivent *dans* `neogeo.zip`, aux
+/// côtés des autres. Posés à part, ils ne servent à rien — et le dire vaut
+/// mieux que prétendre ne pas les connaître.
+fn is_neogeo_chip(lower: &str) -> bool {
+    const CHIPS: &[&str] = &[
+        "000-lo.lo",
+        "asia-s3.rom",
+        "neo-epo.bin",
+        "neo-geo.rom",
+        "neo-po.bin",
+        "neodebug.rom",
+        "sfix.sfix",
+        "sfix.sfx",
+        "sm1.sm1",
+        "usa_2slt.bin",
+        "vs-bios.rom",
+    ];
+    CHIPS.contains(&lower)
+        || ["sp-", "sp1", "ng-", "uni-bios."]
+            .iter()
+            .any(|prefix| lower.starts_with(prefix))
+}
 
 /// Vrai si le nom ressemble à un ensemble arcade.
 ///
@@ -136,8 +189,19 @@ fn named_in_table(name: &str) -> bool {
 }
 
 /// Décide où va un fichier, d'après son nom et, faute de nom parlant, sa taille.
-fn landing(name: &str, size: Option<u64>, targets: &Targets) -> Option<Landing> {
+fn landing(name: &str, size: Option<u64>, targets: &Targets) -> Option<Recognised> {
     let lower = name.to_lowercase();
+
+    /// Chez l'émulateur s'il est là, sinon on dit à qui ce fichier appartient.
+    fn chez(home: Option<&PathBuf>, system: &'static str, file: &str) -> Option<Recognised> {
+        Some(match home {
+            Some(dir) => Recognised::Goes(Landing {
+                system: system.to_owned(),
+                paths: vec![dir.join(file)],
+            }),
+            None => Recognised::Homeless(system),
+        })
+    }
 
     // Les micrologiciels annoncés par le tableau des fichiers système.
     for (basename, relative, system) in crate::bios::destinations() {
@@ -152,10 +216,10 @@ fn landing(name: &str, size: Option<u64>, targets: &Targets) -> Option<Landing> 
         if lower == "aes_keys.txt" {
             paths.extend(targets.threeds_sysdata.iter().map(|dir| dir.join(&lower)));
         }
-        return Some(Landing {
+        return Some(Recognised::Goes(Landing {
             system: system.to_owned(),
             paths,
-        });
+        }));
     }
 
     // Les fichiers des émulateurs autonomes, chacun chez lui.
@@ -169,35 +233,36 @@ fn landing(name: &str, size: Option<u64>, targets: &Targets) -> Option<Landing> 
             "Nintendo 3DS" => targets.threeds_sysdata.as_ref(),
             _ => targets.xbox_home.as_ref(),
         };
-        return home.map(|dir| Landing {
-            system: (*system).to_owned(),
-            paths: vec![dir.join(basename)],
-        });
+        return chez(home, system, basename);
     }
 
     // Le disque dur virtuel de la Xbox, dont le nom varie.
     if lower.ends_with(".qcow2") {
-        return targets.xbox_home.as_ref().map(|dir| Landing {
-            system: "Xbox".to_owned(),
-            paths: vec![dir.join(name)],
-        });
+        return chez(targets.xbox_home.as_ref(), "Xbox", name);
     }
 
     // Sa mémoire flash, reconnue à sa taille faute de nom convenu.
     if lower.ends_with(".bin") && size == Some(XBOX_FLASH) {
-        return targets.xbox_home.as_ref().map(|dir| Landing {
-            system: "Xbox".to_owned(),
-            paths: vec![dir.join(name)],
-        });
+        return chez(targets.xbox_home.as_ref(), "Xbox", name);
+    }
+
+    // Le micrologiciel de la PlayStation 2, reconnu au nom qu'on lui donne
+    // toujours et à sa taille, qui ne bouge pas non plus.
+    let ps2_named = lower.starts_with("ps2") || lower.starts_with("scph");
+    let ps2_companion = lower
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| PS2_COMPANIONS.contains(&extension));
+    if ps2_named && (ps2_companion || (lower.ends_with(".bin") && size == Some(PS2_BIOS))) {
+        return chez(targets.ps2_bios.as_ref(), "PlayStation 2", name);
     }
 
     // Un ensemble arcade, reconnu à la forme de son nom.
     if let Some(stem) = lower.strip_suffix(".zip") {
         if looks_like_romset(stem) {
-            return Some(Landing {
+            return Some(Recognised::Goes(Landing {
                 system: "Arcade".to_owned(),
                 paths: vec![targets.system.join("fbneo").join(&lower)],
-            });
+            }));
         }
     }
 
@@ -222,6 +287,17 @@ fn install(source: &Path, landing: &Landing) -> Result<(), String> {
             .map_err(|e| format!("{} : {e}", destination.display()))?;
     }
     Ok(())
+}
+
+/// Rend compte d'un fichier reconnu dont l'émulateur manque.
+fn homeless(name: String, system: &str) -> Placed {
+    Placed {
+        name,
+        system: system.to_owned(),
+        destination: String::new(),
+        placed: false,
+        note: format!("fichier {system} reconnu, mais son émulateur n'est pas encore installé"),
+    }
 }
 
 /// Rend compte d'un fichier posé, en nommant les places supplémentaires.
@@ -259,7 +335,7 @@ pub fn adopt(source: &Path, targets: &Targets) -> Vec<Placed> {
     }
 
     let results = match landing(&name, size, targets) {
-        Some(landing) => match install(source, &landing) {
+        Some(Recognised::Goes(landing)) => match install(source, &landing) {
             Ok(()) => vec![success(name, &landing, None)],
             Err(error) => vec![Placed {
                 name,
@@ -269,6 +345,15 @@ pub fn adopt(source: &Path, targets: &Targets) -> Vec<Placed> {
                 note: error,
             }],
         },
+        Some(Recognised::Homeless(system)) => vec![homeless(name, system)],
+        None if is_neogeo_chip(&name.to_lowercase()) => vec![Placed {
+            name,
+            system: "Neo Geo".into(),
+            destination: String::new(),
+            placed: false,
+            note: "cette puce se range dans neogeo.zip, pas à côté : ajoutez-la à l'archive"
+                .into(),
+        }],
         None => vec![Placed {
             name,
             system: String::new(),
@@ -348,13 +433,23 @@ fn adopt_archive(source: &Path, archive_name: &str, targets: &Targets) -> Vec<Pl
         members.push(entry_name.to_lowercase());
 
         let placement = match tree_member(&relative) {
-            Some(kept) => Some(Landing {
+            Some(kept) => Some(Recognised::Goes(Landing {
                 system: MSX_TREE.to_owned(),
                 paths: vec![targets.system.join(kept)],
-            }),
+            })),
             None => landing(&entry_name, Some(entry.size()), targets),
         };
-        let Some(placement) = placement else { continue };
+        let placement = match placement {
+            Some(Recognised::Goes(placement)) => placement,
+            // Une clé dont l'émulateur manque mérite d'être nommée : sans cela
+            // l'archive se solderait par « aucun fichier reconnu », ce qui est
+            // faux et envoie chercher le problème là où il n'est pas.
+            Some(Recognised::Homeless(system)) => {
+                results.push(homeless(entry_name, system));
+                continue;
+            }
+            None => continue,
+        };
 
         let mut contents = Vec::new();
         use std::io::Read;
@@ -616,6 +711,7 @@ mod tests {
             wiiu_home: Some(base.join("cemu")),
             xbox_home: Some(base.join("xemu")),
             threeds_sysdata: Some(base.join("azahar")),
+            ps2_bios: Some(base.join("pcsx2").join("bios")),
         }
     }
 
@@ -751,6 +847,64 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
 
         assert!(!faits[0].placed);
+    }
+
+    #[test]
+    fn le_micrologiciel_de_la_playstation_2_va_chez_pcsx2() {
+        let base = scratch();
+        let source = depose(&base, "ps2-0200a-20040614.bin", PS2_BIOS as usize);
+
+        let faits = adopt(&source, &targets(&base));
+        let pose = base
+            .join("pcsx2")
+            .join("bios")
+            .join("ps2-0200a-20040614.bin")
+            .exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(faits[0].system, "PlayStation 2");
+        assert!(pose);
+    }
+
+    #[test]
+    fn les_compagnons_du_micrologiciel_ps2_suivent() {
+        // `.erom`, `.nvm` — PCSX2 les cherche sous le même nom de base, et ils
+        // n'ont pas de taille convenue.
+        let base = scratch();
+        let source = depose(&base, "SCPH-70012_BIOS_V12_USA_200.erom", 64);
+
+        let faits = adopt(&source, &targets(&base));
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(faits[0].system, "PlayStation 2");
+    }
+
+    #[test]
+    fn un_bios_de_la_premiere_playstation_ne_part_pas_chez_pcsx2() {
+        // `scph1001.bin` commence comme un nom de BIOS PS2 : seule sa taille
+        // dit que c'en est un de PlayStation première du nom.
+        let base = scratch();
+        let source = depose(&base, "scph1001.bin", 512 * 1024);
+
+        let faits = adopt(&source, &targets(&base));
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_ne!(faits[0].system, "PlayStation 2");
+    }
+
+    #[test]
+    fn une_puce_neo_geo_isolee_dit_ou_elle_devrait_etre() {
+        // Elle ne se range nulle part : sa place est dans neogeo.zip. Le dire
+        // vaut mieux que « fichier inconnu », qui laisserait chercher.
+        let base = scratch();
+        let source = depose(&base, "sfix.sfix", 131_072);
+
+        let faits = adopt(&source, &targets(&base));
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert!(!faits[0].placed);
+        assert_eq!(faits[0].system, "Neo Geo");
+        assert!(faits[0].note.contains("neogeo.zip"));
     }
 
     #[test]
@@ -939,6 +1093,10 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
 
         assert!(!faits[0].placed);
+        // Et on dit pourquoi : « fichier inconnu » enverrait chercher un
+        // problème qui n'existe pas.
+        assert_eq!(faits[0].system, "Nintendo Switch");
+        assert!(faits[0].note.contains("pas encore installé"), "{}", faits[0].note);
     }
 
     #[test]
