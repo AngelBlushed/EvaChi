@@ -231,8 +231,8 @@ const EXPECTED: &[Expected] = &[
     },
     Expected {
         system: "Nintendo 3DS",
-        core: "citra_libretro",
-        file: "citra/sysdata/aes_keys.txt",
+        core: "azahar_libretro",
+        file: "azahar/sysdata/aes_keys.txt",
         need: Need::Required,
         note: "clés de déchiffrement ; sans elles un dépôt chiffré est refusé",
     },

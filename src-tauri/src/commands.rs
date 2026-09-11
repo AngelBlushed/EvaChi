@@ -335,6 +335,16 @@ const KNOWN_EXTERNALS: &[KnownExternal] = &[
         extensions: &["iso", "chd", "cso", "gz", "bin", "mdf", "nrg"],
     },
     KnownExternal {
+        system: "Nintendo 3DS",
+        // Azahar succède à Citra ; Lime3DS est l'autre héritier.
+        executables: &["azahar.exe", "lime3ds.exe", "citra-qt.exe"],
+        args: &["-f", "{rom}"],
+        // `cia` est la raison d'être de cette entrée : c'est un paquet
+        // d'installation, qu'aucun cœur libretro ne sait ouvrir. Seul
+        // l'émulateur complet sait l'installer puis le lancer.
+        extensions: &["3ds", "cia", "cci", "cxi", "3dsx", "app"],
+    },
+    KnownExternal {
         system: "PS Vita",
         executables: &["Vita3K.exe"],
         args: &["-r", "{rom}"],
@@ -1379,13 +1389,19 @@ fn probe_core(path: &Path) -> CoreEntry {
         return fallback();
     };
 
-    let output = std::process::Command::new(exe)
+    let spawned = std::process::Command::new(exe)
         .arg("--probe-core")
         .arg(path)
-        .output();
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn();
 
-    match output {
-        Ok(result) if result.status.success() => {
+    let Ok(child) = spawned else {
+        return fallback();
+    };
+
+    match wait_with_deadline(child, PROBE_TIMEOUT) {
+        Some(result) if result.status.success() => {
             let text = String::from_utf8_lossy(&result.stdout);
             // Un cœur bavard écrit sur la sortie standard avant nous : on ne
             // garde que la dernière ligne, celle que la sonde a produite.
@@ -1395,6 +1411,42 @@ fn probe_core(path: &Path) -> CoreEntry {
                 .unwrap_or_else(fallback)
         }
         _ => fallback(),
+    }
+}
+
+/// Temps laissé à un cœur pour décliner son identité.
+///
+/// Les plus lourds — Citra, Dolphin — répondent en moins d'une seconde ; ils ne
+/// font qu'ouvrir la bibliothèque et lire deux chaînes. Quinze secondes sont
+/// donc une largesse, et ce qui les dépasse ne répondra jamais.
+const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
+
+/// Attend la fin d'un processus, et l'abrège s'il s'éternise.
+///
+/// `Command::output()` attend sans limite. Un cœur qui se bloque à
+/// l'interrogation figeait donc le démarrage entier : la fenêtre s'ouvrait,
+/// la bibliothèque restait vide, et rien n'expliquait l'attente. Un cœur
+/// récalcitrant ne doit coûter que lui-même.
+fn wait_with_deadline(
+    mut child: std::process::Child,
+    limit: std::time::Duration,
+) -> Option<std::process::Output> {
+    let started = std::time::Instant::now();
+
+    loop {
+        match child.try_wait() {
+            // Terminé de lui-même : on récupère ce qu'il a écrit.
+            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(None) if started.elapsed() < limit => {
+                std::thread::sleep(std::time::Duration::from_millis(25));
+            }
+            // Trop lent, ou impossible à observer : on l'abrège.
+            _ => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return None;
+            }
+        }
     }
 }
 
@@ -2362,3 +2414,92 @@ mod preset_args_tests {
     }
 }
 
+
+/// L'attente bornée d'un processus d'interrogation.
+///
+/// Sans elle, un cœur qui se bloque à l'interrogation fige le démarrage entier :
+/// la fenêtre s'ouvre, la bibliothèque reste vide, et rien n'explique l'attente.
+/// C'est exactement ce qu'a fait le cœur Azahar.
+#[cfg(test)]
+mod deadline_tests {
+    use super::*;
+    use std::process::{Command, Stdio};
+    use std::time::{Duration, Instant};
+
+    /// Un processus qui répond tout de suite, et ce qu'il écrit.
+    fn prompt(texte: &str) -> std::process::Child {
+        let mut command = if cfg!(windows) {
+            let mut c = Command::new("cmd");
+            c.args(["/C", "echo", texte]);
+            c
+        } else {
+            let mut c = Command::new("echo");
+            c.arg(texte);
+            c
+        };
+        command
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("processus de test")
+    }
+
+    /// Un processus qui ne rend jamais la main de lui-même.
+    fn interminable() -> std::process::Child {
+        let mut command = if cfg!(windows) {
+            // `pause` attend une frappe qui ne viendra pas : l'entrée est vide.
+            let mut c = Command::new("cmd");
+            c.args(["/C", "pause"]);
+            c
+        } else {
+            let mut c = Command::new("sleep");
+            c.arg("300");
+            c
+        };
+        command
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("processus de test")
+    }
+
+    #[test]
+    fn un_processus_rapide_rend_sa_sortie() {
+        let sortie = wait_with_deadline(prompt("bonjour"), Duration::from_secs(10))
+            .expect("un processus qui se termine doit rendre sa sortie");
+
+        assert!(sortie.status.success());
+        assert!(String::from_utf8_lossy(&sortie.stdout).contains("bonjour"));
+    }
+
+    #[test]
+    fn un_processus_bloque_est_abrege() {
+        let debut = Instant::now();
+        let sortie = wait_with_deadline(interminable(), Duration::from_millis(300));
+        let duree = debut.elapsed();
+
+        assert!(sortie.is_none(), "un processus bloqué ne rend rien");
+        assert!(
+            duree < Duration::from_secs(5),
+            "l'attente doit être bornée, elle a duré {duree:?}"
+        );
+    }
+
+    #[test]
+    fn l_attente_ne_depasse_pas_la_limite_de_beaucoup() {
+        // La boucle interroge toutes les 25 ms : le dépassement se compte en
+        // millisecondes, pas en secondes.
+        let debut = Instant::now();
+        let _ = wait_with_deadline(interminable(), Duration::from_millis(200));
+
+        assert!(debut.elapsed() < Duration::from_millis(2000));
+    }
+
+    #[test]
+    fn le_delai_laisse_de_la_marge_aux_coeurs_les_plus_lourds() {
+        // Les plus lents répondent en moins d'une seconde ; ce plafond ne doit
+        // jamais écarter un cœur valide par impatience.
+        assert!(PROBE_TIMEOUT >= Duration::from_secs(10));
+    }
+}

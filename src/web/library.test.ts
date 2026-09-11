@@ -470,3 +470,68 @@ describe('consoles à émulateur autonome', () => {
     assert.equal(shelf.preferred, 'dolphin_libretro');
   });
 });
+
+/**
+ * La 3DS, servie par deux voies.
+ *
+ * Un `.cia` est un paquet d'installation : aucun cœur libretro ne sait l'ouvrir,
+ * seul l'émulateur complet le peut. Une cartouche `.3ds` se lit des deux côtés,
+ * et l'émulateur autonome garde la main tant qu'il est déclaré.
+ */
+describe('Nintendo 3DS', () => {
+  function external(system: string, extensions: string[]): CatalogEntry {
+    return {
+      kind: 'externe',
+      id: `externe:${system}`,
+      label: system,
+      extensions,
+      layout: JOYPAD,
+      needsPath: true,
+      async open() {
+        throw new Error('un émulateur externe se lance, il ne s’héberge pas');
+      },
+    };
+  }
+
+  const AZAHAR = core('azahar_libretro', ['3ds', '3dsx', 'cci', 'cxi', 'app'], 'Azahar');
+  const EXTERNE = external('Nintendo 3DS', ['3ds', 'cia', 'cci', 'cxi', '3dsx', 'app']);
+  const DOSSIER = 'Nintendo 3ds (3ds-cia-3dsx)';
+
+  it('confie le dossier à l’émulateur autonome quand il est déclaré', () => {
+    const games = [rom('jeu.cia', DOSSIER), rom('autre.3ds', DOSSIER)];
+    const [shelf] = groupLibrary(games, [AZAHAR, EXTERNE], {}, NO_CHOICE, '');
+
+    assert.equal(shelf.preferred, 'externe:Nintendo 3DS');
+  });
+
+  it('se rabat sur le cœur Azahar quand l’autonome manque', () => {
+    const games = [rom('jeu.3ds', DOSSIER)];
+    const [shelf] = groupLibrary(games, [AZAHAR], {}, NO_CHOICE, '');
+
+    assert.equal(shelf.preferred, 'azahar_libretro');
+  });
+
+  it('n’offre aucun cœur libretro pour un paquet .cia', () => {
+    // C'est la raison d'être de l'entrée externe : le `.cia` n'a qu'un preneur.
+    const preneurs = coresFor(rom('jeu.cia', DOSSIER), [AZAHAR, EXTERNE]);
+
+    assert.deepEqual(
+      preneurs.map((candidate) => candidate.id),
+      ['externe:Nintendo 3DS'],
+    );
+  });
+
+  it('ne détourne pas la Nintendo DS au passage', () => {
+    // « nintendo ds » ne doit pas attraper l'indice « 3ds ».
+    const melonds = core('melonds_libretro', ['nds', 'dsi'], 'melonDS');
+    const [shelf] = groupLibrary(
+      [rom('jeu.nds', 'Nintendo Ds (nds-dsi)')],
+      [AZAHAR, EXTERNE, melonds],
+      {},
+      NO_CHOICE,
+      '',
+    );
+
+    assert.equal(shelf.preferred, 'melonds_libretro');
+  });
+});

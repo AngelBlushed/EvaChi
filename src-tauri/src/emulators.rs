@@ -93,6 +93,20 @@ pub const STANDALONES: &[Standalone] = &[
         site: "https://xemu.app",
     },
     Standalone {
+        system: "Nintendo 3DS",
+        label: "Azahar",
+        repository: "azahar-emu/azahar",
+        // Le projet publie sept archives Windows : trois chaînes de
+        // compilation, chacune en archive et en installeur, plus un cœur
+        // libretro. C'est la version MSVC en archive qu'on veut.
+        wants: &["windows", "msvc", ".zip"],
+        rejects: &["installer", "libretro"],
+        executable: "azahar.exe",
+        portable: "user/",
+        license: "GPL-3.0",
+        site: "https://azahar-emu.org",
+    },
+    Standalone {
         system: "PS Vita",
         label: "Vita3K",
         repository: "Vita3K/Vita3K",

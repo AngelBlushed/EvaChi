@@ -37,7 +37,7 @@ const CATALOGUE: &[(&str, &str, &str)] = &[
     ("sameboy_libretro", "SameBoy", "Game Boy · Game Boy Color"),
     ("mgba_libretro", "mGBA", "Game Boy Advance"),
     ("melonds_libretro", "melonDS", "Nintendo DS"),
-    ("citra_libretro", "Citra", "Nintendo 3DS"),
+    ("azahar_libretro", "Azahar", "Nintendo 3DS"),
     ("mupen64plus_next_libretro", "Mupen64Plus-Next", "Nintendo 64"),
     ("dolphin_libretro", "Dolphin", "GameCube · Wii"),
     ("mednafen_vb_libretro", "Beetle VB", "Virtual Boy"),

@@ -60,6 +60,8 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   // cela le nom du dossier trahit son contenu : « PlayStation 2 » contient
   // « playstation » et partirait chez SwanStation, « Wii U » contient « wii »
   // et partirait chez Dolphin — qui accepte justement les `.iso` et les `.wad`.
+  ['nintendo 3ds', 'externe:Nintendo 3DS'],
+  ['3ds', 'externe:Nintendo 3DS'],
   ['nintendo switch', 'externe:Nintendo Switch'],
   ['switch', 'externe:Nintendo Switch'],
   ['wii u', 'externe:Wii U'],
@@ -85,7 +87,9 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['gameboy', 'sameboy'],
   ['game boy', 'sameboy'],
   ['game watch', 'gw'],
-  ['3ds', 'citra'],
+  // Repli quand l'emulateur autonome n'est pas installe : le coeur Azahar
+  // ouvre les cartouches, mais pas les paquets .cia.
+  ['3ds', 'azahar'],
   ['nintendo ds', 'melonds'],
   ['nds', 'melonds'],
   ['nintendo 64', 'mupen64plus_next'],
