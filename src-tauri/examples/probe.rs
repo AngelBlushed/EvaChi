@@ -23,6 +23,9 @@ fn main() {
 
     let mut content: Option<PathBuf> = None;
     let mut frames = 5usize;
+    // Où écrire la dernière image. Un cœur qui dessine son propre message
+    // à l’écran ne le dit nulle part ailleurs : il faut regarder l’image.
+    let mut dump: Option<PathBuf> = None;
     let mut system: Option<PathBuf> = None;
 
     while let Some(arg) = args.next() {
@@ -35,6 +38,8 @@ fn main() {
             // Pour éprouver les micrologiciels là où l'application les range,
             // et non à côté du cœur.
             system = args.next().map(PathBuf::from);
+        } else if arg == "--dump" {
+            dump = args.next().map(PathBuf::from);
         } else {
             content = Some(PathBuf::from(arg));
         }
@@ -114,6 +119,7 @@ fn main() {
     let mut changes = 0usize;
     let mut last_ink = 0usize;
     let mut last_pixels = 0usize;
+    let mut last_frame: Option<(u32, u32, Vec<u8>)> = None;
 
     for index in 1..=frames {
         match session.run_frame(no_buttons) {
@@ -135,6 +141,9 @@ fn main() {
                     }
                     distinct.insert(fingerprint);
 
+                    if dump.is_some() {
+                        last_frame = Some((video.width, video.height, video.rgba.clone()));
+                    }
                     last_pixels = video.rgba.len() / 4;
                     last_ink = video
                         .rgba
@@ -163,6 +172,20 @@ fn main() {
 
         if distinct.len() == 1 {
             println!("\n⚠ image parfaitement figée : le programme ne dessine peut-être rien.");
+        }
+    }
+
+    // Format volontairement bête : deux entiers puis les pixels bruts. Un
+    // script de trois lignes en fait une image regardable.
+    if let (Some(chemin), Some((largeur, hauteur, rgba))) = (dump.as_ref(), last_frame.as_ref())
+    {
+        let mut octets = Vec::with_capacity(8 + rgba.len());
+        octets.extend_from_slice(&largeur.to_le_bytes());
+        octets.extend_from_slice(&hauteur.to_le_bytes());
+        octets.extend_from_slice(rgba);
+        match std::fs::write(chemin, &octets) {
+            Ok(()) => println!("image     {largeur}×{hauteur} écrite"),
+            Err(erreur) => eprintln!("image non écrite : {erreur}"),
         }
     }
 

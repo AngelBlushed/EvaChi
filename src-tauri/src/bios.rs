@@ -241,7 +241,7 @@ const EXPECTED: &[Expected] = &[
         core: "fbneo_libretro",
         file: "fbneo/neogeo.zip",
         need: Need::Optional,
-        note: "indispensable aux jeux Neo Geo, inutile aux autres",
+        note: "a poser ici, comme les romsets de jeux : FinalBurn Neo ne cherche que dans ce dossier",
     },
 ];
 
