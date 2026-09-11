@@ -7,6 +7,11 @@ EvaChi crée elle-même, au premier lancement, un dossier par console sous
 attendus écrits entre parenthèses. Il n'y a plus qu'à y déposer ses fichiers :
 le nom du dossier suffit à désigner la console, et donc l'émulateur.
 
+Si un dossier `roms` est posé à côté de l'exécutable, c'est lui qui sert de
+bibliothèque : une copie distribuée est alors portable, et ses jeux se voient
+sans avoir à ouvrir `%APPDATA%`. C'est ce dossier-ci quand on lance EvaChi
+depuis le dépôt.
+
 La liste vit dans `src-tauri/src/skeleton.rs`. Une console ajoutée à EvaChi doit
 y gagner son dossier — un test le vérifie pour les émulateurs autonomes.
 

@@ -115,6 +115,11 @@ savent lire le même format.
 On peut aussi désigner ses propres dossiers — `Fichier → Ajouter un dossier de
 jeux…` — auquel cas c'est ce classement-là qui fait loi.
 
+Une exception : si un dossier `roms` se trouve **à côté de l'exécutable**, c'est
+lui qui sert de bibliothèque, et le dossier caché n'est plus touché. C'est ce
+qui rend une copie distribuée portable — les jeux se déposent à la vue de tous
+plutôt que dans un `%APPDATA%` qu'il faudrait d'abord expliquer.
+
 ## Architecture
 
 Tout passe par un contrat unique, [`src/core/types.ts`](src/core/types.ts) :

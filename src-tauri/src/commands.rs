@@ -44,7 +44,7 @@ impl Paths {
             cores: base.join("cores"),
             system: base.join("system"),
             saves: base.join("saves"),
-            roms: base.join("roms"),
+            roms: library_root(roms_beside_exe(), &base),
             emulators: base.join("emulators"),
             config: base.join("config.json"),
         };
@@ -60,6 +60,25 @@ impl Paths {
                 .map_err(|error| format!("{} : {error}", directory.display()))?;
         }
         Ok(paths)
+    }
+}
+
+/// Le dossier `roms` posé à côté de l'exécutable, s'il y en a un.
+fn roms_beside_exe() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    Some(exe.parent()?.join("roms"))
+}
+
+/// Le dossier de jeux : celui posé à côté du programme, sinon celui du profil.
+///
+/// Une copie d'EvaChi livrée avec son dossier `roms` est portable. Les jeux se
+/// déposent alors à la vue de tous, à côté de l'exécutable, plutôt que dans un
+/// `%APPDATA%` que personne n'ouvre — et qu'il faudrait d'abord expliquer.
+/// Sans ce dossier, rien ne change : l'installation ordinaire garde le sien.
+fn library_root(beside: Option<PathBuf>, app_data: &Path) -> PathBuf {
+    match beside {
+        Some(folder) if folder.is_dir() => folder,
+        _ => app_data.join("roms"),
     }
 }
 
@@ -1370,7 +1389,7 @@ fn headless_paths() -> Option<Paths> {
         cores: base.join("cores"),
         system: base.join("system"),
         saves: base.join("saves"),
-        roms: base.join("roms"),
+        roms: library_root(roms_beside_exe(), &base),
         emulators: base.join("emulators"),
         config: base.join("config.json"),
     })
@@ -2045,6 +2064,38 @@ mod tests {
 
         assert_eq!(u32_at(&packed, 12), 0, "aucune trame audio");
         assert_eq!(packed.len(), FRAME_HEADER + 4);
+    }
+}
+
+#[cfg(test)]
+mod library_root_tests {
+    use super::*;
+
+    #[test]
+    fn un_dossier_roms_pose_a_cote_du_programme_l_emporte() {
+        let base = std::env::temp_dir().join(format!("evachi-portable-{}", std::process::id()));
+        let cote = base.join("roms");
+        std::fs::create_dir_all(&cote).expect("dossier portable");
+
+        let choisi = library_root(Some(cote.clone()), Path::new("C:\\profil"));
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(choisi, cote);
+    }
+
+    #[test]
+    fn sans_dossier_a_cote_on_garde_celui_du_profil() {
+        let profil = Path::new("C:\\profil");
+        assert_eq!(library_root(None, profil), profil.join("roms"));
+    }
+
+    #[test]
+    fn un_chemin_qui_n_existe_pas_ne_detourne_pas_la_bibliotheque() {
+        // `current_exe` rend toujours un chemin ; c'est l'existence du dossier
+        // qui décide, pas la possibilité de le nommer.
+        let profil = Path::new("C:\\profil");
+        let fantome = Some(PathBuf::from("Z:\\nulle-part\\roms"));
+        assert_eq!(library_root(fantome, profil), profil.join("roms"));
     }
 }
 
