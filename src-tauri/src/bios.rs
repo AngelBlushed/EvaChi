@@ -68,9 +68,11 @@ const EXPECTED: &[Expected] = &[
     Expected {
         system: "3DO",
         core: "opera_libretro",
-        file: "panafz1.bin",
+        // Éprouvé : Opera choisit ce nom-là par défaut. Un panafz1.bin seul est
+        // ignoré, et le jeu reste sur un écran noir sans que rien ne l'explique.
+        file: "panafz10.bin",
         need: Need::Required,
-        note: "micrologiciel Panasonic FZ-1 ; panafz10.bin et goldstar.bin conviennent aussi",
+        note: "micrologiciel Panasonic FZ-10 ; c'est ce nom qu'Opera prend par défaut",
     },
     Expected {
         system: "PlayStation",
@@ -140,7 +142,10 @@ const EXPECTED: &[Expected] = &[
         core: "same_cdi_libretro",
         file: "cdimono1.zip",
         need: Need::Required,
-        note: "ensemble des ROMs de la machine, au format MAME",
+        // Éprouvé : une archive complète par les noms peut être refusée quand
+        // même. MAME identifie chaque ROM par son empreinte, pas par son nom, et
+        // annonce alors « NOT FOUND » sur des fichiers pourtant présents.
+        note: "ensemble MAME ; sa version doit correspondre à celle de SAME_CDI",
     },
     Expected {
         system: "MSX · ColecoVision",

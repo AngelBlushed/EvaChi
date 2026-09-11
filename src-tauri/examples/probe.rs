@@ -23,6 +23,7 @@ fn main() {
 
     let mut content: Option<PathBuf> = None;
     let mut frames = 5usize;
+    let mut system: Option<PathBuf> = None;
 
     while let Some(arg) = args.next() {
         if arg == "--frames" {
@@ -30,18 +31,25 @@ fn main() {
                 .next()
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(frames);
+        } else if arg == "--system" {
+            // Pour éprouver les micrologiciels là où l'application les range,
+            // et non à côté du cœur.
+            system = args.next().map(PathBuf::from);
         } else {
             content = Some(PathBuf::from(arg));
         }
     }
 
-    // Les cœurs cherchent leur BIOS et écrivent leurs sauvegardes à côté du
-    // cœur lui-même : c'est le choix le moins surprenant pour une sonde.
+    // À défaut d'indication, les cœurs cherchent leur BIOS et écrivent leurs
+    // sauvegardes à côté du cœur lui-même : c'est le choix le moins surprenant
+    // pour une sonde.
     let workdir = core_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+    let system = system.unwrap_or_else(|| workdir.clone());
+    println!("système     {}", system.display());
 
     let session = Session::spawn();
 
-    let info = match session.load_core(&core_path, &workdir, &workdir) {
+    let info = match session.load_core(&core_path, &system, &workdir) {
         Ok(info) => info,
         Err(error) => {
             eprintln!("chargement impossible : {error}");
