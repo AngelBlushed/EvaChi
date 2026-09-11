@@ -59,7 +59,6 @@ const CATALOGUE: &[(&str, &str, &str)] = &[
     ("freeintv_libretro", "FreeIntv", "Intellivision"),
     ("vecx_libretro", "VecX", "Vectrex"),
     ("opera_libretro", "Opera", "3DO"),
-    ("same_cdi_libretro", "SAME_CDI", "Philips CD-i"),
     ("fbneo_libretro", "FinalBurn Neo", "Arcade"),
     ("puae_libretro", "PUAE", "Amiga"),
     ("vice_x64_libretro", "VICE x64", "Commodore 64"),

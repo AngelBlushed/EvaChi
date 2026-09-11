@@ -48,9 +48,9 @@ export function folderLabel(folder: string): string {
  * Le classement par nombre de fichiers ouverts ne suffit pas à départager des
  * cœurs qui acceptent les mêmes formats. Un dossier « 3DO » ne contient que des
  * `.iso` et des `.chd` — formats qu'une dizaine de cœurs déclarent — et c'est le
- * hasard du décompte qui choisissait, tombant sur SAME_CDI, prévu pour le
- * CD-i. Le nom que l'utilisateur a donné au dossier dit la console : c'est le
- * renseignement le plus sûr dont on dispose, et il passe donc avant.
+ * hasard du décompte qui tranchait, désignant parfois un cœur prévu pour une
+ * tout autre machine. Le nom que l'utilisateur a donné au dossier dit la
+ * console : c'est le renseignement le plus sûr, et il passe donc avant.
  *
  * L'ordre compte : « neo geo pocket » doit être essayé avant « neo geo », et
  * « gameboy advance » avant « gameboy ».
@@ -75,8 +75,6 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['psvita', 'externe:PS Vita'],
   ['vita', 'externe:PS Vita'],
   ['3do', 'opera'],
-  ['cd i', 'same_cdi'],
-  ['cdi', 'same_cdi'],
   ['neo geo pocket', 'mednafen_ngp'],
   ['neo geo', 'fbneo'],
   ['arcade', 'fbneo'],

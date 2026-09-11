@@ -138,16 +138,6 @@ const EXPECTED: &[Expected] = &[
         note: "polices de caractères",
     },
     Expected {
-        system: "Philips CD-i",
-        core: "same_cdi_libretro",
-        file: "cdimono1.zip",
-        need: Need::Required,
-        // Éprouvé : une archive complète par les noms peut être refusée quand
-        // même. MAME identifie chaque ROM par son empreinte, pas par son nom, et
-        // annonce alors « NOT FOUND » sur des fichiers pourtant présents.
-        note: "ensemble MAME ; sa version doit correspondre à celle de SAME_CDI",
-    },
-    Expected {
         system: "MSX · ColecoVision",
         core: "bluemsx_libretro",
         // Éprouvé : à la racine du dossier système, et non sous `bluemsx/`.
