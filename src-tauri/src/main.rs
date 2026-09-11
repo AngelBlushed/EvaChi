@@ -13,6 +13,7 @@
 // Empêche l'ouverture d'une console derrière la fenêtre sur Windows, hors debug.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod adopt;
 mod bios;
 mod commands;
 mod emulators;
@@ -46,6 +47,13 @@ const INSTALL_FLAG: &str = "--install-cores";
 /// Argument interne : installe les émulateurs autonomes manquants.
 const INSTALL_EMULATORS_FLAG: &str = "--install-emulators";
 
+/// Argument interne : range un fichier système, puis ressort.
+///
+/// Le même chemin de code que le bouton « Ranger un fichier… », mais qui dit à
+/// haute voix où il pose ce qu'on lui donne — le seul moyen de vérifier un
+/// rangement sans le chercher à l'aveugle dans `%APPDATA%`.
+const ADOPT_FLAG: &str = "--ranger";
+
 fn main() {
     // Doit passer avant toute initialisation de Tauri : ce mode ne doit rien
     // afficher, seulement écrire sur la sortie standard.
@@ -65,6 +73,13 @@ fn main() {
     }
     if args.iter().any(|arg| arg == INSTALL_EMULATORS_FLAG) {
         std::process::exit(commands::install_emulators_to_stdout());
+    }
+    if let Some(position) = args.iter().position(|arg| arg == ADOPT_FLAG) {
+        let Some(path) = args.get(position + 1) else {
+            eprintln!("{ADOPT_FLAG} attend un chemin de fichier");
+            std::process::exit(2);
+        };
+        std::process::exit(commands::adopt_to_stdout(std::path::Path::new(path)));
     }
 
     tauri::Builder::default()
@@ -124,6 +139,8 @@ fn main() {
             commands::install_core,
             commands::system_files,
             commands::reveal_system_dir,
+            commands::pick_system_file,
+            commands::adopt_system_file,
             commands::installable_emulators,
             commands::install_emulator,
             commands::note,

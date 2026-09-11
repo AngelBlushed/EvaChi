@@ -366,6 +366,11 @@
         text-decoration: underline;
         cursor: pointer;
       }
+      /* Deux actions à la suite ont besoin d'air : collées, elles se lisent
+         comme une seule phrase soulignée. */
+      button.lien + button.lien { margin-left: 14px; }
+      /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
+      #bios-adopted:empty { display: none; }
       /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
          cette fenêtre : tout le reste peut attendre. */
       .preset-list .state.manque { color: #e58b8b; }
@@ -600,8 +605,16 @@
           EvaChi ne peut pas le fournir : c'est du code sous copyright, qui se
           copie depuis la machine qu'on possède. Elle dit en revanche lequel
           manque, sous quel nom, et où le déposer.
+        </p>
+        <p class="hint-text">
+          Inutile de savoir où : choisissez le fichier tel qu'il est — un BIOS,
+          une clé, un micrologiciel, ou une archive qui en contient plusieurs —
+          et EvaChi le porte au bon endroit, pour les cœurs comme pour les
+          émulateurs autonomes.
+          <button type="button" id="bios-adopt" class="lien">Ranger un fichier…</button>
           <button type="button" id="bios-folder" class="lien">Ouvrir le dossier</button>
         </p>
+        <p class="hint-text" id="bios-adopted"></p>
         <ul class="preset-list" id="bios-list"></ul>
       </div>
       <div class="dialog-foot">

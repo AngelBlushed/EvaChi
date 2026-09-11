@@ -189,6 +189,33 @@ export async function revealSystemDir(): Promise<string> {
   return invoke<string>('reveal_system_dir');
 }
 
+/** Ce qu'est devenu un fichier confié au rangement automatique. */
+export interface Placed {
+  readonly name: string;
+  /** Console ou usage reconnu, vide si personne ne réclamait ce fichier. */
+  readonly system: string;
+  /** Où il a été posé, vide s'il n'a pas bougé. */
+  readonly destination: string;
+  readonly placed: boolean;
+  /** Ce qui s'est passé, en une phrase. */
+  readonly note: string;
+}
+
+/** Ouvre le sélecteur pour désigner un BIOS, une clé ou une archive. */
+export async function pickSystemFile(): Promise<string | null> {
+  return invoke<string | null>('pick_system_file');
+}
+
+/**
+ * Range un fichier système là où l'émulateur concerné ira le chercher.
+ *
+ * Une archive est ouverte et vidée de ce qu'on sait placer : un lot entier se
+ * confie d'un seul geste.
+ */
+export async function adoptSystemFile(path: string): Promise<Placed[]> {
+  return invoke<Placed[]>('adopt_system_file', { path });
+}
+
 /**
  * Un émulateur autonome qu'EvaChi sait installer.
  *

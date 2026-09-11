@@ -251,6 +251,20 @@ pub struct SystemFile {
     pub path: String,
 }
 
+/// Où va un fichier système reconnu, sous le dossier système.
+///
+/// Rendu depuis le même tableau que la liste affichée : un fichier reconnu ici
+/// est forcément un fichier annoncé là-bas, et les deux ne peuvent pas diverger.
+pub fn destinations() -> Vec<(&'static str, &'static str, &'static str)> {
+    EXPECTED
+        .iter()
+        .map(|expected| {
+            let basename = expected.file.rsplit('/').next().unwrap_or(expected.file);
+            (basename, expected.file, expected.system)
+        })
+        .collect()
+}
+
 /// Fait le tour des fichiers système attendus, et dit lesquels sont là.
 ///
 /// `installed` porte les identifiants des cœurs présents : un fichier réclamé

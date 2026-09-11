@@ -756,6 +756,84 @@ pub fn reveal_system_dir(paths: State<'_, Paths>) -> Result<String, String> {
     Ok(target.to_string_lossy().into_owned())
 }
 
+/// Le dossier d'un émulateur autonome déclaré, s'il l'est.
+fn external_home(declared: &[ExternalSystem], name: &str) -> Option<PathBuf> {
+    let target = declared.iter().find(|system| system.name == name)?;
+    Path::new(&target.executable)
+        .parent()
+        .map(Path::to_path_buf)
+}
+
+/// Les endroits où peut atterrir un fichier système, sur cette machine.
+///
+/// Un émulateur portable range ses affaires chez lui, les autres dans le profil
+/// Windows — et rien ne le dit sinon la présence du dossier qui le décide.
+/// Cemu l'appelle `portable`, Azahar `user` ; chacun ses habitudes.
+fn system_targets(paths: &Paths) -> crate::adopt::Targets {
+    let declared = read_config(paths).external;
+    let roaming = std::env::var_os("APPDATA").map(PathBuf::from);
+
+    crate::adopt::Targets {
+        system: paths.system.clone(),
+        switch_data: external_home(&declared, "Nintendo Switch").and_then(|home| {
+            let portable = home.join("portable");
+            match portable.is_dir() {
+                true => Some(portable.join("system")),
+                false => roaming.as_ref().map(|base| base.join("Ryujinx").join("system")),
+            }
+        }),
+        wiiu_home: external_home(&declared, "Wii U").and_then(|home| {
+            let portable = home.join("portable");
+            match portable.is_dir() {
+                true => Some(portable),
+                false => roaming.as_ref().map(|base| base.join("Cemu")),
+            }
+        }),
+        xbox_home: external_home(&declared, "Xbox"),
+        threeds_sysdata: external_home(&declared, "Nintendo 3DS").and_then(|home| {
+            let portable = home.join("user");
+            match portable.is_dir() {
+                true => Some(portable.join("sysdata")),
+                false => roaming.as_ref().map(|base| base.join("Azahar").join("sysdata")),
+            }
+        }),
+    }
+}
+
+/// Ouvre le sélecteur de fichiers pour désigner un fichier système à ranger.
+#[tauri::command]
+pub fn pick_system_file(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    app.dialog()
+        .file()
+        .set_title("Choisir un BIOS, une clé ou une archive")
+        .blocking_pick_file()
+        .map(|file| file.to_string())
+}
+
+/// Range un fichier système là où l'émulateur concerné ira le chercher.
+///
+/// L'alternative — ouvrir le dossier et laisser faire — suppose de savoir
+/// lequel des vingt-six noms attendus on tient en main, et sous quel
+/// sous-dossier il se range. C'est précisément ce que personne ne sait.
+#[tauri::command]
+pub fn adopt_system_file(path: String, paths: State<'_, Paths>) -> Vec<crate::adopt::Placed> {
+    let targets = system_targets(&paths);
+    let results = crate::adopt::adopt(Path::new(&path), &targets);
+
+    for placed in &results {
+        write_log(
+            &paths,
+            &format!(
+                "rangement : {} — {} ({})",
+                placed.name, placed.note, placed.destination
+            ),
+        );
+    }
+    results
+}
+
 /// Un émulateur autonome proposé, avec son état sur cette machine.
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -1014,21 +1092,15 @@ pub fn launch_external(
 /// Emprunte exactement le chemin de l'interface — mêmes dossiers, même cache,
 /// même interrogation — mais depuis un terminal, où l'on voit ce qui échoue.
 pub fn list_cores_to_stdout() -> i32 {
-    let Some(base) = dirs_app_data() else {
+    let Some(paths) = headless_paths() else {
         eprintln!("dossier de données introuvable");
         return 1;
     };
 
-    let paths = Paths {
-        cores: base.join("cores"),
-        system: base.join("system"),
-        saves: base.join("saves"),
-        roms: base.join("roms"),
-            emulators: base.join("emulators"),
-        config: base.join("config.json"),
-    };
-
-    println!("données   {}", base.display());
+    println!(
+        "données   {}",
+        paths.cores.parent().unwrap_or(&paths.cores).display()
+    );
     println!("cœurs     {}", paths.cores.display());
 
     match scan_cores(&paths.cores) {
@@ -1066,18 +1138,9 @@ pub fn list_cores_to_stdout() -> i32 {
 /// sa fenêtre. Tout est aussi écrit dans le journal, seul témoin quand le
 /// programme est lancé d'un double-clic.
 pub fn install_cores_to_stdout() -> i32 {
-    let Some(base) = dirs_app_data() else {
+    let Some(paths) = headless_paths() else {
         eprintln!("dossier de données introuvable");
         return 1;
-    };
-
-    let paths = Paths {
-        cores: base.join("cores"),
-        system: base.join("system"),
-        saves: base.join("saves"),
-        roms: base.join("roms"),
-            emulators: base.join("emulators"),
-        config: base.join("config.json"),
     };
 
     let present: std::collections::HashSet<String> = scan_cores(&paths.cores)
@@ -1182,18 +1245,9 @@ pub fn declared_externals_summary(paths: &Paths) -> Vec<String> {
 /// Le pendant de `--install-cores` pour les consoles sans cœur libretro. Ceux
 /// dont la forge se protège des robots sont nommés, pas contournés.
 pub fn install_emulators_to_stdout() -> i32 {
-    let Some(base) = dirs_app_data() else {
+    let Some(paths) = headless_paths() else {
         eprintln!("dossier de données introuvable");
         return 1;
-    };
-
-    let paths = Paths {
-        cores: base.join("cores"),
-        system: base.join("system"),
-        saves: base.join("saves"),
-        roms: base.join("roms"),
-        emulators: base.join("emulators"),
-        config: base.join("config.json"),
     };
     let _ = fs::create_dir_all(&paths.emulators);
 
@@ -1257,6 +1311,46 @@ pub fn install_emulators_to_stdout() -> i32 {
     i32::from(failures > 0)
 }
 
+/// Range un fichier système depuis un terminal, puis ressort.
+///
+/// Le pendant du bouton « Ranger un fichier… ». Utile pour équiper
+/// l'application d'un lot entier sans ouvrir sa fenêtre, et surtout pour voir
+/// où chaque fichier atterrit quand on se demande pourquoi un cœur reste noir.
+pub fn adopt_to_stdout(source: &Path) -> i32 {
+    let Some(paths) = headless_paths() else {
+        eprintln!("dossier de données introuvable");
+        return 1;
+    };
+
+    let targets = system_targets(&paths);
+    println!("système   {}", targets.system.display());
+    for (nom, dossier) in [
+        ("switch", &targets.switch_data),
+        ("wii u", &targets.wiiu_home),
+        ("xbox", &targets.xbox_home),
+        ("3ds", &targets.threeds_sysdata),
+    ] {
+        match dossier {
+            Some(dossier) => println!("{nom:9} {}", dossier.display()),
+            None => println!("{nom:9} (émulateur non déclaré)"),
+        }
+    }
+
+    let results = crate::adopt::adopt(source, &targets);
+    let mut placed = 0;
+    for outcome in &results {
+        let mark = if outcome.placed { "OK " } else { "NON" };
+        println!("{mark} {} — {}", outcome.name, outcome.note);
+        if outcome.placed {
+            println!("    {}", outcome.destination);
+            placed += 1;
+        }
+    }
+
+    println!("{placed} fichier(s) rangé(s) sur {}", results.len());
+    i32::from(placed == 0)
+}
+
 /// Le dossier de données de l'application, hors de tout contexte Tauri.
 ///
 /// Doit rester aligné sur ce que `Paths::resolve` obtient d'`app_data_dir` :
@@ -1265,6 +1359,19 @@ fn dirs_app_data() -> Option<PathBuf> {
     std::env::var_os("APPDATA")
         .map(PathBuf::from)
         .map(|roaming| roaming.join("app.evachi"))
+}
+
+/// Les mêmes dossiers que dans la fenêtre, hors de tout contexte Tauri.
+fn headless_paths() -> Option<Paths> {
+    let base = dirs_app_data()?;
+    Some(Paths {
+        cores: base.join("cores"),
+        system: base.join("system"),
+        saves: base.join("saves"),
+        roms: base.join("roms"),
+        emulators: base.join("emulators"),
+        config: base.join("config.json"),
+    })
 }
 
 /// Un cœur trouvé sur le disque, avec ce qu'il a déclaré à l'interrogation.

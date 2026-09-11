@@ -18,6 +18,8 @@ import {
   installableEmulators,
   systemFiles,
   revealSystemDir,
+  pickSystemFile,
+  adoptSystemFile,
   directories,
   libraryFolders,
   listRoms,
@@ -94,6 +96,8 @@ const emulatorList = $<HTMLUListElement>('emulator-list');
 const biosList = $<HTMLUListElement>('bios-list');
 const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
+const biosAdopt = $<HTMLButtonElement>('bios-adopt');
+const biosAdopted = $<HTMLElement>('bios-adopted');
 const installProgress = $<HTMLElement>('install-progress');
 const installButton = $<HTMLButtonElement>('install-selected');
 const extName = $<HTMLInputElement>('ext-name');
@@ -1025,6 +1029,42 @@ biosFolder.addEventListener('click', async () => {
     log(`dossier ouvert : ${await revealSystemDir()}`);
   } catch (error) {
     log(`ouverture impossible — ${reason(error)}`, 'err');
+  }
+});
+
+/**
+ * Range un fichier choisi par l'utilisateur, où qu'il doive aller.
+ *
+ * Le geste est le même pour un BIOS de PlayStation, une clé de Switch et une
+ * archive de vingt fichiers : désigner, et c'est fait. Ce qui n'a pas été
+ * reconnu est nommé plutôt que passé sous silence — un fichier resté sur le
+ * bureau sans explication vaut moins qu'un refus clair.
+ */
+biosAdopt.addEventListener('click', async () => {
+  biosAdopt.disabled = true;
+  biosAdopted.textContent = '';
+  try {
+    const choisi = await pickSystemFile();
+    if (!choisi) return;
+
+    const faits = await adoptSystemFile(choisi);
+    for (const fait of faits) {
+      const détail = fait.placed ? `${fait.note} → ${fait.destination}` : fait.note;
+      log(`${fait.name} : ${détail}`, fait.placed ? 'ok' : 'err');
+    }
+
+    const rangés = faits.filter((fait) => fait.placed);
+    const consoles = [...new Set(rangés.map((fait) => fait.system))].join(', ');
+    biosAdopted.textContent = rangés.length
+      ? `${plural(rangés.length, 'fichier')} rangé${rangés.length > 1 ? 's' : ''} · ${consoles}`
+      : (faits[0]?.note ?? 'rien à ranger');
+
+    systemeFichiers = await systemFiles();
+    renderBios();
+  } catch (error) {
+    log(`rangement impossible — ${reason(error)}`, 'err');
+  } finally {
+    biosAdopt.disabled = false;
   }
 });
 
