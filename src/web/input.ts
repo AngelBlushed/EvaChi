@@ -116,3 +116,26 @@ export const JOYPAD: ButtonLayout = {
 
 /** Nombre de boutons qu'un cœur reçoit, quelle que soit la disposition. */
 export const BUTTON_COUNT = 16;
+
+/** Ce qu'on a besoin de savoir d'une manette pour décider laquelle lire. */
+interface PadSlot {
+  readonly connected: boolean;
+}
+
+/**
+ * L'emplacement de manette à lire, d'après ce que le navigateur présente.
+ *
+ * Garde celle qu'on suivait tant qu'elle répond, en adopte une autre sinon, et
+ * rend `-1` quand il n'y en a aucune.
+ *
+ * S'en remettre au seul événement `gamepadconnected` ne suffit pas. Il ne part
+ * qu'au premier appui **et** fenêtre au premier plan : une manette branchée
+ * avant le lancement, ou dont on a pressé un bouton pendant que la fenêtre
+ * n'avait pas le dessus, restait invisible pour toujours — et aucun appui
+ * ultérieur n'y changeait rien, puisque plus personne ne regardait. Il faut
+ * aller voir, pas attendre qu'on nous dise.
+ */
+export function choosePad(pads: readonly (PadSlot | null | undefined)[], current: number): number {
+  if (current >= 0 && pads[current]?.connected) return current;
+  return pads.findIndex((pad) => pad?.connected);
+}

@@ -52,6 +52,7 @@ import {
   BUTTON_COUNT,
   FALLBACK_KEY_LABELS,
   HEX_KEYPAD,
+  choosePad,
   PAD_DOWN,
   PAD_LEFT,
   PAD_RIGHT,
@@ -1434,6 +1435,26 @@ function setButton(index: number, down: boolean): void {
 }
 
 /**
+ * La manette à lire maintenant, en la cherchant si on n'en tient aucune.
+ *
+ * Le navigateur ne prévient pas toujours : une manette branchée avant le
+ * lancement n'émet rien, et l'événement de connexion ne part qu'au premier
+ * appui, fenêtre au premier plan. Regarder à chaque trame coûte un tableau et
+ * règle le cas une fois pour toutes.
+ */
+function currentPad(): Gamepad | null {
+  const pads = navigator.getGamepads?.() ?? [];
+  const found = choosePad(pads, padIndex);
+  if (found !== padIndex) {
+    padIndex = found;
+    const pad = found >= 0 ? pads[found] : null;
+    padStatus.textContent = pad ? `Manette : ${pad.id}` : 'Aucune manette détectée.';
+    log(pad ? `manette : ${pad.id}` : 'manette débranchée', pad ? 'ok' : 'info');
+  }
+  return padIndex >= 0 ? pads[padIndex] : null;
+}
+
+/**
  * Compose l'état à envoyer au cœur : clavier, plus manette si elle est là.
  *
  * Appelée juste avant chaque trame plutôt que sur événement, parce que l'API
@@ -1444,7 +1465,7 @@ function sampleInput(): void {
     buttons[index] = keyboard[index];
   }
 
-  const pad = padIndex >= 0 ? navigator.getGamepads()?.[padIndex] : null;
+  const pad = currentPad();
   if (pad) {
     for (const [source, target] of layout.gamepad) {
       if (pad.buttons[source]?.pressed) buttons[target] = true;
@@ -1473,18 +1494,25 @@ function sampleInput(): void {
   }
 }
 
-window.addEventListener('gamepadconnected', (event) => {
-  padIndex = event.gamepad.index;
-  padStatus.textContent = `Manette : ${event.gamepad.id}`;
-  log(`manette : ${event.gamepad.id}`, 'ok');
-});
+// Les deux événements ne servent plus qu'à réagir tout de suite : c'est
+// `currentPad` qui décide, et lui seul, pour qu'un branchement annoncé et un
+// branchement découvert donnent exactement le même état.
+window.addEventListener('gamepadconnected', () => void currentPad());
+window.addEventListener('gamepaddisconnected', () => void currentPad());
 
-window.addEventListener('gamepaddisconnected', (event) => {
-  if (event.gamepad.index !== padIndex) return;
-  padIndex = -1;
-  padStatus.textContent = 'Aucune manette détectée.';
-  log('manette débranchée');
-});
+/**
+ * Fait vivre le panneau des commandes quand aucun jeu ne tourne.
+ *
+ * Sans cela, ouvrir « Commandes » pour essayer sa manette ne montrait rien :
+ * les entrées n'étaient lues qu'entre deux trames, et à l'arrêt il n'y en a
+ * pas. On pressait les boutons devant une grille immobile, et on en concluait
+ * que la manette n'était pas reconnue — alors que le jeu, lui, l'aurait vue.
+ */
+function pollControls(): void {
+  if (!running && dialogs.controls.open) sampleInput();
+  requestAnimationFrame(pollControls);
+}
+requestAnimationFrame(pollControls);
 
 let keyLabels: Map<string, string> | null = null;
 
