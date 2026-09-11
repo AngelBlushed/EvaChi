@@ -319,6 +319,12 @@ fn success(name: String, landing: &Landing, origin: Option<&str>) -> Placed {
 
 /// Range un fichier, ou le contenu reconnaissable d'une archive.
 pub fn adopt(source: &Path, targets: &Targets) -> Vec<Placed> {
+    let results = adopt_one(source, targets);
+    finish(results, targets)
+}
+
+/// Le même travail, sans le geste final : de quoi en enchaîner beaucoup.
+fn adopt_one(source: &Path, targets: &Targets) -> Vec<Placed> {
     let name = source
         .file_name()
         .and_then(|n| n.to_str())
@@ -334,7 +340,7 @@ pub fn adopt(source: &Path, targets: &Targets) -> Vec<Placed> {
         return adopt_archive(source, &name, targets);
     }
 
-    let results = match landing(&name, size, targets) {
+    match landing(&name, size, targets) {
         Some(Recognised::Goes(landing)) => match install(source, &landing) {
             Ok(()) => vec![success(name, &landing, None)],
             Err(error) => vec![Placed {
@@ -361,9 +367,7 @@ pub fn adopt(source: &Path, targets: &Targets) -> Vec<Placed> {
             placed: false,
             note: "aucun cœur ni émulateur ne réclame ce fichier".into(),
         }],
-    };
-
-    finish(results, targets)
+    }
 }
 
 /// Le sous-arbre du dossier système où va une entrée d'archive, s'il y en a un.
@@ -502,7 +506,100 @@ fn adopt_archive(source: &Path, archive_name: &str, targets: &Targets) -> Vec<Pl
         results.push(unopened(source, archive_name, targets, ncas, &members, flat));
     }
 
+    results
+}
+
+/// Profondeur de descente dans un dossier confié au rangement.
+///
+/// Les dossiers de fichiers système s'emboîtent — `bios/Fonctionne/BlueMsx/
+/// Machines/MSX2/…` — mais pas sans fin. Cette borne évite qu'un dossier
+/// désigné par erreur, la racine du disque par exemple, occupe la machine
+/// pendant dix minutes.
+const FOLDER_DEPTH: usize = 8;
+
+/// Range tout ce qu'un dossier contient, aussi loin qu'il s'emboîte.
+///
+/// Désigner ses fichiers un par un n'a de sens que quand on en a un. Quand on a
+/// un dossier entier — et c'est le cas ordinaire, celui du lot récupéré quelque
+/// part — le seul geste raisonnable est de montrer le dossier.
+///
+/// Ce qui n'est reconnu par personne n'est pas énuméré : un dossier blueMSX
+/// porte trois cents `config.ini`, et en faire trois cents lignes de refus
+/// noierait les vingt lignes qui comptent. On les compte, on le dit.
+pub fn adopt_folder(root: &Path, targets: &Targets) -> Vec<Placed> {
+    let mut results = Vec::new();
+    let mut trees = 0usize;
+    let mut ignored = 0usize;
+
+    walk(root, root, FOLDER_DEPTH, targets, &mut results, &mut trees, &mut ignored);
+
+    if trees > 0 {
+        results.push(Placed {
+            name: "Machines / Databases".into(),
+            system: MSX_TREE.into(),
+            destination: targets.system.to_string_lossy().into_owned(),
+            placed: true,
+            note: format!("{trees} fichiers recopiés"),
+        });
+    }
+    if ignored > 0 {
+        results.push(Placed {
+            name: format!("{ignored} fichiers ignorés"),
+            system: String::new(),
+            destination: String::new(),
+            placed: false,
+            note: "aucun cœur ni émulateur ne les réclame".into(),
+        });
+    }
+
     finish(results, targets)
+}
+
+/// Descend un dossier, en rangeant ce qu'il reconnaît.
+fn walk(
+    root: &Path,
+    directory: &Path,
+    depth: usize,
+    targets: &Targets,
+    results: &mut Vec<Placed>,
+    trees: &mut usize,
+    ignored: &mut usize,
+) {
+    if depth == 0 {
+        return;
+    }
+    let Ok(entries) = std::fs::read_dir(directory) else {
+        return;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk(root, &path, depth - 1, targets, results, trees, ignored);
+            continue;
+        }
+
+        // Une arborescence blueMSX se reconnaît à ses dossiers, pas aux noms de
+        // ses fichiers : c'est le chemin depuis la racine confiée qui le dit.
+        let relative = path.strip_prefix(root).unwrap_or(&path);
+        if let Some(kept) = tree_member(relative) {
+            match std::fs::create_dir_all(targets.system.join(&kept).parent().unwrap_or(&targets.system))
+                .and_then(|()| std::fs::copy(&path, targets.system.join(&kept)).map(|_| ()))
+            {
+                Ok(()) => *trees += 1,
+                Err(_) => *ignored += 1,
+            }
+            continue;
+        }
+
+        for placed in adopt_one(&path, targets) {
+            if placed.placed || !placed.system.is_empty() {
+                results.push(placed);
+            } else {
+                *ignored += 1;
+            }
+        }
+    }
 }
 
 /// Que faire d'une archive dont rien n'a été reconnu.
@@ -1078,6 +1175,51 @@ mod tests {
         assert!(!faits[0].placed);
         assert_eq!(faits[0].system, "Nintendo Switch");
         assert!(faits[0].note.contains("Ryubing"));
+    }
+
+    #[test]
+    fn un_dossier_entier_se_range_d_un_seul_geste() {
+        // Le cas ordinaire : un lot récupéré quelque part, en vrac, avec ses
+        // sous-dossiers, son arborescence blueMSX et ses fichiers parasites.
+        let base = scratch();
+        let lot = base.join("en-vrac");
+        std::fs::create_dir_all(lot.join("consoles").join("atari")).expect("dossiers");
+        std::fs::create_dir_all(lot.join("BlueMsx").join("Machines").join("MSX2"))
+            .expect("dossiers");
+
+        std::fs::write(lot.join("lynxboot.img"), b"x").expect("bios");
+        std::fs::write(lot.join("consoles").join("atari").join("exec.bin"), b"x").expect("bios");
+        std::fs::write(lot.join("consoles").join("prod.keys"), b"x").expect("clé");
+        std::fs::write(
+            lot.join("BlueMsx").join("Machines").join("MSX2").join("config.ini"),
+            b"x",
+        )
+        .expect("machine");
+        std::fs::write(lot.join("lisez-moi.txt"), b"x").expect("parasite");
+        std::fs::write(lot.join("vacances.jpg"), b"x").expect("parasite");
+
+        let faits = adopt_folder(&lot, &targets(&base));
+        let lynx = base.join("system").join("lynxboot.img").exists();
+        let exec = base.join("system").join("exec.bin").exists();
+        let clé = base.join("ryubing").join("prod.keys").exists();
+        let machine = base
+            .join("system")
+            .join("Machines")
+            .join("MSX2")
+            .join("config.ini")
+            .exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert!(lynx, "un fichier de la racine");
+        assert!(exec, "un fichier au fond d'un sous-dossier");
+        assert!(clé, "une clé d'émulateur autonome");
+        assert!(machine, "l'arborescence blueMSX reconstituée");
+
+        // Les deux parasites sont comptés, pas énumérés : trois cents lignes de
+        // refus noieraient les lignes qui comptent.
+        let ignorés = faits.iter().find(|placed| placed.name.contains("ignorés"));
+        assert!(ignorés.is_some_and(|placed| placed.name.starts_with('2')), "{faits:#?}");
+        assert_eq!(faits.iter().filter(|placed| placed.placed).count(), 4);
     }
 
     #[test]

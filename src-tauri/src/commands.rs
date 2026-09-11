@@ -832,6 +832,37 @@ pub fn pick_system_file(app: tauri::AppHandle) -> Option<String> {
         .map(|file| file.to_string())
 }
 
+/// Ouvre le sélecteur pour désigner un dossier entier à ranger.
+#[tauri::command]
+pub fn pick_system_folder(app: tauri::AppHandle) -> Option<String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    app.dialog()
+        .file()
+        .set_title("Choisir un dossier de BIOS, de clés ou de micrologiciels")
+        .blocking_pick_folder()
+        .map(|folder| folder.to_string())
+}
+
+/// Range tout ce qu'un dossier contient, aussi loin qu'il s'emboîte.
+///
+/// Le cas ordinaire : on récupère un lot quelque part, on le pose sur le
+/// bureau, et il faudrait le trier. Désigner le dossier suffit.
+#[tauri::command]
+pub fn adopt_system_folder(path: String, paths: State<'_, Paths>) -> Vec<crate::adopt::Placed> {
+    let targets = system_targets(&paths);
+    let results = crate::adopt::adopt_folder(Path::new(&path), &targets);
+
+    write_log(
+        &paths,
+        &format!(
+            "rangement du dossier {path} : {} posé(s)",
+            results.iter().filter(|placed| placed.placed).count()
+        ),
+    );
+    results
+}
+
 /// Range un fichier système là où l'émulateur concerné ira le chercher.
 ///
 /// L'alternative — ouvrir le dossier et laisser faire — suppose de savoir
@@ -1344,6 +1375,7 @@ pub fn adopt_to_stdout(source: &Path) -> i32 {
 
     let targets = system_targets(&paths);
     println!("système   {}", targets.system.display());
+    let folder = source.is_dir();
     for (nom, dossier) in [
         ("switch", &targets.switch_data),
         ("wii u", &targets.wiiu_home),
@@ -1357,7 +1389,10 @@ pub fn adopt_to_stdout(source: &Path) -> i32 {
         }
     }
 
-    let results = crate::adopt::adopt(source, &targets);
+    let results = match folder {
+        true => crate::adopt::adopt_folder(source, &targets),
+        false => crate::adopt::adopt(source, &targets),
+    };
     let mut placed = 0;
     for outcome in &results {
         let mark = if outcome.placed { "OK " } else { "NON" };

@@ -9,6 +9,7 @@ import type {
   InstallableCore,
   RomEntry,
   SystemFile,
+  Placed,
 } from '../libretro/client.ts';
 import {
   addLibraryFolder,
@@ -20,6 +21,8 @@ import {
   revealSystemDir,
   pickSystemFile,
   adoptSystemFile,
+  pickSystemFolder,
+  adoptSystemFolder,
   directories,
   libraryFolders,
   listRoms,
@@ -98,6 +101,7 @@ const biosList = $<HTMLUListElement>('bios-list');
 const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
+const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
 const installProgress = $<HTMLElement>('install-progress');
 const installButton = $<HTMLButtonElement>('install-selected');
@@ -1041,14 +1045,25 @@ biosFolder.addEventListener('click', async () => {
  * reconnu est nommé plutôt que passé sous silence — un fichier resté sur le
  * bureau sans explication vaut moins qu'un refus clair.
  */
-biosAdopt.addEventListener('click', async () => {
-  biosAdopt.disabled = true;
+/**
+ * Le geste de rangement, qu'on désigne un fichier ou un dossier entier.
+ *
+ * Les deux ne diffèrent que par ce qu'on montre : ce qui suit — le compte
+ * rendu, le journal, la liste rafraîchie — est le même, et n'a donc aucune
+ * raison d'être écrit deux fois.
+ */
+async function ranger(
+  bouton: HTMLButtonElement,
+  choisir: () => Promise<string | null>,
+  confier: (chemin: string) => Promise<Placed[]>,
+): Promise<void> {
+  bouton.disabled = true;
   biosAdopted.textContent = '';
   try {
-    const choisi = await pickSystemFile();
+    const choisi = await choisir();
     if (!choisi) return;
 
-    const faits = await adoptSystemFile(choisi);
+    const faits = await confier(choisi);
     for (const fait of faits) {
       const détail = fait.placed ? `${fait.note} → ${fait.destination}` : fait.note;
       log(`${fait.name} : ${détail}`, fait.placed ? 'ok' : 'err');
@@ -1065,8 +1080,16 @@ biosAdopt.addEventListener('click', async () => {
   } catch (error) {
     log(`rangement impossible — ${reason(error)}`, 'err');
   } finally {
-    biosAdopt.disabled = false;
+    bouton.disabled = false;
   }
+}
+
+biosAdoptFolder.addEventListener('click', () => {
+  void ranger(biosAdoptFolder, pickSystemFolder, adoptSystemFolder);
+});
+
+biosAdopt.addEventListener('click', () => {
+  void ranger(biosAdopt, pickSystemFile, adoptSystemFile);
 });
 
 /**

@@ -216,6 +216,21 @@ export async function adoptSystemFile(path: string): Promise<Placed[]> {
   return invoke<Placed[]>('adopt_system_file', { path });
 }
 
+/** Ouvre le sélecteur pour désigner un dossier entier à ranger. */
+export async function pickSystemFolder(): Promise<string | null> {
+  return invoke<string | null>('pick_system_folder');
+}
+
+/**
+ * Range tout ce qu'un dossier contient, aussi loin qu'il s'emboîte.
+ *
+ * Le cas ordinaire : un lot récupéré quelque part, posé en vrac. Ce qui n'est
+ * réclamé par personne est compté, pas énuméré.
+ */
+export async function adoptSystemFolder(path: string): Promise<Placed[]> {
+  return invoke<Placed[]>('adopt_system_folder', { path });
+}
+
 /**
  * Un émulateur autonome qu'EvaChi sait installer.
  *

@@ -141,6 +141,8 @@ fn main() {
             commands::reveal_system_dir,
             commands::pick_system_file,
             commands::adopt_system_file,
+            commands::pick_system_folder,
+            commands::adopt_system_folder,
             commands::installable_emulators,
             commands::install_emulator,
             commands::note,
