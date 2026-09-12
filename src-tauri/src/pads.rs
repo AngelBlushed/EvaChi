@@ -6,22 +6,82 @@
 //! manette branchée réponde dès le premier lancement, sans passer par leurs
 //! menus.
 //!
-//! Rien n'est jamais écrasé. Une configuration déjà présente appartient à
-//! l'utilisateur, même si elle est vide : il l'a peut-être voulue ainsi.
+//! Une configuration qui lie déjà un appareil appartient à l'utilisateur et
+//! n'est pas touchée. Celle que l'émulateur a écrite d'usine — clavier et
+//! souris, aucune manette — est remplacée, l'ancienne gardée à côté.
 
 use std::path::{Path, PathBuf};
 
-/// Le dossier de configuration de Dolphin, portable ou non.
+/// Le dossier de configuration de Dolphin, dans l'ordre où lui-même le cherche.
 ///
-/// Dolphin bascule en mode portable dès qu'un `portable.txt` est posé à côté de
-/// lui ; il range alors tout sous `User/`. Sinon ses réglages vivent dans les
-/// documents de l'utilisateur.
-pub fn dolphin_config(executable: &Path, documents: &Path) -> Option<PathBuf> {
+/// Trois emplacements possibles, et se tromper ne produit aucune erreur : les
+/// fichiers sont écrits, ignorés, et la manette reste muette. C'est exactement
+/// ce qui est arrivé — une clé de registre déplaçait le dossier sans que rien
+/// ne le dise.
+///
+/// 1. `portable.txt` posé à côté du programme : tout vit sous `User/` ;
+/// 2. sinon la clé `HKCU\Software\Dolphin Emulator\UserConfigPath`, qu'il
+///    écrit quand on lui a désigné un autre dossier ;
+/// 3. sinon les documents de l'utilisateur.
+pub fn dolphin_config(
+    executable: &Path,
+    documents: &Path,
+    registry: Option<&Path>,
+) -> Option<PathBuf> {
     let home = executable.parent()?;
-    match home.join("portable.txt").is_file() {
-        true => Some(home.join("User").join("Config")),
-        false => Some(documents.join("Dolphin Emulator").join("Config")),
+    if home.join("portable.txt").is_file() {
+        return Some(home.join("User").join("Config"));
     }
+    if let Some(declared) = registry.filter(|path| !path.as_os_str().is_empty()) {
+        return Some(declared.join("Config"));
+    }
+    Some(documents.join("Dolphin Emulator").join("Config"))
+}
+
+/// Le dossier que Dolphin s'est choisi, s'il l'a inscrit dans le registre.
+#[cfg(windows)]
+fn dolphin_registry_path() -> Option<PathBuf> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::Registry::{
+        RegGetValueW, HKEY_CURRENT_USER, RRF_RT_REG_SZ,
+    };
+
+    /// Convertit une chaîne Rust en chaîne large terminée par un zéro.
+    fn large(text: &str) -> Vec<u16> {
+        text.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    let sous_cle = large("Software\\Dolphin Emulator");
+    let valeur = large("UserConfigPath");
+    let mut tampon = [0u16; 520];
+    let mut taille = (tampon.len() * 2) as u32;
+
+    // SAFETY : les deux chaînes sont terminées par un zéro, et la taille
+    // annoncée est bien celle du tampon.
+    let statut = unsafe {
+        RegGetValueW(
+            HKEY_CURRENT_USER,
+            sous_cle.as_ptr(),
+            valeur.as_ptr(),
+            RRF_RT_REG_SZ,
+            std::ptr::null_mut(),
+            tampon.as_mut_ptr().cast(),
+            &mut taille,
+        )
+    };
+    if statut != 0 {
+        return None;
+    }
+
+    let mots = (taille as usize / 2).saturating_sub(1);
+    let texte = std::ffi::OsString::from_wide(&tampon[..mots.min(tampon.len())]);
+    let chemin = PathBuf::from(texte);
+    (!chemin.as_os_str().is_empty()).then_some(chemin)
+}
+
+#[cfg(not(windows))]
+fn dolphin_registry_path() -> Option<PathBuf> {
+    None
 }
 
 /// La manette GameCube, câblée sur une manette XInput.
@@ -98,17 +158,61 @@ pub fn ensure(system: &str, executable: &Path, documents: &Path) -> Vec<String> 
     if system != "GameCube · Wii" {
         return Vec::new();
     }
-    let Some(config) = dolphin_config(executable, documents) else {
+    let registre = dolphin_registry_path();
+    let Some(config) = dolphin_config(executable, documents, registre.as_deref()) else {
         return Vec::new();
     };
+    install_into(&config)
+}
 
+/// Vrai si cette configuration lie un véritable appareil de jeu.
+///
+/// Dolphin ne livre pas un fichier vide : il écrit sa configuration d'usine,
+/// clavier et souris. Le fichier existe donc toujours, et « ne jamais écraser »
+/// revenait à ne jamais rien faire — c'est ce qui laissait la manette muette.
+///
+/// Tant qu'aucun appareil n'est lié, remplacer ne prend le travail de personne.
+/// Dès qu'il y en a un, le fichier appartient à quelqu'un et on n'y touche pas.
+/// Seule la première section compte — `[GCPad1]`, `[Wiimote1]`. Le fichier en
+/// porte d'autres, pour les manettes 2 à 4 et la Balance Board, et l'une
+/// d'elles peut mentionner un appareil oublié depuis longtemps. Juger sur le
+/// fichier entier protégeait ainsi une configuration que personne n'utilisait.
+fn binds_a_gamepad(contents: &str, section: &str) -> bool {
+    contents
+        .lines()
+        .skip_while(|line| line.trim() != section)
+        .skip(1)
+        .take_while(|line| !line.trim_start().starts_with('['))
+        .filter_map(|line| line.split_once('='))
+        .filter(|(key, _)| key.trim() == "Device")
+        .any(|(_, value)| !value.trim().ends_with("Keyboard Mouse"))
+}
+
+/// Installe les configurations de manette dans ce dossier.
+///
+/// Séparé de la recherche du dossier : l'un dépend de la machine — registre,
+/// mode portable — l'autre non, et seul le second se vérifie.
+fn install_into(config: &Path) -> Vec<String> {
     let mut written = Vec::new();
-    for (name, contents) in [("GCPadNew.ini", GCPAD), ("WiimoteNew.ini", WIIMOTE)] {
+    for (name, contents, section) in [
+        ("GCPadNew.ini", GCPAD, "[GCPad1]"),
+        ("WiimoteNew.ini", WIIMOTE, "[Wiimote1]"),
+    ] {
         let target = config.join(name);
-        if target.exists() {
-            continue;
+
+        if let Ok(existing) = std::fs::read_to_string(&target) {
+            if binds_a_gamepad(&existing, section) {
+                continue;
+            }
+            // Ce qu'on remplace, on le garde : l'utilisateur doit pouvoir
+            // revenir en arrière sans réinstaller quoi que ce soit.
+            let backup = config.join(format!("{name}.avant-evachi"));
+            if !backup.exists() {
+                let _ = std::fs::write(&backup, &existing);
+            }
         }
-        if std::fs::create_dir_all(&config).is_err() {
+
+        if std::fs::create_dir_all(config).is_err() {
             continue;
         }
         if std::fs::write(&target, contents).is_ok() {
@@ -135,10 +239,50 @@ mod tests {
         let exe = base.join("Dolphin-x64").join("Dolphin.exe");
         std::fs::create_dir_all(exe.parent().unwrap()).expect("dossier");
 
-        let trouve = dolphin_config(&exe, &base.join("Documents")).expect("chemin");
+        let trouve = dolphin_config(&exe, &base.join("Documents"), None).expect("chemin");
+        let attendu = base.join("Documents").join("Dolphin Emulator").join("Config");
         let _ = std::fs::remove_dir_all(&base);
 
-        assert!(trouve.ends_with("Documents/Dolphin Emulator/Config".replace('/', std::path::MAIN_SEPARATOR_STR).as_str()));
+        assert_eq!(trouve, attendu);
+    }
+
+    #[test]
+    fn une_cle_de_registre_deplace_le_dossier() {
+        // Le cas qui a coûté une soirée : les fichiers étaient écrits dans les
+        // documents, Dolphin lisait ailleurs, et rien ne signalait l'écart.
+        let base = scratch("registre");
+        let home = base.join("Dolphin-x64");
+        std::fs::create_dir_all(&home).expect("dossier");
+        let ailleurs = base.join("Roaming").join("Dolphin Emulator");
+
+        let trouve = dolphin_config(
+            &home.join("Dolphin.exe"),
+            &base.join("Documents"),
+            Some(&ailleurs),
+        )
+        .expect("chemin");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(trouve, ailleurs.join("Config"));
+    }
+
+    #[test]
+    fn le_mode_portable_l_emporte_sur_le_registre() {
+        let base = scratch("priorite");
+        let home = base.join("Dolphin-x64");
+        std::fs::create_dir_all(&home).expect("dossier");
+        std::fs::write(home.join("portable.txt"), b"").expect("marqueur");
+
+        let trouve = dolphin_config(
+            &home.join("Dolphin.exe"),
+            &base.join("Documents"),
+            Some(&base.join("Roaming")),
+        )
+        .expect("chemin");
+        let attendu = home.join("User").join("Config");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(trouve, attendu);
     }
 
     #[test]
@@ -148,7 +292,7 @@ mod tests {
         std::fs::create_dir_all(&home).expect("dossier");
         std::fs::write(home.join("portable.txt"), b"").expect("marqueur");
 
-        let trouve = dolphin_config(&home.join("Dolphin.exe"), &base.join("Documents")).expect("chemin");
+        let trouve = dolphin_config(&home.join("Dolphin.exe"), &base.join("Documents"), None).expect("chemin");
         let attendu = home.join("User").join("Config");
         let _ = std::fs::remove_dir_all(&base);
 
@@ -158,12 +302,9 @@ mod tests {
     #[test]
     fn pose_les_deux_fichiers_quand_ils_manquent() {
         let base = scratch("pose");
-        let home = base.join("Dolphin-x64");
-        std::fs::create_dir_all(&home).expect("dossier");
-        let documents = base.join("Documents");
+        let config = base.join("Dolphin Emulator").join("Config");
 
-        let ecrits = ensure("GameCube · Wii", &home.join("Dolphin.exe"), &documents);
-        let config = documents.join("Dolphin Emulator").join("Config");
+        let ecrits = install_into(&config);
         let gc = std::fs::read_to_string(config.join("GCPadNew.ini")).unwrap_or_default();
         let wii = config.join("WiimoteNew.ini").exists();
         let _ = std::fs::remove_dir_all(&base);
@@ -175,23 +316,71 @@ mod tests {
     }
 
     #[test]
-    fn une_configuration_existante_n_est_jamais_ecrasee() {
-        // Même vide : quelqu'un l'a peut-être voulue ainsi, et une manette mal
-        // reconfigurée en pleine partie est pire qu'une manette muette.
+    fn une_manette_deja_liee_n_est_jamais_touchee() {
+        // Reconfigurer la manette de quelqu'un en pleine partie est pire
+        // qu'une manette muette.
         let base = scratch("respect");
-        let home = base.join("Dolphin-x64");
-        std::fs::create_dir_all(&home).expect("dossier");
-        let documents = base.join("Documents");
-        let config = documents.join("Dolphin Emulator").join("Config");
+        let config = base.join("Dolphin Emulator").join("Config");
         std::fs::create_dir_all(&config).expect("dossier");
-        std::fs::write(config.join("GCPadNew.ini"), b"le mien").expect("fichier");
+        std::fs::write(
+            config.join("GCPadNew.ini"),
+            b"[GCPad1]\nDevice = DInput/0/Ma manette a moi\nButtons/A = `1`\n",
+        )
+        .expect("fichier");
 
-        let ecrits = ensure("GameCube · Wii", &home.join("Dolphin.exe"), &documents);
+        let ecrits = install_into(&config);
         let garde = std::fs::read_to_string(config.join("GCPadNew.ini")).expect("relecture");
         let _ = std::fs::remove_dir_all(&base);
 
-        assert_eq!(garde, "le mien");
-        assert_eq!(ecrits.len(), 1, "seul le fichier manquant est posé");
+        assert!(garde.contains("Ma manette a moi"), "{garde}");
+        assert_eq!(ecrits.len(), 1, "seule la télécommande Wii est posée");
+    }
+
+    #[test]
+    fn la_configuration_d_usine_clavier_est_remplacee_et_gardee() {
+        // Le cas réel : Dolphin écrit toujours un fichier, câblé sur le clavier
+        // et la souris. « Ne jamais écraser » revenait donc à ne jamais rien
+        // faire, et la manette restait muette.
+        let base = scratch("usine");
+        let config = base.join("Dolphin Emulator").join("Config");
+        std::fs::create_dir_all(&config).expect("dossier");
+        let usine = "[GCPad1]\nDevice = DInput/0/Keyboard Mouse\nButtons/A = `X`\n";
+        std::fs::write(config.join("GCPadNew.ini"), usine).expect("fichier");
+
+        let ecrits = install_into(&config);
+        let pose = std::fs::read_to_string(config.join("GCPadNew.ini")).expect("relecture");
+        let sauvegarde =
+            std::fs::read_to_string(config.join("GCPadNew.ini.avant-evachi")).expect("sauvegarde");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(ecrits.len(), 2);
+        assert!(pose.contains("XInput/0/Gamepad"), "{pose}");
+        assert_eq!(sauvegarde, usine, "l'ancienne reste récupérable");
+    }
+
+    #[test]
+    fn on_reconnait_une_configuration_qui_lie_un_appareil() {
+        let section = |device: &str| format!("[Wiimote1]\nDevice = {device}\n");
+        assert!(!binds_a_gamepad(&section("DInput/0/Keyboard Mouse"), "[Wiimote1]"));
+        assert!(binds_a_gamepad(&section("XInput/0/Gamepad"), "[Wiimote1]"));
+        assert!(binds_a_gamepad(&section("DInput/0/Xbox Controller"), "[Wiimote1]"));
+        assert!(!binds_a_gamepad("pas de section du tout", "[Wiimote1]"));
+    }
+
+    #[test]
+    fn une_autre_section_ne_protege_pas_la_premiere() {
+        // Le cas rencontré : la télécommande 1 était sur le clavier, mais une
+        // section plus bas citait un Joy-Con oublié — et tout le fichier s'en
+        // trouvait protégé.
+        let fichier = "\
+[Wiimote1]
+Device = DInput/0/Keyboard Mouse
+Buttons/A = `Click 0`
+[Wiimote2]
+Device = SDL/0/Nintendo Switch Joy-Con (L)
+";
+        assert!(!binds_a_gamepad(fichier, "[Wiimote1]"));
+        assert!(binds_a_gamepad(fichier, "[Wiimote2]"));
     }
 
     #[test]
