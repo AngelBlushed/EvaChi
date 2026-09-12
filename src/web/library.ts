@@ -66,6 +66,9 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['switch', 'externe:Nintendo Switch'],
   ['wii u', 'externe:Wii U'],
   ['wiiu', 'externe:Wii U'],
+  // Le Dolphin d'origine passe avant son cœur libretro tant que celui-ci rend
+  // mal. Le cœur reste choisissable dans la liste du volet.
+  ['gamecube', 'externe:GameCube · Wii'],
   ['playstation 2', 'externe:PlayStation 2'],
   ['ps2', 'externe:PlayStation 2'],
   ['xbox 360', 'externe:Xbox 360'],

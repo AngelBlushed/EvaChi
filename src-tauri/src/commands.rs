@@ -339,6 +339,16 @@ const KNOWN_EXTERNALS: &[KnownExternal] = &[
         args: &["-f", "-g", "{rom}"],
         extensions: &["wud", "wux", "wua", "rpx", "wad"],
     },
+    // GameCube et Wii ont un cœur libretro, mais il rend mal : l'image
+    // clignote là où le Dolphin d'origine tourne sans faute. Tant que le cœur
+    // n'est pas au point, un Dolphin installé sur la machine prend le relais.
+    // `-b` démarre dans le jeu sans passer par la fenêtre de bibliothèque.
+    KnownExternal {
+        system: "GameCube · Wii",
+        executables: &["Dolphin.exe"],
+        args: &["-b", "-e", "{rom}"],
+        extensions: &["iso", "gcm", "dol", "wbfs", "rvz", "ciso", "gcz", "wad"],
+    },
     KnownExternal {
         system: "Xbox 360",
         executables: &["xenia_canary.exe", "xenia.exe"],

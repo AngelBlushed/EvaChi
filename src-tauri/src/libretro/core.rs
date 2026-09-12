@@ -90,7 +90,11 @@ struct Api {
     unserialize: unsafe extern "C" fn(*const c_void, usize) -> bool,
     load_game: unsafe extern "C" fn(*const GameInfo) -> bool,
     unload_game: unsafe extern "C" fn(),
+    set_controller_port_device: unsafe extern "C" fn(c_uint, c_uint),
 }
+
+/// Une manette ordinaire, au sens de libretro.
+const DEVICE_JOYPAD: c_uint = 1;
 
 /// Un cœur chargé, éventuellement porteur d'un contenu en cours.
 ///
@@ -147,6 +151,7 @@ impl Core {
             unserialize: resolve(&lib, "retro_unserialize")?,
             load_game: resolve(&lib, "retro_load_game")?,
             unload_game: resolve(&lib, "retro_unload_game")?,
+            set_controller_port_device: resolve(&lib, "retro_set_controller_port_device")?,
         };
 
         let found = (api.api_version)();
@@ -238,6 +243,18 @@ impl Core {
             return Err(CoreError::ContentRejected);
         }
         self.content_loaded = true;
+
+        // Dire quelle manette est branchée sur le premier port.
+        //
+        // L'ABI le prévoit après le chargement du contenu, et beaucoup de cœurs
+        // s'en passent : ils supposent une manette ordinaire et lisent les
+        // boutons quoi qu'il arrive. D'autres non — Dolphin instancie ses
+        // manettes GameCube à ce moment-là, et sans cet appel le jeu démarre,
+        // s'affiche, et ne répond à rien. Le silence était complet : aucun
+        // message, aucune erreur, juste un jeu qui ignore les boutons.
+        //
+        // SAFETY : le contenu est chargé, ce que l'ABI exige pour cet appel.
+        unsafe { (self.api.set_controller_port_device)(0, DEVICE_JOYPAD) };
 
         let av = self.av_info();
         self.start_hw_render(&av);
