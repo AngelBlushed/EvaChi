@@ -155,14 +155,132 @@ Rumble/Motor = `Motor L`
 /// configurer ne rend rien : ce n'est pas une erreur, seulement une limite
 /// qu'il vaut mieux dire que masquer.
 pub fn ensure(system: &str, executable: &Path, documents: &Path) -> Vec<String> {
-    if system != "GameCube · Wii" {
-        return Vec::new();
+    match system {
+        "GameCube · Wii" => {
+            let registre = dolphin_registry_path();
+            match dolphin_config(executable, documents, registre.as_deref()) {
+                Some(config) => install_into(&config),
+                None => Vec::new(),
+            }
+        }
+        "PlayStation 2" => match executable.parent() {
+            Some(home) => install_pcsx2(&home.join("inis")),
+            None => Vec::new(),
+        },
+        _ => Vec::new(),
     }
-    let registre = dolphin_registry_path();
-    let Some(config) = dolphin_config(executable, documents, registre.as_deref()) else {
+}
+
+/// La manette de la PlayStation 2, câblée sur la première manette SDL.
+///
+/// PCSX2 désigne les appareils par leur rang — `SDL-0` — et non par un
+/// identifiant propre à l'exemplaire : la même configuration vaut donc pour
+/// n'importe quelle manette, sur n'importe quelle machine.
+const PCSX2_PAD: &str = "\
+[Pad1]
+Type = DualShock2
+Up = SDL-0/DPadUp
+Right = SDL-0/DPadRight
+Down = SDL-0/DPadDown
+Left = SDL-0/DPadLeft
+Triangle = SDL-0/FaceNorth
+Circle = SDL-0/FaceEast
+Cross = SDL-0/FaceSouth
+Square = SDL-0/FaceWest
+Select = SDL-0/Back
+Start = SDL-0/Start
+L1 = SDL-0/LeftShoulder
+R1 = SDL-0/RightShoulder
+L2 = SDL-0/+LeftTrigger
+R2 = SDL-0/+RightTrigger
+L3 = SDL-0/LeftStick
+R3 = SDL-0/RightStick
+LUp = SDL-0/-LeftY
+LRight = SDL-0/+LeftX
+LDown = SDL-0/+LeftY
+LLeft = SDL-0/-LeftX
+RUp = SDL-0/-RightY
+RRight = SDL-0/+RightX
+RDown = SDL-0/+RightY
+RLeft = SDL-0/-RightX
+LargeMotor = SDL-0/LargeMotor
+SmallMotor = SDL-0/SmallMotor
+";
+
+/// Réécrit la section `[Pad1]` de PCSX2 si elle ne tient qu'au clavier.
+///
+/// Le fichier porte tous les réglages de l'émulateur — graphismes, dossiers,
+/// jeux récents. On n'en remplace qu'une section, et on garde l'ancien à côté.
+fn install_pcsx2(inis: &Path) -> Vec<String> {
+    let config = inis.join("PCSX2.ini");
+    let Ok(existing) = std::fs::read_to_string(&config) else {
         return Vec::new();
     };
-    install_into(&config)
+    if binds_a_pad_pcsx2(&existing) {
+        return Vec::new();
+    }
+
+    let backup = inis.join("PCSX2.ini.avant-evachi");
+    if !backup.exists() {
+        let _ = std::fs::write(&backup, &existing);
+    }
+
+    let remplace = replace_section(&existing, "[Pad1]", PCSX2_PAD);
+    match std::fs::write(&config, remplace) {
+        Ok(()) => vec![format!("{} ([Pad1])", config.to_string_lossy())],
+        Err(_) => Vec::new(),
+    }
+}
+
+/// Vrai si la manette 1 de PCSX2 tient à autre chose qu'au clavier.
+fn binds_a_pad_pcsx2(contents: &str) -> bool {
+    contents
+        .lines()
+        .skip_while(|line| line.trim() != "[Pad1]")
+        .skip(1)
+        .take_while(|line| !line.trim_start().starts_with('['))
+        .filter_map(|line| line.split_once('='))
+        .any(|(_, value)| {
+            // La section mêle des liens — « SDL-0/DPadUp » — et des réglages
+            // ordinaires — « Type = DualShock2 », « AxisScale = 1.33 ». Seul un
+            // lien porte une barre oblique : c'est ce qui les départage.
+            let value = value.trim();
+            value.contains('/') && !value.starts_with("Keyboard") && !value.starts_with("Mouse")
+        })
+}
+
+/// Remplace une section d'un fichier INI par un contenu tout prêt.
+///
+/// Le reste du fichier est rendu tel quel, à la ligne près : ce sont les
+/// réglages de quelqu'un d'autre.
+fn replace_section(contents: &str, section: &str, remplacement: &str) -> String {
+    let mut out = String::with_capacity(contents.len() + remplacement.len());
+    let mut dedans = false;
+    let mut pose = false;
+
+    for line in contents.lines() {
+        let titre = line.trim_start().starts_with('[');
+        if titre {
+            if line.trim() == section {
+                dedans = true;
+                out.push_str(remplacement);
+                pose = true;
+                continue;
+            }
+            dedans = false;
+        }
+        if dedans {
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+
+    if !pose {
+        out.push('\n');
+        out.push_str(remplacement);
+    }
+    out
 }
 
 /// Vrai si cette configuration lie un véritable appareil de jeu.
@@ -381,6 +499,65 @@ Device = SDL/0/Nintendo Switch Joy-Con (L)
 ";
         assert!(!binds_a_gamepad(fichier, "[Wiimote1]"));
         assert!(binds_a_gamepad(fichier, "[Wiimote2]"));
+    }
+
+    #[test]
+    fn pcsx2_garde_ses_autres_reglages() {
+        let base = scratch("pcsx2");
+        let inis = base.join("inis");
+        std::fs::create_dir_all(&inis).expect("dossier");
+        std::fs::write(
+            inis.join("PCSX2.ini"),
+            "[UI]\nTheme = dark\n\n[Pad1]\nType = DualShock2\nUp = Keyboard/Up\n\n[GS]\nRenderer = 12\n",
+        )
+        .expect("réglages");
+
+        let ecrits = install_pcsx2(&inis);
+        let texte = std::fs::read_to_string(inis.join("PCSX2.ini")).expect("relecture");
+        let sauvegarde = inis.join("PCSX2.ini.avant-evachi").exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(ecrits.len(), 1);
+        assert!(texte.contains("Theme = dark"), "{texte}");
+        assert!(texte.contains("Renderer = 12"), "les autres sections restent");
+        assert!(texte.contains("SDL-0/FaceSouth"), "la manette est câblée");
+        assert!(!texte.contains("Keyboard/Up"), "l'ancien lien disparaît");
+        assert!(sauvegarde);
+    }
+
+    #[test]
+    fn pcsx2_deja_configure_n_est_pas_touche() {
+        let base = scratch("pcsx2-respect");
+        let inis = base.join("inis");
+        std::fs::create_dir_all(&inis).expect("dossier");
+        let mien = "[Pad1]\nType = DualShock2\nCross = SDL-1/FaceSouth\n";
+        std::fs::write(inis.join("PCSX2.ini"), mien).expect("réglages");
+
+        let ecrits = install_pcsx2(&inis);
+        let texte = std::fs::read_to_string(inis.join("PCSX2.ini")).expect("relecture");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert!(ecrits.is_empty());
+        assert_eq!(texte, mien);
+    }
+
+    #[test]
+    fn on_distingue_un_reglage_d_un_appareil() {
+        // `Type = DualShock2` et `AxisScale = 1.33` sont des réglages, pas des
+        // appareils : les prendre pour tels ferait croire la manette déjà
+        // configurée, et on n'y toucherait jamais.
+        assert!(!binds_a_pad_pcsx2(
+            "[Pad1]\nType = DualShock2\nDeadzone = 0\nAxisScale = 1.33\nUp = Keyboard/Up\n"
+        ));
+        assert!(binds_a_pad_pcsx2("[Pad1]\nUp = SDL-0/DPadUp\n"));
+        assert!(binds_a_pad_pcsx2("[Pad1]\nCross = XInput-0/A\n"));
+    }
+
+    #[test]
+    fn une_section_absente_est_ajoutee_a_la_fin() {
+        let sortie = replace_section("[UI]\nTheme = dark\n", "[Pad1]", "[Pad1]\nUp = SDL-0/DPadUp\n");
+        assert!(sortie.contains("Theme = dark"));
+        assert!(sortie.contains("[Pad1]"));
     }
 
     #[test]
