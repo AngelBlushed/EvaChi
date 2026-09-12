@@ -904,6 +904,26 @@ function renderEmulators(): void {
       actions.append(button);
     }
 
+    // Toujours de quoi désigner le sien. Sans ce bouton, une console dont la
+    // forge refuse les robots — la Switch — n'offrait aucune issue depuis cette
+    // fenêtre : le texte disait où aller chercher l'émulateur, et rien ne
+    // permettait ensuite de dire où on l'avait mis.
+    const browse = document.createElement('button');
+    browse.type = 'button';
+    browse.textContent = offer.owned || offer.declared ? 'Changer…' : 'Parcourir…';
+    browse.title = `Désigner soi-même le programme de ${offer.label}`;
+    browse.addEventListener('click', async () => {
+      try {
+        const chosen = await pickExecutable();
+        if (!chosen) return;
+        await adopt(offer.system, chosen);
+        await refreshInstall();
+      } catch (error) {
+        log(`sélection impossible — ${reason(error)}`, 'err');
+      }
+    });
+    actions.append(browse);
+
     if (offer.owned) {
       state.classList.add('ready');
       state.textContent = `installé par EvaChi · ${offer.license}`;
@@ -914,8 +934,9 @@ function renderEmulators(): void {
     } else if (offer.downloadable) {
       state.textContent = `à télécharger · ${offer.license}`;
     } else {
-      // Sa forge refuse les robots : le dire, et dire où aller.
-      state.textContent = `à prendre sur ${offer.site.replace(/^https?:\/\//, '')}`;
+      // Sa forge refuse les robots : dire où aller le chercher, et rappeler
+      // qu'on peut le désigner soi-même une fois installé.
+      state.textContent = `à prendre sur ${offer.site.replace(/^https?:\/\//, '')}, puis « Parcourir… »`;
     }
 
     item.append(name, actions, state);

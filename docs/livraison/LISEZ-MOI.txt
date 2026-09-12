@@ -1,0 +1,107 @@
+EvaChi 0.2.0
+============
+
+Un hôte d'émulation multi-systèmes : une bibliothèque, un lanceur, et les
+émulateurs qui vont avec — sans avoir à les installer un par un.
+
+
+Pour démarrer
+-------------
+
+1. Lancer evachi.exe.
+2. Menu « Émulation » → « Émulateurs… » → cocher les consoles voulues →
+   « Installer la sélection ». EvaChi va chercher les émulateurs elle-même.
+   Pour ceux qu'elle ne peut pas télécharger — la Switch — le bouton
+   « Parcourir… » permet de désigner celui qu'on a installé soi-même.
+3. Déposer ses jeux dans le dossier « roms », dans le sous-dossier de la
+   console correspondante. Le nom du dossier suffit : EvaChi en déduit
+   l'émulateur à employer.
+4. Menu « Affichage » → « Rafraîchir » si la bibliothèque ne s'est pas mise à
+   jour toute seule.
+
+Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
+sert pas peuvent être supprimés.
+
+
+Les BIOS, les clés, les micrologiciels
+--------------------------------------
+
+Certaines consoles ne démarrent pas sans le micrologiciel de la machine
+d'origine. EvaChi ne le fournit pas — voir plus bas. Elle dit en revanche
+lequel manque, et sait le ranger toute seule :
+
+  Menu « Émulation » → « Émulateurs… » → section « Fichiers système »
+  → « Ranger un dossier… »
+
+Montrer le dossier où tout traîne suffit : BIOS, clés, micrologiciels,
+archives, sous-dossiers compris. EvaChi porte chaque fichier au bon endroit,
+aussi bien pour ses propres cœurs que pour les émulateurs autonomes. Ce que
+personne ne réclame n'est pas déplacé. « Un seul fichier… » fait la même chose
+pour un fichier isolé.
+
+Installer les émulateurs AVANT de ranger leurs clés : une clé de Switch n'a
+nulle part où aller tant que l'émulateur n'est pas là. EvaChi le dit quand
+c'est le cas.
+
+
+Les manettes
+------------
+
+Les cœurs intégrés lisent la manette directement : rien à régler.
+
+Les émulateurs autonomes, eux, lisent la leur eux-mêmes, chacun à sa façon.
+EvaChi pose une configuration de départ à ceux qu'elle sait configurer, pour
+qu'une manette branchée réponde dès la première partie. Pour les autres, cela
+se règle dans leurs propres menus.
+
+
+Ce qu'il faut sur la machine
+----------------------------
+
+Windows 10 ou 11, 64 bits, et le moteur WebView2 de Microsoft — déjà présent
+sur Windows 11 et sur un Windows 10 à jour. À défaut, il s'installe depuis le
+site de Microsoft (« Microsoft Edge WebView2 Runtime », gratuit).
+
+Au premier lancement, Windows affiche un avertissement : le programme n'est
+pas signé par un éditeur enregistré. « Informations complémentaires » puis
+« Exécuter quand même ».
+
+EvaChi range ses réglages, ses cœurs et ses sauvegardes dans
+%APPDATA%\app.evachi. Les jeux, eux, restent dans le dossier « roms » posé
+ici, à côté du programme.
+
+
+Ce que ce dossier ne contient pas, et ne contiendra jamais
+----------------------------------------------------------
+
+Aucune ROM. Aucun BIOS. Aucune clé de déchiffrement. Aucun micrologiciel.
+Aucun émulateur.
+
+Écrire un émulateur est légal : c'est du reverse engineering de comportement,
+pas de la copie de code, et la jurisprudence est établie (Sony v. Connectix,
+Bleem!). Distribuer les jeux et les micrologiciels d'origine ne l'est pas.
+
+Les émulateurs ne sont pas redistribués non plus : EvaChi va les chercher, à
+la demande, là où leurs auteurs les publient — les cœurs libretro sur
+buildbot.libretro.com, les émulateurs autonomes sur la forge de chaque projet.
+Chacun garde sa licence et son auteur.
+
+
+Licence
+-------
+
+EvaChi est un logiciel libre sous GNU GPL version 3 ou ultérieure. Le texte
+complet est dans le fichier LICENSE, à côté de ce fichier-ci.
+
+La GPL donne le droit d'utiliser, d'étudier, de modifier et de redistribuer ce
+programme, à la condition d'en transmettre le code source. Le code source de
+cette version est publié à l'adresse suivante :
+
+  <ADRESSE DU DÉPÔT À COMPLÉTER>
+
+Cette ligne doit être remplie avant toute redistribution : sans elle, la
+condition de la GPL n'est pas remplie.
+
+Les émulateurs qu'EvaChi télécharge ne sont pas couverts par cette licence.
+Chacun a la sienne, annoncée dans la fenêtre d'installation avant le
+téléchargement.
