@@ -397,7 +397,13 @@ impl Core {
         Ok(with_host(|host| Frame {
             video: host.video_fresh.then(|| host.video.clone()),
             audio,
-            messages: std::mem::take(&mut host.messages),
+            messages: {
+                // Ce que le cœur a dit de lui-même vient après ce qu'il a
+                // demandé d'afficher : l'un explique souvent l'autre.
+                let mut dites = std::mem::take(&mut host.messages);
+                dites.extend(super::host::take_core_log());
+                dites
+            },
             shutdown: host.shutdown,
         }))
     }

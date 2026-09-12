@@ -809,6 +809,7 @@ dependencies = [
 name = "evachi"
 version = "0.2.0"
 dependencies = [
+ "cc",
  "libloading 0.8.9",
  "serde",
  "serde_json",

@@ -343,25 +343,39 @@ pub unsafe extern "C" fn input_state(
     with_host(|host| host.input[id as usize])
 }
 
-/// Journalise un message émis par le cœur.
+extern "C" {
+    /// Le vrai rappel remis aux cœurs, écrit en C faute de mieux.
+    ///
+    /// Voir `journal.c` : Rust stable sait déclarer une fonction variadique,
+    /// pas en définir une.
+    fn evachi_log_printf(level: c_uint, fmt: *const c_char, ...);
+}
+
+/// Les lignes que les cœurs ont écrites, en attente d'être relevées.
 ///
-/// L'ABI attend ici une fonction variadique à la C, que Rust stable ne sait pas
-/// *définir*. On en fournit une non variadique dont le début de signature
-/// correspond : la convention d'appel C laisse le nettoyage à l'appelant, et
-/// cette fonction ne lit jamais les arguments surnuméraires.
+/// Une file globale plutôt que l'état hôte, pour la même raison que l'audio :
+/// un cœur peut journaliser depuis un de ses propres threads, ou depuis
+/// l'intérieur d'un autre rappel. Emprunter l'état hôte à ce moment-là le
+/// ferait paniquer en pleine partie.
+static CORE_LOG: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Au-delà, on cesse d'accumuler.
 ///
-/// Le format n'est donc pas interprété — on remonte le gabarit tel quel, ce qui
-/// suffit à situer un problème. Écrire sur la sortie d'erreur plutôt que dans
-/// l'état hôte évite un emprunt réentrant : un cœur peut très bien journaliser
-/// depuis l'intérieur d'un autre rappel.
+/// Un cœur bavard en écrit des milliers par seconde avant qu'on ait relevé quoi
+/// que ce soit. Garder les premières plutôt que les dernières : ce sont celles
+/// qui disent pourquoi le démarrage s'est mal passé.
+const CORE_LOG_MAX: usize = 200;
+
+/// Reçoit une ligne déjà formatée par `journal.c`.
 ///
 /// # Safety
-/// `fmt` doit être une chaîne C valide ou nulle.
-unsafe extern "C" fn log_printf(level: c_uint, fmt: *const c_char) {
-    if fmt.is_null() {
+/// `text` doit être une chaîne C valide.
+#[no_mangle]
+pub unsafe extern "C" fn evachi_log_line(level: c_uint, text: *const c_char) {
+    if text.is_null() {
         return;
     }
-    let text = CStr::from_ptr(fmt).to_string_lossy();
+    let text = CStr::from_ptr(text).to_string_lossy();
     let text = text.trim_end();
     if text.is_empty() {
         return;
@@ -374,6 +388,23 @@ unsafe extern "C" fn log_printf(level: c_uint, fmt: *const c_char) {
         _ => "erreur",
     };
     eprintln!("[cœur/{severity}] {text}");
+
+    // Le débogage reste sur la sortie d'erreur : ce sont des milliers de lignes
+    // par partie, et elles n'apprennent rien à qui n'a pas le code sous les
+    // yeux. Le reste remonte jusqu'au journal de l'application.
+    if level == 0 {
+        return;
+    }
+    let mut file = CORE_LOG.lock().unwrap_or_else(|poison| poison.into_inner());
+    if file.len() < CORE_LOG_MAX {
+        file.push(format!("{severity} · {text}"));
+    }
+}
+
+/// Relève les lignes accumulées depuis le dernier passage.
+pub fn take_core_log() -> Vec<String> {
+    let mut file = CORE_LOG.lock().unwrap_or_else(|poison| poison.into_inner());
+    std::mem::take(&mut file)
 }
 
 /// Point d'entrée unique par lequel le cœur interroge et configure son hôte.
@@ -586,10 +617,7 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
             // vérifier qu'on l'a rempli, et sautent alors sur une adresse non
             // initialisée. Fournir un rappel inerte les fait vivre.
             data.cast::<LogCallback>().write(LogCallback {
-                log: std::mem::transmute::<
-                    unsafe extern "C" fn(c_uint, *const c_char),
-                    LogPrintfFn,
-                >(log_printf),
+                log: evachi_log_printf,
             });
             true
         }
