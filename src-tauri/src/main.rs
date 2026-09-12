@@ -18,6 +18,7 @@ mod bios;
 mod commands;
 mod emulators;
 mod install;
+mod pads;
 mod skeleton;
 
 use evachi::libretro::Session;
@@ -104,6 +105,9 @@ fn main() {
             for line in commands::declared_externals_summary(&paths) {
                 commands::write_log(&paths, &line);
             }
+            // Une manette branchée doit répondre dès la première partie ; ces
+            // programmes lisent la leur eux-mêmes, et n'en ont parfois aucune.
+            commands::configure_pads(&paths);
 
             app.manage(paths);
             // Le thread d'émulation vit aussi longtemps que l'application.

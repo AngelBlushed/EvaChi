@@ -1120,6 +1120,13 @@ pub fn launch_external(
         return Err(format!("{} : programme introuvable", target.executable));
     }
 
+    // Une manette branchée doit répondre au premier lancement. L'émulateur lit
+    // la sienne lui-même : tout ce qu'on peut faire est lui poser une
+    // configuration de départ, et seulement s'il n'en a pas.
+    for written in crate::pads::ensure(&system, Path::new(&target.executable), &documents_dir()) {
+        write_log(&paths, &format!("manette configurée : {written}"));
+    }
+
     let mut command = std::process::Command::new(&target.executable);
 
     // Le jeu prend la place du marqueur ; sans marqueur, il vient en dernier,
@@ -1278,6 +1285,20 @@ pub fn seed_library(paths: &Paths) {
     }
 }
 
+/// Pose les configurations de manette manquantes des émulateurs déclarés.
+///
+/// Au démarrage plutôt qu'au premier lancement d'un jeu : une manette qui ne
+/// répond pas se découvre au pire moment, une fois la partie chargée.
+pub fn configure_pads(paths: &Paths) {
+    let documents = documents_dir();
+    for system in read_config(paths).external {
+        for written in crate::pads::ensure(&system.name, Path::new(&system.executable), &documents)
+        {
+            write_log(paths, &format!("manette configurée : {written}"));
+        }
+    }
+}
+
 /// Décrit les émulateurs autonomes déclarés, une ligne chacun.
 ///
 /// Destiné au journal de démarrage : c'est le seul endroit où l'on voit quel
@@ -1415,6 +1436,15 @@ pub fn adopt_to_stdout(source: &Path) -> i32 {
 
     println!("{placed} fichier(s) rangé(s) sur {}", results.len());
     i32::from(placed == 0)
+}
+
+/// Le dossier « Documents » de l'utilisateur, où plusieurs émulateurs rangent
+/// leurs réglages.
+fn documents_dir() -> PathBuf {
+    std::env::var_os("USERPROFILE")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+        .join("Documents")
 }
 
 /// Le dossier de données de l'application, hors de tout contexte Tauri.
