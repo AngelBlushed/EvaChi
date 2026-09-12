@@ -40,6 +40,26 @@ pub struct Standalone {
     pub license: &'static str,
     /// Page officielle, pour ceux qu'on ne peut pas télécharger.
     pub site: &'static str,
+    /// Flux de versions propre au projet, pour ceux qui ne publient pas leurs
+    /// binaires sur GitHub.
+    ///
+    /// Dolphin est de ceux-là : son dépôt n'attache aucun fichier à ses
+    /// versions, tout passe par sa propre forge. Le flux rend la même chose
+    /// sous un autre nom — une version, et une liste de fichiers étiquetés par
+    /// système. `wants` s'applique alors à l'étiquette, pas au nom de fichier.
+    pub feed: &'static str,
+}
+
+impl Standalone {
+    /// Vrai si EvaChi sait aller le chercher toute seule.
+    ///
+    /// Deux forges valent mieux qu'une condition recopiée à trois endroits :
+    /// la question se pose dans l'interface, dans l'installation en ligne de
+    /// commande et dans les épreuves, et une seule d'entre elles oubliée
+    /// suffisait à rendre Dolphin introuvable.
+    pub fn downloadable(&self) -> bool {
+        !self.repository.is_empty() || !self.feed.is_empty()
+    }
 }
 
 /// Les émulateurs autonomes qu'EvaChi sait installer ou reconnaître.
@@ -56,6 +76,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "portable/",
         license: "MPL-2.0",
         site: "https://cemu.info",
+        feed: "",
     },
     Standalone {
         system: "PlayStation 2",
@@ -67,6 +88,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "portable.ini",
         license: "GPL-3.0",
         site: "https://pcsx2.net",
+        feed: "",
     },
     // Le cœur libretro existe, mais il fait tomber l'application : il dessine
     // par le processeur graphique, et notre intégration de ce rendu n'est pas
@@ -81,6 +103,22 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "",
         license: "GPL-2.0-or-later",
         site: "https://www.ppsspp.org",
+        feed: "",
+    },
+    // Le dépôt GitHub de Dolphin n'attache aucun fichier à ses versions : tout
+    // passe par sa propre forge, qui publie un flux. L'étiquette « Windows
+    // x64 » y désigne l'archive, et non son nom de fichier.
+    Standalone {
+        system: "GameCube · Wii",
+        label: "Dolphin",
+        repository: "",
+        wants: &["windows x64"],
+        rejects: &[],
+        executable: "Dolphin.exe",
+        portable: "",
+        license: "GPL-2.0-or-later",
+        site: "https://dolphin-emu.org",
+        feed: "https://dolphin-emu.org/update/latest/beta",
     },
     Standalone {
         system: "Xbox 360",
@@ -92,6 +130,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "",
         license: "BSD-3-Clause",
         site: "https://xenia.jp",
+        feed: "",
     },
     Standalone {
         system: "Xbox",
@@ -105,6 +144,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "",
         license: "GPL-2.0",
         site: "https://xemu.app",
+        feed: "",
     },
     Standalone {
         system: "Nintendo 3DS",
@@ -119,6 +159,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "user/",
         license: "GPL-3.0",
         site: "https://azahar-emu.org",
+        feed: "",
     },
     Standalone {
         system: "PS Vita",
@@ -130,6 +171,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "",
         license: "GPL-2.0",
         site: "https://vita3k.org",
+        feed: "",
     },
     Standalone {
         system: "Nintendo Switch",
@@ -143,6 +185,7 @@ pub const STANDALONES: &[Standalone] = &[
         portable: "",
         license: "MIT",
         site: "https://ryujinx.app",
+        feed: "",
     },
 ];
 
@@ -167,7 +210,7 @@ pub fn catalogue() -> Vec<StandaloneOffer> {
             label: known.label.to_owned(),
             license: known.license.to_owned(),
             site: known.site.to_owned(),
-            downloadable: !known.repository.is_empty(),
+            downloadable: known.downloadable(),
         })
         .collect()
 }
@@ -183,6 +226,106 @@ struct Release {
 struct Asset {
     name: String,
     browser_download_url: String,
+}
+
+/// Ce que rend le flux d'un projet qui publie chez lui.
+#[derive(Deserialize)]
+struct Feed {
+    shortrev: String,
+    artifacts: Vec<Artifact>,
+}
+
+#[derive(Deserialize)]
+struct Artifact {
+    /// Étiquette du système, par exemple « Windows x64 ».
+    system: String,
+    url: String,
+}
+
+/// Une archive retenue : d'où la prendre, et sous quelle version.
+struct Pick {
+    version: String,
+    url: String,
+    name: String,
+}
+
+/// Demande au flux du projet quelle archive prendre.
+fn from_feed(known: &Standalone) -> Result<Pick, String> {
+    let answer = ureq::get(known.feed)
+        .set("User-Agent", "EvaChi")
+        .call()
+        .map_err(|error| format!("{} : {error}", known.label))?
+        .into_string()
+        .map_err(|error| format!("{} : réponse illisible ({error})", known.label))?;
+
+    let feed: Feed = serde_json::from_str(&answer)
+        .map_err(|error| format!("{} : réponse inattendue ({error})", known.label))?;
+
+    let labels: Vec<&str> = feed.artifacts.iter().map(|a| a.system.as_str()).collect();
+    let Some(chosen) = choose(&labels, known) else {
+        return Err(format!(
+            "{} {} : aucune archive Windows parmi {}",
+            known.label,
+            feed.shortrev,
+            labels.join(", ")
+        ));
+    };
+    let artifact = feed
+        .artifacts
+        .iter()
+        .find(|a| a.system == chosen)
+        .expect("l'étiquette vient de cette liste");
+
+    Ok(Pick {
+        version: feed.shortrev.clone(),
+        url: artifact.url.clone(),
+        // Le nom de fichier sert au message d'erreur et à reconnaître le format
+        // de l'archive : il se lit à la fin de l'adresse.
+        name: artifact
+            .url
+            .rsplit('/')
+            .next()
+            .unwrap_or(&artifact.url)
+            .to_owned(),
+    })
+}
+
+/// Demande à GitHub quelle archive prendre.
+fn from_github(known: &Standalone) -> Result<Pick, String> {
+    let answer = ureq::get(&format!(
+        "https://api.github.com/repos/{}/releases/latest",
+        known.repository
+    ))
+    .set("User-Agent", "EvaChi")
+    .set("Accept", "application/vnd.github+json")
+    .call()
+    .map_err(|error| format!("{} : {error}", known.repository))?
+    .into_string()
+    .map_err(|error| format!("{} : réponse illisible ({error})", known.repository))?;
+
+    let release: Release = serde_json::from_str(&answer)
+        .map_err(|error| format!("{} : réponse inattendue ({error})", known.repository))?;
+
+    let names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
+    let Some(chosen) = choose(&names, known) else {
+        return Err(format!(
+            "{} {} : aucune archive Windows parmi {}",
+            known.label,
+            release.tag_name,
+            names.join(", ")
+        ));
+    };
+    let asset = release
+        .assets
+        .iter()
+        .find(|a| a.name == chosen)
+        .expect("le nom vient de cette liste");
+
+    Ok(Pick {
+        version: release.tag_name.clone(),
+        url: asset.browser_download_url.clone(),
+        name: asset.name.clone(),
+    })
 }
 
 /// Choisit l'archive qui convient à cette machine parmi celles publiées.
@@ -221,51 +364,28 @@ pub struct Installed {
 /// Le dossier de destination est remplacé : une installation à moitié écrite
 /// par une tentative précédente ne doit pas se mélanger à la nouvelle.
 pub fn install(known: &Standalone, into: &Path) -> Result<Installed, String> {
-    if known.repository.is_empty() {
-        return Err(format!(
-            "{} ne se télécharge pas : à installer depuis {}",
-            known.label, known.site
-        ));
-    }
-
-    let answer = ureq::get(&format!(
-        "https://api.github.com/repos/{}/releases/latest",
-        known.repository
-    ))
-    .set("User-Agent", "EvaChi")
-    .set("Accept", "application/vnd.github+json")
-    .call()
-    .map_err(|error| format!("{} : {error}", known.repository))?
-    .into_string()
-    .map_err(|error| format!("{} : réponse illisible ({error})", known.repository))?;
-
-    let release: Release = serde_json::from_str(&answer)
-        .map_err(|error| format!("{} : réponse inattendue ({error})", known.repository))?;
-
-    let names: Vec<&str> = release.assets.iter().map(|a| a.name.as_str()).collect();
-    let Some(chosen) = choose(&names, known) else {
-        return Err(format!(
-            "{} {} : aucune archive Windows parmi {}",
-            known.label,
-            release.tag_name,
-            names.join(", ")
-        ));
+    // Deux forges, une seule suite : on demande d'abord où prendre l'archive,
+    // le reste ne dépend plus de qui la publie.
+    let pick = match (known.repository.is_empty(), known.feed.is_empty()) {
+        (true, true) => {
+            return Err(format!(
+                "{} ne se télécharge pas : à installer depuis {}",
+                known.label, known.site
+            ))
+        }
+        (true, false) => from_feed(known)?,
+        _ => from_github(known)?,
     };
-    let asset = release
-        .assets
-        .iter()
-        .find(|a| a.name == chosen)
-        .expect("le nom vient de cette liste");
 
     let mut archive = Vec::new();
-    ureq::get(&asset.browser_download_url)
+    ureq::get(&pick.url)
         .set("User-Agent", "EvaChi")
         .call()
-        .map_err(|error| format!("{} : {error}", asset.name))?
+        .map_err(|error| format!("{} : {error}", pick.name))?
         .into_reader()
         .take(MAX_DOWNLOAD)
         .read_to_end(&mut archive)
-        .map_err(|error| format!("{} : {error}", asset.name))?;
+        .map_err(|error| format!("{} : {error}", pick.name))?;
 
     // On déballe à côté, puis on échange : tant que le nouveau dossier n'est pas
     // complet, l'ancienne installation reste utilisable.
@@ -273,7 +393,7 @@ pub fn install(known: &Standalone, into: &Path) -> Result<Installed, String> {
     let _ = std::fs::remove_dir_all(&staging);
     std::fs::create_dir_all(&staging).map_err(|error| format!("{} : {error}", staging.display()))?;
 
-    let outcome = if asset.name.to_lowercase().ends_with(".7z") {
+    let outcome = if pick.name.to_lowercase().ends_with(".7z") {
         unpack_7z(archive, &staging)
     } else {
         unpack_zip(archive, &staging)
@@ -316,7 +436,7 @@ pub fn install(known: &Standalone, into: &Path) -> Result<Installed, String> {
 
     Ok(Installed {
         executable: into.join(relative),
-        version: release.tag_name,
+        version: pick.version,
     })
 }
 
@@ -476,7 +596,7 @@ mod tests {
 
     #[test]
     fn chaque_emulateur_telechargeable_sait_ce_qu_il_cherche() {
-        for known in STANDALONES.iter().filter(|e| !e.repository.is_empty()) {
+        for known in STANDALONES.iter().filter(|known| known.downloadable()) {
             assert!(
                 !known.wants.is_empty(),
                 "{} ne dit pas quelle archive prendre",
@@ -487,7 +607,13 @@ mod tests {
                 "{} : exécutable douteux",
                 known.label
             );
-            assert!(known.repository.contains('/'), "{} : dépôt douteux", known.label);
+            // L'un ou l'autre, jamais rien : un dépôt GitHub « propriétaire/nom »,
+            // ou l'adresse du flux du projet.
+            let source = match known.repository.is_empty() {
+                true => known.feed.starts_with("https://"),
+                false => known.repository.contains('/'),
+            };
+            assert!(source, "{} : source douteuse", known.label);
         }
     }
 

@@ -193,20 +193,27 @@ mod tests {
         // qu'EvaChi sait faire tourner ; l'ossature doit suivre. Un cœur ajouté
         // sans son dossier laisserait l'utilisateur sans endroit où ranger ses
         // jeux.
+        // Les deux tableaux séparent les consoles jumelles à leur façon —
+        // « Gamecube-Wii » d'un côté, « GameCube · Wii » de l'autre. C'est le
+        // dossier qui compte, pas le trait d'union : on compare les mots.
+        let mots = |texte: &str| {
+            texte
+                .to_lowercase()
+                .replace(['·', '-', '_'], " ")
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        };
+
         let debuts: Vec<String> = FOLDERS
             .iter()
             .map(|folder| {
-                folder
-                    .split(['(', '['])
-                    .next()
-                    .unwrap_or(folder)
-                    .trim()
-                    .to_lowercase()
+                mots(folder.split(['(', '[']).next().unwrap_or(folder))
             })
             .collect();
 
         for known in crate::emulators::STANDALONES {
-            let attendu = known.system.to_lowercase();
+            let attendu = mots(known.system);
             assert!(
                 debuts.contains(&attendu),
                 "{} n'a pas de dossier dans l'ossature",

@@ -1353,7 +1353,7 @@ pub fn install_emulators_to_stdout() -> i32 {
             write_log(&paths, &line);
             continue;
         }
-        if known.repository.is_empty() {
+        if !known.downloadable() {
             let line = format!("{} : à installer depuis {}", known.label, known.site);
             println!("{line}");
             write_log(&paths, &line);
