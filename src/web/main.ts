@@ -456,6 +456,10 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
     await core.load(bytes, path);
   } catch (error) {
     log(`${name} — ${reason(error)}`, 'err');
+    // Le cœur a presque toujours dit pourquoi avant de refuser. Sans cette
+    // relève, son explication attendait le jeu suivant, où elle n'éclairait
+    // plus rien.
+    await drainMessages();
     return;
   }
 

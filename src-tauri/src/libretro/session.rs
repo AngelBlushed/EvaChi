@@ -255,10 +255,18 @@ impl Session {
 
     /// Relève les messages accumulés et vide la file.
     pub fn take_messages(&self) -> Vec<String> {
-        self.messages
+        let mut pending = self
+            .messages
             .lock()
             .map(|mut pending| std::mem::take(&mut *pending))
-            .unwrap_or_default()
+            .unwrap_or_default();
+
+        // Ce que le cœur a écrit avant de refuser le contenu ne passait par
+        // aucune trame — puisqu'il n'y en a jamais eu — et n'arrivait donc
+        // qu'au jeu suivant, où il n'expliquait plus rien. C'est pourtant le
+        // seul endroit où l'on apprend *pourquoi* un chargement a échoué.
+        pending.extend(super::host::take_core_log());
+        pending
     }
 
     pub fn reset(&self) -> Result<(), String> {

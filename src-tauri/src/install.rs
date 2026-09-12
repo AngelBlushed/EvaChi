@@ -52,6 +52,12 @@ const CATALOGUE: &[(&str, &str, &str)] = &[
     ("mednafen_ngp_libretro", "Beetle NeoPop", "Neo Geo Pocket"),
     ("mednafen_wswan_libretro", "Beetle WonderSwan", "WonderSwan"),
     ("mednafen_lynx_libretro", "Beetle Lynx", "Atari Lynx"),
+    // Deux portages de Stella, et le plus récent n'est pas le meilleur : la
+    // version publiée par la forge est une préversion 8.0 qui refuse des ROMs
+    // de quatre kilo-octets parfaitement ordinaires — « Unrecognized ROM file
+    // type » sur River Raid. Le portage de 2014 les ouvre sans broncher, et
+    // c'est lui que la bibliothèque retient.
+    ("stella2014_libretro", "Stella 2014", "Atari 2600"),
     ("stella_libretro", "Stella", "Atari 2600"),
     ("prosystem_libretro", "ProSystem", "Atari 7800"),
     ("atari800_libretro", "Atari800", "Atari 800 · 5200"),

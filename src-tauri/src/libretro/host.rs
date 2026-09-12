@@ -593,16 +593,21 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
             true
         }
 
-        ENV_GET_PREFERRED_HW_RENDER => {
-            if data.is_null() {
-                return false;
-            }
-            // Les cœurs qui savent faire les deux — Mupen64Plus-Next par
-            // exemple — demandent ici quoi choisir. Vulkan n'étant pas servi,
-            // autant le dire avant qu'ils ne s'y engagent.
-            data.cast::<c_uint>().write(HW_CONTEXT_OPENGL);
-            true
-        }
+        // `GET_PREFERRED_HW_RENDER` n'est volontairement pas traité.
+        //
+        // On y répondait « OpenGL », pour que les cœurs sachant faire les deux
+        // choisissent GL plutôt que Vulkan. Mais la question n'est pas « lequel
+        // préfères-tu » : c'est « lequel dois-tu employer ». Un cœur logiciel
+        // qui la pose par acquit de conscience — DOSBox Pure le fait — prenait
+        // notre réponse pour un ordre, s'engageait dans son chemin accéléré, et
+        // emportait l'application entière avant d'avoir affiché quoi que ce
+        // soit. Une violation d'accès, sans un mot.
+        //
+        // Ne pas répondre ne coûte rien : le repli existe déjà un cran plus
+        // bas. `SET_HW_RENDER` refuse tout ce qui n'est pas OpenGL, et les
+        // cœurs redescendent d'eux-mêmes — Mupen64Plus de Vulkan vers GL,
+        // Dolphin d'OpenGL Core vers OpenGL 3.0. C'est là que la décision se
+        // prend, et elle s'y prend mieux.
 
         // Acceptées sans effet : le cœur s'en accommode.
         ENV_SET_PERFORMANCE_LEVEL | ENV_SET_INPUT_DESCRIPTORS | ENV_SET_SUPPORT_NO_GAME

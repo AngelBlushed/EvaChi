@@ -120,6 +120,9 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['pc engine', 'mednafen_pce_fast'],
   ['turbografx', 'mednafen_pce_fast'],
   ['wonderswan', 'mednafen_wswan'],
+  // Le portage de 2014 avant le récent : celui de la forge est une préversion
+  // qui refuse des ROMs de quatre kilo-octets ordinaires.
+  ['atari 2600', 'stella2014'],
   ['atari 2600', 'stella'],
   ['atari 7800', 'prosystem'],
   ['atari 800', 'atari800'],
