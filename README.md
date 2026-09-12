@@ -38,7 +38,7 @@ L'interface écoute sur <http://localhost:5173>. Le bouton **Démo** charge
 `roms/bounce.ch8`, une ROM écrite pour ce projet.
 
 ```bash
-npm test                                    # 64 tests : CHIP-8, décodage des trames, audio
+npm test                                    # tests TypeScript : CHIP-8, trames, audio, bibliothèque, manette
 npm run typecheck                           # tsc sur tout le TypeScript
 npm run build                               # bundle statique dans dist/
 node scripts/run-headless.mjs roms/bounce.ch8 --frames 180 --every 60
@@ -97,6 +97,17 @@ Les consoles sans portage libretro — Wii U, PS2, Xbox, Xbox 360, PS Vita —
 passent par un émulateur autonome, qu'EvaChi installe dans
 `%APPDATA%\app.evachi\emulators\` depuis la forge de chaque projet, et qu'elle
 lance directement dans le jeu, en plein écran, sans montrer son menu.
+
+La GameCube et la PSP les ont rejointes, bien qu'un cœur existe pour elles : ces
+cœurs-là dessinent par le processeur graphique, et notre intégration de ce rendu
+n'est pas au point. Dolphin et PPSSPP d'origine tournent sans faute et prennent
+la place ; les cœurs restent choisissables dans le volet.
+
+Ces programmes lisent la manette eux-mêmes — EvaChi ne peut rien leur
+transmettre. Elle leur pose en revanche une configuration de départ quand ils
+n'en ont aucune, pour que la manette réponde dès la première partie. Voir
+[docs/coeurs.md](docs/coeurs.md) pour qui peut en bénéficier et pourquoi pas
+tout le monde.
 
 La Switch fait exception : la forge de Ryubing est protégée par un test
 anti-robot, qu'EvaChi ne cherche pas à contourner. Installez-le depuis
