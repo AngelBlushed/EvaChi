@@ -350,6 +350,12 @@ const KNOWN_EXTERNALS: &[KnownExternal] = &[
         extensions: &["iso", "gcm", "dol", "wbfs", "rvz", "ciso", "gcz", "wad"],
     },
     KnownExternal {
+        system: "PSP",
+        executables: &["PPSSPPWindows64.exe", "PPSSPPWindows.exe", "PPSSPP.exe"],
+        args: &["--fullscreen", "{rom}"],
+        extensions: &["iso", "cso", "pbp", "elf", "chd", "prx"],
+    },
+    KnownExternal {
         system: "Xbox 360",
         executables: &["xenia_canary.exe", "xenia.exe"],
         args: &["--fullscreen", "{rom}"],

@@ -75,6 +75,8 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['xbox360', 'externe:Xbox 360'],
   ['xbox', 'externe:Xbox'],
   ['ps vita', 'externe:PS Vita'],
+  // Le cœur PSP fait tomber l'application : PPSSPP d'origine prend sa place.
+  ['psp', 'externe:PSP'],
   ['psvita', 'externe:PS Vita'],
   ['vita', 'externe:PS Vita'],
   ['3do', 'opera'],

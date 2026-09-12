@@ -68,6 +68,20 @@ pub const STANDALONES: &[Standalone] = &[
         license: "GPL-3.0",
         site: "https://pcsx2.net",
     },
+    // Le cœur libretro existe, mais il fait tomber l'application : il dessine
+    // par le processeur graphique, et notre intégration de ce rendu n'est pas
+    // au point. PPSSPP d'origine tourne sans faute.
+    Standalone {
+        system: "PSP",
+        label: "PPSSPP",
+        repository: "hrydgard/ppsspp",
+        wants: &["windows", "x64", ".zip"],
+        rejects: &["arm64"],
+        executable: "PPSSPPWindows64.exe",
+        portable: "",
+        license: "GPL-2.0-or-later",
+        site: "https://www.ppsspp.org",
+    },
     Standalone {
         system: "Xbox 360",
         label: "Xenia Canary",
