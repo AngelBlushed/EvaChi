@@ -46,6 +46,11 @@ pub struct HostState {
     pub options: HashMap<String, CString>,
     /// Vrai tant que le cœur n'a pas relu les options modifiées.
     pub options_dirty: bool,
+    /// Quarts de tour à appliquer à l'image, dans le sens direct.
+    ///
+    /// Les consoles portables qui se tiennent de côté — la WonderSwan — le
+    /// demandent, et comptent sur l'hôte pour le faire.
+    pub rotation: c_uint,
     /// Le contexte graphique réclamé par le cœur, s'il dessine en 3D.
     ///
     /// Renseigné pendant `retro_set_environment`, donc bien avant que le
@@ -95,6 +100,7 @@ impl Default for HostState {
             messages: Vec::new(),
             options: HashMap::new(),
             options_dirty: false,
+            rotation: 0,
             hw: None,
             #[cfg(windows)]
             gl: None,
@@ -188,6 +194,46 @@ unsafe fn convert(
     }
 }
 
+/// Tourne une image RGBA d'un quart de tour dans le sens direct.
+///
+/// Rend l'image tournée et sa nouvelle géométrie — largeur et hauteur
+/// échangées. Isolé des rappels pour être éprouvable : une erreur d'indice ici
+/// donnerait une image en miroir ou un panique en pleine partie, et la lecture
+/// seule ne départage pas les deux.
+pub fn rotate_quarter(pixels: &[u8], width: usize, height: usize) -> (Vec<u8>, usize, usize) {
+    let mut out = vec![0u8; width * height * 4];
+    // Un quart de tour direct amène le bord droit en haut : le pixel de la
+    // colonne `width - 1 - row` et de la ligne `col` prend la place (col, row).
+    for row in 0..width {
+        for col in 0..height {
+            let source = (col * width + (width - 1 - row)) * 4;
+            let destination = (row * height + col) * 4;
+            out[destination..destination + 4].copy_from_slice(&pixels[source..source + 4]);
+        }
+    }
+    (out, height, width)
+}
+
+/// Applique autant de quarts de tour que le cœur en a demandé.
+fn rotate(frame: &mut VideoFrame, quarters: c_uint) {
+    if quarters == 0 || frame.rgba.is_empty() {
+        return;
+    }
+    let (mut width, mut height) = (frame.width as usize, frame.height as usize);
+    if frame.rgba.len() < width * height * 4 {
+        return;
+    }
+
+    for _ in 0..quarters % 4 {
+        let (tourne, w, h) = rotate_quarter(&frame.rgba, width, height);
+        frame.rgba = tourne;
+        width = w;
+        height = h;
+    }
+    frame.width = width as u32;
+    frame.height = height as u32;
+}
+
 // --- Rappels ----------------------------------------------------------------
 
 /// # Safety
@@ -219,6 +265,7 @@ pub unsafe extern "C" fn video_refresh(
                     None => rgba.clear(),
                 }
                 host.video = VideoFrame { rgba, width, height };
+                rotate(&mut host.video, host.rotation);
                 host.video_fresh = !host.video.rgba.is_empty();
             }
             #[cfg(not(windows))]
@@ -233,6 +280,7 @@ pub unsafe extern "C" fn video_refresh(
         convert(data, width, height, pitch, format, &mut rgba);
 
         host.video = VideoFrame { rgba, width, height };
+        rotate(&mut host.video, host.rotation);
         host.video_fresh = true;
     });
 }
@@ -611,7 +659,19 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 
         // Acceptées sans effet : le cœur s'en accommode.
         ENV_SET_PERFORMANCE_LEVEL | ENV_SET_INPUT_DESCRIPTORS | ENV_SET_SUPPORT_NO_GAME
-        | ENV_SET_ROTATION => true,
+        => true,
+
+        ENV_SET_ROTATION => {
+            if data.is_null() {
+                return false;
+            }
+            // Répondre « oui » sans tourner l'image était pire que refuser : le
+            // cœur nous croit sur parole et n'y touche plus. GunPey sortait
+            // couché, et tous les jeux verticaux avec lui.
+            let quarters = data.cast::<c_uint>().read() % 4;
+            with_host(|host| host.rotation = quarters);
+            true
+        }
 
         ENV_GET_LOG_INTERFACE => {
             if data.is_null() {
@@ -637,6 +697,66 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn un_quart_de_tour_amene_le_bord_droit_en_haut() {
+        // Deux pixels côte à côte : rouge à gauche, vert à droite. Après un
+        // quart de tour direct, le vert doit se retrouver en haut.
+        let pixels = vec![
+            0xff, 0x00, 0x00, 0xff, // rouge, colonne 0
+            0x00, 0xff, 0x00, 0xff, // vert, colonne 1
+        ];
+
+        let (tourne, largeur, hauteur) = rotate_quarter(&pixels, 2, 1);
+
+        assert_eq!((largeur, hauteur), (1, 2), "la géométrie s'échange");
+        assert_eq!(&tourne[0..4], &[0x00, 0xff, 0x00, 0xff], "le vert passe en haut");
+        assert_eq!(&tourne[4..8], &[0xff, 0x00, 0x00, 0xff], "le rouge descend");
+    }
+
+    #[test]
+    fn quatre_quarts_de_tour_rendent_l_image_intacte() {
+        let pixels: Vec<u8> = (0..(3 * 2 * 4) as u8).collect();
+        let mut frame = VideoFrame {
+            rgba: pixels.clone(),
+            width: 3,
+            height: 2,
+        };
+
+        rotate(&mut frame, 4);
+
+        assert_eq!(frame.rgba, pixels);
+        assert_eq!((frame.width, frame.height), (3, 2));
+    }
+
+    #[test]
+    fn une_rotation_nulle_ne_touche_a_rien() {
+        let pixels: Vec<u8> = (0..16).collect();
+        let mut frame = VideoFrame {
+            rgba: pixels.clone(),
+            width: 2,
+            height: 2,
+        };
+
+        rotate(&mut frame, 0);
+
+        assert_eq!(frame.rgba, pixels);
+    }
+
+    #[test]
+    fn une_image_trop_courte_ne_fait_pas_paniquer() {
+        // Un cœur qui annonce une géométrie sans fournir les pixels ne doit pas
+        // emporter l'application : on laisse l'image telle quelle.
+        let mut frame = VideoFrame {
+            rgba: vec![0; 4],
+            width: 64,
+            height: 64,
+        };
+
+        rotate(&mut frame, 1);
+
+        assert_eq!(frame.rgba.len(), 4);
+    }
 
     /// Convertit un tampon de test et rend le RGBA obtenu.
     fn convert_rows<T: Copy>(rows: &[Vec<T>], width: u32, format: PixelFormat) -> Vec<u8> {
