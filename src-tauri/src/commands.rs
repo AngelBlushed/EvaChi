@@ -1563,8 +1563,17 @@ pub fn probe_core_to_stdout(path: &Path) -> i32 {
     // processus n'existe que pour ça et se termine juste après.
     let outcome = unsafe { evachi::libretro::Core::load(path, &workdir, &workdir) };
 
-    let Ok(core) = outcome else {
-        return 1;
+    let core = match outcome {
+        Ok(core) => core,
+        Err(error) => {
+            // La raison compte autant que l'échec. Windows refuse de charger
+            // une bibliothèque non signée quand le Contrôle d'application
+            // intelligent est actif, et les cœurs libretro ne sont jamais
+            // signés : sans ce message, l'utilisateur lit « cœur écarté » et
+            // n'a aucun moyen de savoir que la décision ne vient pas de nous.
+            eprintln!("{error}");
+            return 1;
+        }
     };
 
     let info = core.info().clone();
@@ -1635,7 +1644,8 @@ fn modified_at(path: &Path) -> u64 {
 /// Un cœur qui se termine brutalement — faute d'un contexte graphique matériel,
 /// par exemple — ne fait alors tomber que ce processus-là. Le faire dans le
 /// nôtre emporterait toute l'application au premier démarrage.
-fn probe_core(path: &Path) -> CoreEntry {
+/// Interroge un cœur, et rend aussi ce qui a empêché de le lire.
+fn probe_core_with_reason(path: &Path) -> (CoreEntry, String) {
     let fallback = || CoreEntry {
         id: path
             .file_stem()
@@ -1653,18 +1663,18 @@ fn probe_core(path: &Path) -> CoreEntry {
     };
 
     let Ok(exe) = std::env::current_exe() else {
-        return fallback();
+        return (fallback(), "programme introuvable".into());
     };
 
     let spawned = std::process::Command::new(exe)
         .arg("--probe-core")
         .arg(path)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::null())
+        .stderr(std::process::Stdio::piped())
         .spawn();
 
     let Ok(child) = spawned else {
-        return fallback();
+        return (fallback(), "interrogation impossible".into());
     };
 
     match wait_with_deadline(child, PROBE_TIMEOUT) {
@@ -1672,12 +1682,46 @@ fn probe_core(path: &Path) -> CoreEntry {
             let text = String::from_utf8_lossy(&result.stdout);
             // Un cœur bavard écrit sur la sortie standard avant nous : on ne
             // garde que la dernière ligne, celle que la sonde a produite.
-            text.lines()
+            let entry = text
+                .lines()
                 .rev()
-                .find_map(|line| serde_json::from_str::<CoreEntry>(line.trim()).ok())
-                .unwrap_or_else(fallback)
+                .find_map(|line| serde_json::from_str::<CoreEntry>(line.trim()).ok());
+            match entry {
+                Some(entry) => (entry, String::new()),
+                None => (fallback(), "réponse illisible".into()),
+            }
         }
-        _ => fallback(),
+        Some(result) => {
+            let plainte = String::from_utf8_lossy(&result.stderr);
+            let derniere = plainte
+                .lines()
+                .map(str::trim)
+                .rfind(|line| !line.is_empty())
+                .unwrap_or("refusé sans explication")
+                .to_owned();
+            (fallback(), explain_refusal(&derniere))
+        }
+        None => (fallback(), "n'a pas répondu à temps".into()),
+    }
+}
+
+/// Traduit le refus de Windows quand c'est lui qui a décidé.
+///
+/// Les cœurs libretro sont compilés par la communauté et ne sont signés par
+/// personne. Sur une installation neuve de Windows 11, le Contrôle
+/// d'application intelligent refuse de charger ce qu'il ne peut pas attribuer à
+/// un éditeur — et le refus arrive sous la forme d'un « accès refusé » qui
+/// n'apprend rien. La décision ne vient pas d'EvaChi : autant le dire.
+fn explain_refusal(raw: &str) -> String {
+    let lower = raw.to_lowercase();
+    let bloque = lower.contains("accès refusé")
+        || lower.contains("access is denied")
+        || lower.contains("os error 5")
+        || lower.contains("1260");
+
+    match bloque {
+        true => format!("{raw} — Windows a refusé de charger cette bibliothèque. Le Contrôle d'application intelligent bloque ce qui n'est pas signé, et aucun cœur libretro ne l'est."),
+        false => raw.to_owned(),
     }
 }
 
@@ -1799,7 +1843,10 @@ fn resolve_cores(paths: &Paths) -> Result<Vec<CoreEntry>, String> {
         match config.cores.get(&key) {
             Some(known) if known.modified == stamp => cores.push(known.entry.clone()),
             _ => {
-                let entry = probe_core(path);
+                let (entry, refus) = probe_core_with_reason(path);
+                if !entry.usable {
+                    write_log(paths, &format!("cœur écarté — {} : {refus}", entry.id));
+                }
                 config.cores.insert(
                     key,
                     CachedCore {
