@@ -1661,6 +1661,12 @@ async function start(): Promise<void> {
     keyLabels = null;
   }
 
+  // Dit avant d'attendre. Au premier lancement, chaque cœur fraîchement
+  // installé doit être interrogé un par un, et l'attente se compte en dizaines
+  // de secondes : sans un mot, une bibliothèque vide passe pour une panne, et
+  // on referme la fenêtre — ce qui fait tout recommencer au lancement suivant.
+  if (inShell) log('interrogation des cœurs installés…');
+
   catalog = await discover(makeChip8);
 
   if (inShell) {
@@ -1669,10 +1675,21 @@ async function start(): Promise<void> {
       defaultRomsPath = known.find(([label]) => label === 'jeux')?.[1] ?? '';
       folders = await libraryFolders();
       externals = await externalSystems();
-      presets = await knownExternals();
     } catch {
       // Sans ces chemins, la bibliothèque sera juste moins bavarde.
     }
+
+    // La recherche des émulateurs déjà installés parcourt les disques : elle
+    // n'a aucune raison de retarder l'affichage, et tout intérêt à ne pas le
+    // faire. Attendue ici, elle laissait la fenêtre blanche et le curseur en
+    // sablier tant qu'un disque lent — ou un lecteur réseau déconnecté — ne
+    // répondait pas. On l'annonce, et la liste se remplit quand elle revient.
+    void knownExternals()
+      .then((found) => {
+        presets = found;
+        renderExternals();
+      })
+      .catch((error) => log(`recherche des émulateurs interrompue — ${reason(error)}`, 'err'));
   } else {
     log("page web : seuls les cœurs internes sont disponibles, sans bibliothèque");
   }

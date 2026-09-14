@@ -431,6 +431,15 @@ const DETECT_DEPTH: usize = 4;
 /// jamais les emplacements probables.
 const DETECT_BUDGET: usize = 40_000;
 
+/// Temps que la détection s'autorise, quoi qu'elle trouve.
+///
+/// Un plafond en nombre de dossiers ne borne pas la durée : un seul `read_dir`
+/// sur un partage réseau déconnecté bloque des dizaines de secondes, et aucun
+/// budget n'y change rien. Sur la machine où ce défaut est apparu, la fenêtre
+/// restait blanche indéfiniment — la recherche était attendue avant le premier
+/// affichage. Elle ne l'est plus, et elle s'arrête d'elle-même.
+const DETECT_DEADLINE: std::time::Duration = std::time::Duration::from_secs(6);
+
 /// Dossiers qu'on ne traverse jamais : rien d'installé ne s'y trouve.
 fn is_uninteresting(name: &str) -> bool {
     const SKIP: &[&str] = &[
@@ -468,9 +477,10 @@ fn detect_externals(roots: &[PathBuf]) -> std::collections::HashMap<&'static str
         .map(|root| (root.clone(), DETECT_DEPTH))
         .collect();
     let mut budget = DETECT_BUDGET;
+    let debut = std::time::Instant::now();
 
     while let Some((directory, depth)) = queue.pop_front() {
-        if budget == 0 {
+        if budget == 0 || debut.elapsed() >= DETECT_DEADLINE {
             break;
         }
         budget -= 1;
@@ -524,6 +534,32 @@ fn detect_externals(roots: &[PathBuf]) -> std::collections::HashMap<&'static str
 /// Les racines des disques viennent d'abord : c'est là que se trouvent les
 /// dossiers d'émulateurs qu'on se constitue soi-même, et le parcours en largeur
 /// fait qu'un `D:\EM\...` est atteint bien avant les profondeurs de `C:`.
+/// Vrai si cette lettre désigne un disque interne.
+///
+/// Les autres sont écartés, et pas par économie : un partage réseau
+/// déconnecté fait attendre `read_dir` jusqu'à ce que le protocole abandonne,
+/// un lecteur optique vide réveille son moteur, une clé USB lente se traîne.
+/// Aucun n'est un endroit où l'on installe un émulateur, et chacun pouvait
+/// tenir le démarrage en otage.
+#[cfg(windows)]
+fn is_fixed_drive(root: &str) -> bool {
+    use windows_sys::Win32::Storage::FileSystem::GetDriveTypeA;
+
+    /// Valeur que Windows rend pour un disque interne. La constante n'est pas
+    /// exposée par la liaison ; sa valeur, elle, fait partie de l'interface.
+    const DRIVE_FIXED: u32 = 3;
+
+    let mut nom: Vec<u8> = root.bytes().collect();
+    nom.push(0);
+    // SAFETY : chaîne terminée par zéro, lecture seule d'un état système.
+    unsafe { GetDriveTypeA(nom.as_ptr()) == DRIVE_FIXED }
+}
+
+#[cfg(not(windows))]
+fn is_fixed_drive(root: &str) -> bool {
+    Path::new(root).is_dir()
+}
+
 fn search_roots() -> Vec<PathBuf> {
     let mut roots: Vec<PathBuf> = Vec::new();
 
@@ -533,8 +569,9 @@ fn search_roots() -> Vec<PathBuf> {
         // à la racine.
         roots.extend(
             ('C'..='Z')
-                .map(|letter| PathBuf::from(format!("{letter}:\\")))
-                .filter(|drive| drive.is_dir()),
+                .map(|letter| format!("{letter}:\\"))
+                .filter(|drive| is_fixed_drive(drive))
+                .map(PathBuf::from),
         );
     }
 
@@ -559,13 +596,22 @@ fn search_roots() -> Vec<PathBuf> {
 }
 
 /// Les émulateurs autonomes connus, avec leur état sur cette machine.
+/// Asynchrone pour la même raison que [`list_cores`] : elle parcourt les
+/// disques, et le fil principal n'a pas à l'attendre.
 #[tauri::command]
-pub fn known_externals(paths: State<'_, Paths>) -> Vec<ExternalPreset> {
+pub async fn known_externals(paths: State<'_, Paths>) -> Result<Vec<ExternalPreset>, String> {
+    let paths = (*paths).clone();
+    tauri::async_runtime::spawn_blocking(move || known_externals_now(&paths))
+        .await
+        .map_err(|error| format!("recherche interrompue : {error}"))
+}
+
+fn known_externals_now(paths: &Paths) -> Vec<ExternalPreset> {
     // Ouvrir cette liste, c'est demander « regarde maintenant » : on refouille
     // le disque, même si le balayage d'ouverture a déjà eu lieu.
-    install_detected(&paths, true);
+    install_detected(paths, true);
 
-    let declared = read_config(&paths).external;
+    let declared = read_config(paths).external;
     let found = detect_externals(&search_roots());
 
     KNOWN_EXTERNALS
@@ -864,13 +910,25 @@ pub fn pick_system_folder(app: tauri::AppHandle) -> Option<String> {
 ///
 /// Le cas ordinaire : on récupère un lot quelque part, on le pose sur le
 /// bureau, et il faudrait le trier. Désigner le dossier suffit.
+/// Asynchrone : un dossier de micrologiciels en compte parfois des milliers,
+/// et la fenêtre n'a pas à figer pendant qu'on les range.
 #[tauri::command]
-pub fn adopt_system_folder(path: String, paths: State<'_, Paths>) -> Vec<crate::adopt::Placed> {
-    let targets = system_targets(&paths);
+pub async fn adopt_system_folder(
+    path: String,
+    paths: State<'_, Paths>,
+) -> Result<Vec<crate::adopt::Placed>, String> {
+    let paths = (*paths).clone();
+    tauri::async_runtime::spawn_blocking(move || adopt_system_folder_now(path, &paths))
+        .await
+        .map_err(|error| format!("rangement interrompu : {error}"))
+}
+
+fn adopt_system_folder_now(path: String, paths: &Paths) -> Vec<crate::adopt::Placed> {
+    let targets = system_targets(paths);
     let results = crate::adopt::adopt_folder(Path::new(&path), &targets);
 
     write_log(
-        &paths,
+        paths,
         &format!(
             "rangement du dossier {path} : {} posé(s)",
             results.iter().filter(|placed| placed.placed).count()
@@ -1663,9 +1721,18 @@ fn wait_with_deadline(
 ///
 /// Le résultat est conservé dans les réglages : interroger quinze cœurs prend
 /// plusieurs secondes, et ils ne changent qu'au gré des installations.
+/// Asynchrone, et ce n'est pas un détail. Une commande Tauri déclarée `fn`
+/// s'exécute sur le fil principal — celui qui fait vivre la fenêtre. Sur une
+/// machine où quarante cœurs venaient d'être installés, cette liste tenait ce
+/// fil pendant plusieurs minutes : la fenêtre passait au blanc, le curseur au
+/// sablier, et Windows la déclarait sans réponse. Elle n'était pas plantée,
+/// elle travaillait — mais rien ne le disait, et on la refermait.
 #[tauri::command]
-pub fn list_cores(paths: State<'_, Paths>) -> Result<Vec<CoreEntry>, String> {
-    resolve_cores(&paths)
+pub async fn list_cores(paths: State<'_, Paths>) -> Result<Vec<CoreEntry>, String> {
+    let paths = (*paths).clone();
+    tauri::async_runtime::spawn_blocking(move || resolve_cores(&paths))
+        .await
+        .map_err(|error| format!("interrogation interrompue : {error}"))?
 }
 
 /// Établit la liste des cœurs, en s'appuyant sur le cache quand il est à jour.
@@ -1742,6 +1809,18 @@ fn resolve_cores(paths: &Paths) -> Result<Vec<CoreEntry>, String> {
                 );
                 changed = true;
                 cores.push(entry);
+
+                // La fiche est écrite tout de suite, pas à la fin de la
+                // tournée. Quarante cœurs fraîchement installés se
+                // réinterrogent d'un coup, et chacun peut prendre jusqu'à
+                // quinze secondes : qui referme la fenêtre en la croyant
+                // bloquée perdait tout le travail déjà fait, et retombait sur
+                // la même attente au lancement suivant, indéfiniment.
+                if let Err(error) = write_config(paths, &config) {
+                    write_log(paths, &format!("fiche non écrite : {error}"));
+                } else {
+                    changed = false;
+                }
             }
         }
     }
@@ -1893,13 +1972,22 @@ pub fn read_content(path: String) -> Result<Response, String> {
         .map_err(|error| format!("{path} : {error}"))
 }
 
+/// Asynchrone : une bibliothèque posée sur un disque lent, ou comptant des
+/// milliers de fichiers, tiendrait sinon la fenêtre pendant son parcours.
 #[tauri::command]
-pub fn list_roms(paths: State<'_, Paths>) -> Vec<RomEntry> {
+pub async fn list_roms(paths: State<'_, Paths>) -> Result<Vec<RomEntry>, String> {
+    let paths = (*paths).clone();
+    tauri::async_runtime::spawn_blocking(move || list_roms_now(&paths))
+        .await
+        .map_err(|error| format!("lecture de la bibliothèque interrompue : {error}"))
+}
+
+fn list_roms_now(paths: &Paths) -> Vec<RomEntry> {
     let mut found = Vec::new();
 
     // Le dossier par défaut d'abord, puis ceux que l'utilisateur a ajoutés.
     scan_roms(&paths.roms, "", LIBRARY_DEPTH, &mut found);
-    for folder in read_config(&paths).library_folders {
+    for folder in read_config(paths).library_folders {
         scan_roms(Path::new(&folder), "", LIBRARY_DEPTH, &mut found);
     }
 
@@ -1914,7 +2002,7 @@ pub fn list_roms(paths: State<'_, Paths>) -> Vec<RomEntry> {
     let folders: std::collections::HashSet<&str> =
         found.iter().map(|rom| rom.folder.as_str()).collect();
     write_log(
-        &paths,
+        paths,
         &format!(
             "jeux : {} fichier(s) dans {} dossier(s)",
             found.len(),
