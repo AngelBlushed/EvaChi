@@ -72,6 +72,26 @@ export function columnsFor(width: number, tile: number, gap: number): number {
   return Math.max(1, Math.floor((width + gap) / (tile + gap)));
 }
 
+/**
+ * De combien agrandir un menu prévu pour une petite fenêtre.
+ *
+ * Les tailles du menu animé sont posées pour une fenêtre d'environ six cents
+ * pixels de haut, où tout tombe juste. En plein écran, les mêmes tailles se
+ * perdent dans le vide : les pastilles deviennent minuscules et la liste
+ * s'entasse dans un coin. On agrandit donc tout dans la même proportion, plutôt
+ * que d'ajouter des lignes — un menu de salon se regarde de loin, il doit
+ * grossir avec l'écran.
+ *
+ * Jamais en dessous de 1 : une petite fenêtre garde la disposition d'origine,
+ * qui lui va déjà. Jamais au-dessus de 2,2 non plus, faute de quoi trois jeux
+ * rempliraient un écran de cinéma.
+ */
+export function echelle(hauteur: number): number {
+  const REFERENCE = 660;
+  if (hauteur <= 0) return 1;
+  return Math.min(2.2, Math.max(1, hauteur / REFERENCE));
+}
+
 /** Un appui qui vient d'avoir lieu, par opposition à un bouton tenu. */
 export interface Edge {
   /** Vrai le temps d'une trame, au moment où le bouton s'enfonce. */

@@ -276,6 +276,11 @@
        * menu lisible d'un bout à l'autre du canapé.
        */
       .xmb {
+        /* Toutes les tailles ci-dessous sont multipliées par --ech, que le
+           script recalcule à chaque changement de taille de fenêtre. Sans
+           cela, le menu garde en plein écran la taille prévue pour une petite
+           fenêtre, et se perd dans le vide. */
+        --ech: 1;
         position: relative;
         height: 100%;
         overflow: hidden;
@@ -302,13 +307,13 @@
         display: flex;
         justify-content: space-between;
         align-items: baseline;
-        padding: 16px 28px;
-        font-size: 13px;
+        padding: calc(16px * var(--ech)) calc(28px * var(--ech));
+        font-size: calc(13px * var(--ech));
         color: var(--muted);
       }
       .xmb-tete strong {
         color: var(--ink);
-        font-size: 15px;
+        font-size: calc(15px * var(--ech));
         font-weight: 600;
         letter-spacing: 0.02em;
       }
@@ -318,10 +323,10 @@
          n'oblige à recalculer aucune mise en page. */
       .xmb-piste {
         position: absolute;
-        transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+        transition: transform 110ms cubic-bezier(0.22, 0.61, 0.36, 1);
       }
 
-      .xmb-rail { top: 74px; height: 96px; }
+      .xmb-rail { top: calc(74px * var(--ech)); height: calc(96px * var(--ech)); }
       .xmb-rail .xmb-piste {
         left: 0;
         top: 0;
@@ -333,8 +338,8 @@
       /* Chaque console est une pastille ronde de largeur fixe : c'est cette
          largeur qui sert à calculer le décalage de la piste. */
       .xmb-console {
-        width: 86px;
-        flex: 0 0 86px;
+        width: calc(86px * var(--ech));
+        flex: 0 0 calc(86px * var(--ech));
         border: 0;
         background: none;
         padding: 0;
@@ -342,29 +347,29 @@
         font: inherit;
         display: grid;
         justify-items: center;
-        gap: 7px;
+        gap: calc(7px * var(--ech));
         color: var(--muted);
       }
       .xmb-console .rond {
-        width: 46px;
-        height: 46px;
+        width: calc(46px * var(--ech));
+        height: calc(46px * var(--ech));
         border-radius: 50%;
         display: grid;
         place-items: center;
-        font-size: 15px;
+        font-size: calc(15px * var(--ech));
         font-weight: 600;
         background: var(--raised);
         color: var(--ink);
         opacity: 0.45;
-        transition: transform 200ms ease, opacity 200ms ease, background-color 200ms ease;
+        transition: transform 120ms ease, opacity 120ms ease, background-color 120ms ease;
       }
       .xmb-console .etiquette {
-        font-size: 10px;
+        font-size: calc(10px * var(--ech));
         text-align: center;
         line-height: 1.2;
-        max-width: 84px;
+        max-width: calc(84px * var(--ech));
         opacity: 0;
-        transition: opacity 200ms ease;
+        transition: opacity 120ms ease;
       }
       /* Seule la console en cours dit son nom : l'afficher sous chaque pastille
          donnerait une bande de texte illisible. */
@@ -379,14 +384,19 @@
 
       /* La liste s'arrête avant l'affiche : sans cette marge, un titre long
          passerait derrière la jaquette. */
-      .xmb-liste { top: 182px; bottom: 46px; right: 38%; overflow: hidden; }
+      .xmb-liste {
+        top: calc(182px * var(--ech));
+        bottom: calc(46px * var(--ech));
+        right: 38%;
+        overflow: hidden;
+      }
 
       .xmb-affiche {
         position: absolute;
-        top: 182px;
+        top: calc(182px * var(--ech));
         right: 5%;
         width: 26%;
-        max-width: 280px;
+        max-width: calc(280px * var(--ech));
         pointer-events: none;
       }
       .xmb-affiche .boite {
@@ -401,7 +411,7 @@
       }
       .xmb-affiche .boite > * { grid-area: 1 / 1; }
       .xmb-affiche .initiale {
-        font-size: 58px;
+        font-size: calc(58px * var(--ech));
         font-weight: 600;
         color: var(--muted);
         opacity: 0.4;
@@ -426,32 +436,32 @@
       /* Une rangée de hauteur fixe, quoi qu'elle porte : la sélection grossit
          par transformation, ce qui ne déplace pas ses voisines. */
       .xmb-entree {
-        height: 54px;
+        height: calc(54px * var(--ech));
         width: 100%;
         border: 0;
         background: none;
-        padding: 0 28px;
+        padding: 0 calc(28px * var(--ech));
         cursor: pointer;
         font: inherit;
         color: var(--muted);
         display: flex;
         align-items: center;
-        gap: 16px;
+        gap: calc(16px * var(--ech));
         text-align: left;
         opacity: 0.78;
         transform-origin: left center;
-        transition: opacity 200ms ease, transform 200ms ease, color 200ms ease;
+        transition: opacity 110ms ease, transform 110ms ease, color 110ms ease;
       }
       .xmb-entree .vignette {
-        flex: 0 0 40px;
-        width: 40px;
-        height: 40px;
-        border-radius: 5px;
+        flex: 0 0 calc(40px * var(--ech));
+        width: calc(40px * var(--ech));
+        height: calc(40px * var(--ech));
+        border-radius: calc(5px * var(--ech));
         background: var(--raised);
         display: grid;
         place-items: center;
         overflow: hidden;
-        font-size: 16px;
+        font-size: calc(16px * var(--ech));
         font-weight: 600;
         box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
       }
@@ -467,7 +477,7 @@
 
       .xmb-entree .texte { display: grid; gap: 1px; min-width: 0; }
       .xmb-entree .titre {
-        font-size: 15px;
+        font-size: calc(15px * var(--ech));
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -475,12 +485,12 @@
       /* Le sous-titre n'apparaît que sous la sélection, comme sur une console :
          répété partout, il double la hauteur apparente de la liste. */
       .xmb-entree .detail {
-        font-size: 11px;
+        font-size: calc(11px * var(--ech));
         color: var(--muted);
         opacity: 0;
         height: 0;
         overflow: hidden;
-        transition: opacity 200ms ease;
+        transition: opacity 110ms ease;
       }
       .xmb-entree[aria-selected="true"] {
         opacity: 1;
@@ -495,8 +505,8 @@
 
       .xmb-pied {
         bottom: 0;
-        padding: 14px 28px;
-        font-size: 11px;
+        padding: calc(14px * var(--ech)) calc(28px * var(--ech));
+        font-size: calc(11px * var(--ech));
         color: var(--muted);
       }
 
@@ -512,7 +522,7 @@
         left: 0;
         right: 0;
         bottom: 100%;
-        height: 34px;
+        height: calc(34px * var(--ech));
         background: linear-gradient(transparent, var(--bg));
         pointer-events: none;
       }

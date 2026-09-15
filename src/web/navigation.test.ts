@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { Held, columnsFor, move, step } from './navigation.ts';
+import { Held, columnsFor, echelle, move, step } from './navigation.ts';
 
 /*  Grille de référence, 4 colonnes, 10 jeux :
  *
@@ -105,6 +105,31 @@ describe('nombre de colonnes', () => {
   it('en garde toujours au moins une', () => {
     assert.equal(columnsFor(10, 100, 20), 1);
     assert.equal(columnsFor(0, 100, 20), 1);
+  });
+});
+
+describe('mise à l’échelle du menu', () => {
+  it('laisse la petite fenêtre telle quelle', () => {
+    // Les tailles sont posées pour cette hauteur-là : elle n'a rien à gagner
+    // d'un agrandissement, et beaucoup à perdre d'un rétrécissement.
+    assert.equal(echelle(660), 1);
+    assert.equal(echelle(500), 1);
+    assert.equal(echelle(120), 1);
+  });
+
+  it('grossit avec la hauteur', () => {
+    assert.equal(echelle(990), 1.5);
+    assert.equal(echelle(1320), 2);
+  });
+
+  it('s’arrête avant le ridicule', () => {
+    // Sans plafond, un écran de cinéma n'afficherait plus que trois jeux.
+    assert.equal(echelle(4000), 2.2);
+  });
+
+  it('survit à une fenêtre sans hauteur', () => {
+    assert.equal(echelle(0), 1);
+    assert.equal(echelle(-10), 1);
   });
 });
 

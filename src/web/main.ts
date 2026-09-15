@@ -77,7 +77,7 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
-import { Held, columnsFor, move, step } from './navigation.ts';
+import { Held, columnsFor, echelle, move, step } from './navigation.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 
@@ -937,11 +937,14 @@ async function jouerChoisie(): Promise<void> {
  * filtres liraient la même manette deux fois par trame, et un appui compterait
  * double le jour où les deux vues seraient éveillées ensemble.
  */
+// 260 ms avant la première répétition puis une toutes les 55 ms : à la
+// manette on parcourt vite, et l'attente d'origine se sentait comme un retard
+// alors qu'elle n'était qu'une prudence de clavier.
 const directions = {
-  gauche: new Held(),
-  droite: new Held(),
-  haut: new Held(),
-  bas: new Held(),
+  gauche: new Held(260, 55),
+  droite: new Held(260, 55),
+  haut: new Held(260, 55),
+  bas: new Held(260, 55),
 };
 const valider = new Held(1000, 1000);
 
@@ -1049,6 +1052,19 @@ document.addEventListener('keydown', (event) => {
  * Ancré plus bas, le menu s'ouvrait sur un grand vide.
  */
 const XMB = { colonne: 86, entree: 54, ancre: 0 };
+
+/**
+ * Le facteur d'agrandissement en cours, posé sur la vue et lu par le calcul
+ * des décalages. Une seule source : la feuille de style et le script doivent
+ * s'accorder au pixel près, sinon la sélection dérive d'une ligne tous les
+ * vingt jeux.
+ */
+let echelleXmb = 1;
+
+function poserEchelle(): void {
+  echelleXmb = echelle(xmbView.clientHeight);
+  xmbView.style.setProperty('--ech', String(echelleXmb));
+}
 
 /** Les volets tels que le menu animé les montre. */
 let voletsXmb: Shelf[] = [];
@@ -1178,7 +1194,7 @@ function placerXmb(): void {
     pastille.setAttribute('aria-selected', String(rang === colonneXmb));
   }
   // La console en cours vient se placer à gauche, à une pastille du bord.
-  xmbColonnes.style.transform = `translateX(${XMB.colonne - colonneXmb * XMB.colonne}px)`;
+  xmbColonnes.style.transform = `translateX(${(1 - colonneXmb) * XMB.colonne * echelleXmb}px)`;
 
   const entrees = [...xmbEntrees.children] as HTMLElement[];
   for (const [rang, entree] of entrees.entries()) {
@@ -1186,14 +1202,14 @@ function placerXmb(): void {
   }
   // Le jeu en cours vient se placer à la troisième ligne : assez bas pour
   // qu'on voie d'où l'on vient, assez haut pour qu'on voie où l'on va.
-  xmbEntrees.style.transform = `translateY(${(XMB.ancre - entreeXmb) * XMB.entree}px)`;
+  xmbEntrees.style.transform = `translateY(${(XMB.ancre - entreeXmb) * XMB.entree * echelleXmb}px)`;
 
   xmbConsole.textContent = shelf?.label ?? '—';
   const item = shelf?.games[entreeXmb];
   xmbPied.textContent = shelf
     ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${entreeXmb + 1} sur ${shelf.games.length}${item ? ` · ${item.rom.extension}` : ''}`
     : '';
-  void poserAffiche(item);
+  poserAffiche(item);
 }
 
 /**
@@ -1204,9 +1220,19 @@ function placerXmb(): void {
  * dernière arrivée l'emporterait sur la bonne.
  */
 let afficheJeton = 0;
+let afficheMinuterie = 0;
 
-async function poserAffiche(item: Playable | undefined): Promise<void> {
+/**
+ * La grande jaquette attend qu'on se pose.
+ *
+ * Elle n'est demandée qu'après un court arrêt : à la manette on traverse vingt
+ * jeux en une seconde, et demander vingt images dont dix-neuf seront jetées
+ * aussitôt rend le défilement saccadé pour rien. Le nom, lui, change tout de
+ * suite — c'est lui qu'on lit en défilant.
+ */
+function poserAffiche(item: Playable | undefined): void {
   const jeton = ++afficheJeton;
+  clearTimeout(afficheMinuterie);
 
   xmbAfficheInitiale.textContent = item ? item.rom.name.slice(0, 1).toUpperCase() : '';
   xmbAfficheInitiale.hidden = false;
@@ -1215,13 +1241,15 @@ async function poserAffiche(item: Playable | undefined): Promise<void> {
 
   if (!item || !jaquettesVoulues()) return;
 
-  try {
-    const trouve = chooseCover(await inventaire(item.rom.folder), item.rom.name);
-    if (jeton !== afficheJeton || !trouve) return;
-    xmbAfficheImage.src = coverUrl(trouve.folder, trouve.name, trouve.kind);
-  } catch {
-    // Pas de réseau : l'initiale reste, et le menu marche sans.
-  }
+  afficheMinuterie = window.setTimeout(async () => {
+    try {
+      const trouve = chooseCover(await inventaire(item.rom.folder), item.rom.name);
+      if (jeton !== afficheJeton || !trouve) return;
+      xmbAfficheImage.src = coverUrl(trouve.folder, trouve.name, trouve.kind);
+    } catch {
+      // Pas de réseau : l'initiale reste, et le menu marche sans.
+    }
+  }, 140);
 }
 
 xmbAfficheImage.addEventListener('load', () => {
@@ -1277,6 +1305,7 @@ function renderXmb(shelves: Shelf[]): void {
   const shelf = shelves[colonneXmb];
   entreeXmb = step(entreeXmb, shelf?.games.length ?? 0, 0);
 
+  poserEchelle();
   renderColonnesXmb();
   renderEntreesXmb();
   placerXmb();
@@ -1303,6 +1332,19 @@ function poserHeure(): void {
   });
 }
 setInterval(poserHeure, 30_000);
+
+/*
+ * La fenêtre change de taille : tout le menu se remet à l'échelle.
+ *
+ * Le décalage des pistes se calcule en pixels, donc il dépend de l'échelle :
+ * sans ce rappel, agrandir la fenêtre laisserait la sélection à côté de son
+ * repère, et l'écart grandirait à mesure qu'on descend dans la liste.
+ */
+window.addEventListener('resize', () => {
+  if (xmbView.hidden) return;
+  poserEchelle();
+  placerXmb();
+});
 
 /** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
 function viderXmb(): void {
