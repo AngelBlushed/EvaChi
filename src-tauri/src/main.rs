@@ -21,6 +21,7 @@ mod emulators;
 mod install;
 mod manual;
 mod pads;
+mod shots;
 mod skeleton;
 
 use evachi::libretro::Session;
@@ -152,6 +153,10 @@ fn main() {
             commands::installable_emulators,
             commands::install_emulator,
             commands::cover_index,
+            commands::save_shot,
+            commands::list_shots,
+            commands::delete_shot,
+            commands::reveal_shots_dir,
             commands::manual_covers,
             commands::set_manual_cover,
             commands::clear_manual_cover,

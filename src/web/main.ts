@@ -25,14 +25,18 @@ import {
   adoptSystemFolder,
   clearManualCover,
   coverIndex,
+  deleteShot,
   directories,
   libraryFolders,
   listRoms,
+  listShots,
   manualCovers,
   pickContent,
   pickFolder,
   readContent,
   removeLibraryFolder,
+  revealShotsDir,
+  saveShot,
   setManualCover,
   note,
   takeMessages,
@@ -54,6 +58,7 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
+import type { Shot } from '../libretro/client.ts';
 import {
   FAVORIS,
   collapseDiscs,
@@ -149,6 +154,9 @@ const menuList = $<HTMLDivElement>('menu-list');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
+const galerieBoite = $<HTMLDivElement>('galerie');
+const galerieVide = $<HTMLElement>('gallery-vide');
+const galerieDossier = $<HTMLButtonElement>('gallery-folder');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const disquesCase = $<HTMLInputElement>('disques');
 const musiqueCase = $<HTMLInputElement>('musique');
@@ -179,6 +187,7 @@ const dialogs = {
   about: $<HTMLDialogElement>('about-dialog'),
   themes: $<HTMLDialogElement>('theme-dialog'),
   graphics: $<HTMLDialogElement>('graphics-dialog'),
+  gallery: $<HTMLDialogElement>('gallery-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -382,6 +391,8 @@ function basculerFavori(chemin: string): boolean {
  */
 const contextuel = $<HTMLDivElement>('contextuel');
 
+galerieDossier.addEventListener('click', () => void revealShotsDir());
+
 /** Ferme le menu du clic droit, sans faire d'histoire s'il est déjà fermé. */
 function fermerContextuel(): void {
   contextuel.hidden = true;
@@ -470,6 +481,137 @@ async function enleverJaquette(item: Playable): Promise<void> {
     renderGames();
   } catch (error) {
     log(`jaquette — ${reason(error)}`, 'err');
+  }
+}
+
+// --- Captures d'écran -------------------------------------------------------
+
+/**
+ * Prend une capture de l'image en cours.
+ *
+ * C'est le canevas qu'on photographie, pas la fenêtre : on veut l'image du jeu
+ * telle que le cœur l'a produite, sans la barre de menus ni les bords noirs
+ * ajoutés pour l'ajuster.
+ *
+ * Cœurs internes seulement : un émulateur externe dessine dans sa propre
+ * fenêtre, où EvaChi n'a rien à photographier.
+ */
+async function prendreCapture(): Promise<void> {
+  if (!core || libraryView.hidden === false) return;
+  try {
+    const adresse = canvas.toDataURL('image/png');
+    const fichier = await saveShot(contentName || 'capture', adresse);
+    if (sonsVoulus()) ticValidation();
+    log(`capture — ${fichier}`, 'ok');
+    await relireCaptures();
+  } catch (error) {
+    log(`capture impossible — ${reason(error)}`, 'err');
+  }
+}
+
+/** Les captures relues à l'ouverture de la galerie et au démarrage. */
+let captures: Shot[] = [];
+
+async function relireCaptures(): Promise<void> {
+  try {
+    captures = await listShots();
+  } catch {
+    captures = [];
+  }
+}
+
+/** La clé du volet réservé aux captures, dans le menu animé. */
+const GALERIE = 'galerie';
+
+/**
+ * Le volet des captures, tout à gauche du menu animé.
+ *
+ * Une case à part plutôt qu'une entrée de menu : dans un menu qu'on parcourt à
+ * la manette, ce qui n'est pas sur la rangée n'existe pas. Les jeux y sont
+ * faux — ce sont des images, pas des cartouches — mais ils se parcourent et
+ * s'affichent exactement de la même façon, ce qui évite une seconde grille.
+ */
+function voletGalerie(): Shelf | null {
+  if (captures.length === 0) return null;
+  return {
+    key: GALERIE,
+    label: 'Galerie',
+    games: captures.map((capture) => ({
+      rom: {
+        name: capture.game,
+        path: `capture:${capture.file}`,
+        extension: 'png',
+        size: 0,
+        folder: '',
+      },
+      cores: [],
+    })),
+    candidates: [],
+    preferred: undefined,
+  };
+}
+
+/** Dessine la galerie. */
+function renderGalerie(): void {
+  galerieBoite.replaceChildren();
+  galerieVide.hidden = captures.length > 0;
+
+  for (const capture of captures) {
+    const vignette = document.createElement('button');
+    vignette.type = 'button';
+    vignette.className = 'capture';
+    vignette.title = `${capture.game} — clic droit pour effacer`;
+
+    const image = document.createElement('img');
+    image.alt = capture.game;
+    image.loading = 'lazy';
+    image.src = capture.data;
+
+    const quoi = document.createElement('span');
+    quoi.className = 'quoi';
+    quoi.textContent = capture.game;
+    const quand = document.createElement('span');
+    quand.className = 'quand';
+    quand.textContent = capture.taken
+      ? new Date(capture.taken * 1000).toLocaleString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : '';
+    quoi.append(quand);
+
+    vignette.append(image, quoi);
+    // Un clic ouvre l'image en grand dans une nouvelle vue ; ici on se contente
+    // d'ouvrir le dossier, qui est ce que l'on veut neuf fois sur dix.
+    vignette.addEventListener('click', () => void revealShotsDir());
+    vignette.addEventListener('contextmenu', (event) => {
+      event.preventDefault();
+      void effacerCapture(capture.file);
+    });
+    galerieBoite.append(vignette);
+  }
+}
+
+async function ouvrirGalerie(): Promise<void> {
+  try {
+    captures = await listShots();
+  } catch (error) {
+    captures = [];
+    log(`galerie — ${reason(error)}`, 'err');
+  }
+  renderGalerie();
+  openDialog(dialogs.gallery);
+}
+
+async function effacerCapture(fichier: string): Promise<void> {
+  try {
+    await deleteShot(fichier);
+    captures = captures.filter((capture) => capture.file !== fichier);
+    renderGalerie();
+  } catch (error) {
+    log(`effacement — ${reason(error)}`, 'err');
   }
 }
 
@@ -812,6 +954,7 @@ function refreshMenus(): void {
     reset: playing,
     save: playing,
     restore: playing && savedState !== null,
+    shot: playing,
     stop: playing,
   };
 
@@ -1406,6 +1549,7 @@ const boutons = {
   start: new Held(1000, 1000),
   retour: new Held(1000, 1000),
   favori: new Held(1000, 1000),
+  capture: new Held(1200, 1200),
 };
 
 /**
@@ -1448,6 +1592,9 @@ function naviguerMenu(): void {
   // les deux ensemble ne se pressent jamais par hasard.
   if (libraryView.hidden) {
     surveillerEtats(pad, maintenant);
+    if (boutons.capture.update(appuye(BOUTON.select) && appuye(BOUTON.y), maintenant).pressed) {
+      void prendreCapture();
+    }
     const ensemble = appuye(BOUTON.select) && appuye(BOUTON.start);
     if (boutons.retour.update(ensemble, maintenant).pressed) {
       tic(true);
@@ -1691,6 +1838,13 @@ document.addEventListener(
     }
 
     if (!core || !libraryView.hidden) return;
+
+    if (event.key === 'F12') {
+      event.preventDefault();
+      void prendreCapture();
+      return;
+    }
+
     for (const quoi of ['sauver', 'charger'] as const) {
       if (raccourcisEtat[quoi].clavier && raccourcisEtat[quoi].clavier === event.key) {
         event.preventDefault();
@@ -1828,7 +1982,8 @@ function renderColonnesXmb(): void {
     rond.className = 'rond';
     // Les favoris portent une étoile plutôt que des initiales : c'est le seul
     // volet qu'on ne reconnaît pas à sa console.
-    rond.textContent = shelf.key === FAVORIS ? '★' : initiales(shelf.label);
+    rond.textContent =
+      shelf.key === FAVORIS ? '★' : shelf.key === GALERIE ? '📷' : initiales(shelf.label);
 
     const etiquette = document.createElement('span');
     etiquette.className = 'etiquette';
@@ -1859,7 +2014,17 @@ function renderEntreesXmb(): void {
     initiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
     vignette.append(initiale);
 
-    if (jaquettesVoulues()) {
+    if (shelf.key === GALERIE) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      image.className = 'vue';
+      image.src = captures[rang]?.data ?? '';
+      image.addEventListener('load', () => {
+        initiale.hidden = true;
+      });
+      vignette.append(image);
+    } else if (jaquettesVoulues()) {
       const jaquette = document.createElement('img');
       jaquette.alt = '';
       jaquette.loading = 'lazy';
@@ -1882,8 +2047,20 @@ function renderEntreesXmb(): void {
 
     const detail = document.createElement('span');
     detail.className = 'detail';
-    const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
-    detail.textContent = `${cœur?.label ?? 'aucun émulateur'} · ${humanSize(item.rom.size)}`;
+    if (shelf.key === GALERIE) {
+      const capture = captures[rang];
+      detail.textContent = capture?.taken
+        ? new Date(capture.taken * 1000).toLocaleString('fr-FR', {
+            day: 'numeric',
+            month: 'long',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : 'capture';
+    } else {
+      const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
+      detail.textContent = `${cœur?.label ?? 'aucun émulateur'} · ${humanSize(item.rom.size)}`;
+    }
 
     texte.append(titre, detail);
     entree.append(vignette, texte);
@@ -1933,10 +2110,24 @@ function placerXmb(): void {
 
   xmbConsole.textContent = shelf?.label ?? '—';
   const item = shelf?.games[entreeXmb];
+  const galerie = shelf?.key === GALERIE;
+  const quoi = galerie ? (['capture', 'captures'] as const) : (['jeu', 'jeux'] as const);
   xmbPied.textContent = shelf
-    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${entreeXmb + 1} sur ${shelf.games.length}${item ? ` · ${item.rom.extension}` : ''}`
+    ? `${plural(shelf.games.length, quoi[0], quoi[1])} · ${entreeXmb + 1} sur ${shelf.games.length}${
+        item && !galerie ? ` · ${item.rom.extension}` : ''
+      }`
     : '';
-  poserAffiche(item);
+
+  // Dans la galerie, la grande image est la capture elle-même : rien à aller
+  // chercher, elle est déjà entre nos mains.
+  if (galerie) {
+    afficheJeton += 1;
+    clearTimeout(afficheMinuterie);
+    xmbAfficheInitiale.hidden = true;
+    xmbAfficheImage.src = captures[entreeXmb]?.data ?? '';
+  } else {
+    poserAffiche(item);
+  }
 }
 
 /**
@@ -2028,6 +2219,12 @@ async function jouerXmb(): Promise<void> {
   const shelf = voletsXmb[colonneXmb];
   const item = shelf?.games[entreeXmb];
   if (!shelf || !item) return;
+
+  // Dans la galerie, valider ouvre la galerie : il n'y a rien à lancer.
+  if (shelf.key === GALERIE) {
+    await ouvrirGalerie();
+    return;
+  }
   const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
   if (cœur) await play(cœur, item.rom);
 }
@@ -2345,10 +2542,14 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 /** Redessine la bibliothèque, filtrée par la recherche. */
 function renderGames(): void {
   const needle = searchInput.value.trim().toLowerCase();
-  const shelves = withFavourites(
+  const classes = withFavourites(
     groupLibrary(games, catalog, readFolderCores(), chosenCore, needle, disquesReplies()),
     favoris,
   );
+  // La galerie n'existe que dans le menu animé : en liste et en grille, elle a
+  // son entrée dans la barre de menus, qui y est toujours sous la main.
+  const galerie = enXmb() && !needle ? voletGalerie() : null;
+  const shelves = galerie ? [galerie, ...classes] : classes;
   volets = shelves;
 
   shelvesBox.replaceChildren();
@@ -3155,6 +3356,9 @@ const actions: Record<string, () => void | Promise<void>> = {
   stop: stopPlaying,
 
   fullscreen: toggleFullscreen,
+  gallery: () => void ouvrirGalerie(),
+  shot: () => void prendreCapture(),
+  'shots-folder': () => void revealShotsDir(),
   graphics: () => {
     renderGraphisme();
     openDialog(dialogs.graphics);
@@ -3576,6 +3780,7 @@ async function start(): Promise<void> {
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.
   await relireJaquettesPosees();
+  await relireCaptures();
 
   try {
     // Chrome publie la disposition réelle du clavier ; on affiche alors les

@@ -331,6 +331,42 @@
       }
       .contextuel .etoile { color: var(--accent); }
 
+      /* La galerie : des vignettes que l'on parcourt, pas une liste. */
+      dialog.large { width: min(92vw, 1000px); max-width: none; }
+      .galerie {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+        gap: 12px;
+      }
+      .capture {
+        display: grid;
+        gap: 5px;
+        padding: 0;
+        border: 2px solid var(--edge);
+        border-radius: 7px;
+        overflow: hidden;
+        background: var(--raised);
+        font: inherit;
+        color: var(--muted);
+        cursor: pointer;
+      }
+      .capture:focus, .capture:hover { outline: none; border-color: var(--accent); }
+      .capture img {
+        width: 100%;
+        aspect-ratio: 4 / 3;
+        object-fit: cover;
+        display: block;
+        background: #000;
+      }
+      .capture .quoi {
+        padding: 0 8px 7px;
+        font-size: 11px;
+        line-height: 1.3;
+        text-align: left;
+        overflow: hidden;
+      }
+      .capture .quand { display: block; opacity: 0.7; }
+
       /* --- Menu animé --- */
 
       /*
@@ -1127,6 +1163,17 @@
         </div>
 
         <div class="menu" data-menu>
+          <button class="menu-title" type="button">Galerie</button>
+          <div class="menu-items">
+            <button type="button" data-action="gallery">Voir les captures…</button>
+            <button type="button" data-action="shot" disabled>
+              Prendre une capture<span class="shortcut">F12</span>
+            </button>
+            <button type="button" data-action="shots-folder">Ouvrir le dossier…</button>
+          </div>
+        </div>
+
+        <div class="menu" data-menu>
           <button class="menu-title" type="button">Aide</button>
           <div class="menu-items">
             <button type="button" data-action="about">À propos…</button>
@@ -1386,6 +1433,21 @@
         </label>
       </div>
       <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="gallery-dialog" class="large">
+      <h2>Galerie</h2>
+      <div class="dialog-body">
+        <p class="hint-text" id="gallery-vide">
+          Aucune capture. Pressez <strong>F12</strong> en cours de partie, ou
+          <strong>Select + Y</strong> à la manette.
+        </p>
+        <div class="galerie" id="galerie"></div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="gallery-folder" class="lien">Ouvrir le dossier…</button>
         <button type="button" data-close>Fermer</button>
       </div>
     </dialog>

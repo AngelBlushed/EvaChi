@@ -94,7 +94,7 @@ fn type_mime(extension: &str) -> &'static str {
 }
 
 /// Encode des octets en base64, sans dépendance.
-fn base64(octets: &[u8]) -> String {
+pub fn encode_base64(octets: &[u8]) -> String {
     const ALPHABET: &[u8; 64] =
         b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut sortie = String::with_capacity(octets.len().div_ceil(3) * 4);
@@ -140,7 +140,7 @@ fn en_adresse(chemin: &Path) -> Option<String> {
     Some(format!(
         "data:{};base64,{}",
         type_mime(&extension),
-        base64(&octets)
+        encode_base64(&octets)
     ))
 }
 
@@ -223,11 +223,11 @@ mod tests {
     #[test]
     fn encode_comme_la_norme() {
         // Les exemples de la RFC 4648, y compris le remplissage.
-        assert_eq!(base64(b"f"), "Zg==");
-        assert_eq!(base64(b"fo"), "Zm8=");
-        assert_eq!(base64(b"foo"), "Zm9v");
-        assert_eq!(base64(b"foobar"), "Zm9vYmFy");
-        assert_eq!(base64(b""), "");
+        assert_eq!(encode_base64(b"f"), "Zg==");
+        assert_eq!(encode_base64(b"fo"), "Zm8=");
+        assert_eq!(encode_base64(b"foo"), "Zm9v");
+        assert_eq!(encode_base64(b"foobar"), "Zm9vYmFy");
+        assert_eq!(encode_base64(b""), "");
     }
 
     #[test]

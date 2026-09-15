@@ -237,6 +237,36 @@ export interface CoverIndex {
   readonly names: string[];
 }
 
+/** Une capture d'écran conservée. */
+export interface Shot {
+  readonly file: string;
+  readonly game: string;
+  /** Secondes depuis 1970. */
+  readonly taken: number;
+  /** L'image, prête à afficher. */
+  readonly data: string;
+}
+
+/** Écrit une capture et rend son nom de fichier. */
+export async function saveShot(game: string, data: string): Promise<string> {
+  return invoke<string>('save_shot', { game, data });
+}
+
+/** Toutes les captures, la plus récente d'abord. */
+export async function listShots(): Promise<Shot[]> {
+  return invoke<Shot[]>('list_shots');
+}
+
+/** Efface une capture. */
+export async function deleteShot(file: string): Promise<void> {
+  return invoke<void>('delete_shot', { file });
+}
+
+/** Ouvre le dossier des captures dans l'explorateur. */
+export async function revealShotsDir(): Promise<string> {
+  return invoke<string>('reveal_shots_dir');
+}
+
 /** Les jaquettes posées à la main, par chemin de jeu. */
 export async function manualCovers(): Promise<Record<string, string>> {
   return invoke<Record<string, string>>('manual_covers');

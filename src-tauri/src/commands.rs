@@ -765,6 +765,78 @@ pub struct CoverIndex {
     pub names: Vec<String>,
 }
 
+/// Écrit une capture d'écran et rend son nom de fichier.
+#[tauri::command]
+pub async fn save_shot(
+    game: String,
+    data: String,
+    paths: State<'_, Paths>,
+) -> Result<String, String> {
+    let base = paths.covers.parent().map_or_else(
+        || paths.covers.clone(),
+        std::path::Path::to_path_buf,
+    );
+    let instant = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or_default();
+
+    tauri::async_runtime::spawn_blocking(move || crate::shots::poser(&base, &game, &data, instant))
+        .await
+        .map_err(|error| format!("capture interrompue : {error}"))?
+}
+
+/// Toutes les captures, la plus récente d'abord.
+#[tauri::command]
+pub async fn list_shots(paths: State<'_, Paths>) -> Result<Vec<crate::shots::Shot>, String> {
+    let base = paths.covers.parent().map_or_else(
+        || paths.covers.clone(),
+        std::path::Path::to_path_buf,
+    );
+    tauri::async_runtime::spawn_blocking(move || crate::shots::toutes(&base))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
+}
+
+/// Efface une capture.
+#[tauri::command]
+pub async fn delete_shot(file: String, paths: State<'_, Paths>) -> Result<(), String> {
+    let base = paths.covers.parent().map_or_else(
+        || paths.covers.clone(),
+        std::path::Path::to_path_buf,
+    );
+    tauri::async_runtime::spawn_blocking(move || crate::shots::effacer(&base, &file))
+        .await
+        .map_err(|error| format!("effacement interrompu : {error}"))?
+}
+
+/// Ouvre le dossier des captures dans l'explorateur.
+#[tauri::command]
+pub fn reveal_shots_dir(paths: State<'_, Paths>) -> Result<String, String> {
+    let base = paths.covers.parent().map_or_else(
+        || paths.covers.clone(),
+        std::path::Path::to_path_buf,
+    );
+    let dossier = crate::shots::dossier(&base);
+    std::fs::create_dir_all(&dossier).map_err(|error| format!("dossier : {error}"))?;
+
+    #[cfg(windows)]
+    let opener = "explorer";
+    #[cfg(target_os = "macos")]
+    let opener = "open";
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let opener = "xdg-open";
+
+    // Comme pour le dossier système : l'explorateur Windows rend 1 même quand
+    // il a bien ouvert la fenêtre, on ne juge donc que du lancement.
+    std::process::Command::new(opener)
+        .arg(&dossier)
+        .spawn()
+        .map_err(|error| format!("ouverture impossible : {error}"))?;
+
+    Ok(dossier.to_string_lossy().into_owned())
+}
+
 /// Les jaquettes posées à la main, par chemin de jeu.
 #[tauri::command]
 pub async fn manual_covers(
