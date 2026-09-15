@@ -616,6 +616,17 @@
       .form input[type="text"]:focus { outline: 1px solid var(--accent); }
 
       .field { display: flex; gap: 8px; align-items: center; margin: 0 0 12px; color: var(--muted); }
+      /* Une case à cocher dont l'explication tient sous l'intitulé : alignée
+         sur le haut, sinon la case flotte au milieu du paragraphe. */
+      .field.bascule { align-items: start; cursor: pointer; color: var(--ink); }
+      .field.bascule input { accent-color: var(--accent); margin-top: 2px; }
+      .field.bascule small {
+        display: block;
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
       .field input[type="range"] { accent-color: var(--accent); }
       #chip8-options[hidden] { display: none; }
 
@@ -910,6 +921,18 @@
 
         <h3 class="section">Présentation</h3>
         <div class="menus" id="menu-list"></div>
+
+        <h3 class="section">Jaquettes</h3>
+        <label class="field bascule">
+          <input type="checkbox" id="jaquettes" checked />
+          <span>
+            Afficher les jaquettes des jeux
+            <small>
+              Elles viennent du serveur de vignettes du projet libretro, à la
+              demande. Décochée, la bibliothèque ne demande plus rien au réseau.
+            </small>
+          </span>
+        </label>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>

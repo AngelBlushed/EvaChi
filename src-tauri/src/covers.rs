@@ -75,18 +75,29 @@ fn cache_name(system: &str) -> String {
         .collect()
 }
 
-/// L'inventaire d'une console : depuis le disque s'il y est, du serveur sinon.
-pub fn index(system: &str, cache_dir: &Path) -> Result<Vec<String>, String> {
-    let cache = cache_dir.join(format!("{}.txt", cache_name(system)));
-    if let Ok(texte) = std::fs::read_to_string(&cache) {
-        return Ok(texte.lines().map(str::to_owned).collect());
-    }
+/// Les sortes d'images publiées, de la plus parlante à la plus quelconque.
+///
+/// Toutes les consoles n'ont pas de boîtes. Le DOS, ScummVM, l'arcade et les
+/// ordinateurs anciens n'en ont presque aucune, et leurs volets restaient
+/// entièrement vides. L'écran-titre puis une capture de jeu prennent alors le
+/// relais : ce n'est pas une jaquette, mais c'est une image du jeu.
+pub const KINDS: [&str; 3] = ["Named_Boxarts", "Named_Titles", "Named_Snaps"];
+
+/// Un inventaire : les noms disponibles, et de quelle sorte d'image.
+pub struct Inventory {
+    pub kind: String,
+    pub names: Vec<String>,
+}
+
+/// Va chercher l'index d'une sorte d'image pour une console.
+fn fetch(system: &str, kind: &str) -> Result<Vec<String>, String> {
+    use std::io::Read;
 
     let url = format!(
-        "https://thumbnails.libretro.com/{}/Named_Boxarts/",
-        urlencode(system)
+        "https://thumbnails.libretro.com/{}/{}/",
+        urlencode(system),
+        kind
     );
-    use std::io::Read;
 
     let mut html = Vec::new();
     ureq::get(&url)
@@ -98,15 +109,60 @@ pub fn index(system: &str, cache_dir: &Path) -> Result<Vec<String>, String> {
         .read_to_end(&mut html)
         .map_err(|error| format!("{system} : {error}"))?;
 
-    let noms = parse_index(&String::from_utf8_lossy(&html));
+    Ok(parse_index(&String::from_utf8_lossy(&html)))
+}
 
-    // Un inventaire vide ne se met pas en cache : ce serait retenir une panne
-    // de réseau pour toujours.
-    if !noms.is_empty() {
-        let _ = std::fs::create_dir_all(cache_dir);
-        let _ = std::fs::write(&cache, noms.join("\n"));
+/// L'inventaire d'une console : depuis le disque s'il y est, du serveur sinon.
+///
+/// Le fichier de cache porte la sorte d'image en première ligne, précédée d'un
+/// dièse : un nom de jeu ne commence jamais ainsi, et un cache écrit par une
+/// version précédente — sans cette ligne — se relit donc encore.
+pub fn index(system: &str, cache_dir: &Path) -> Result<Inventory, String> {
+    let cache = cache_dir.join(format!("{}.txt", cache_name(system)));
+    if let Ok(texte) = std::fs::read_to_string(&cache) {
+        let lignes = texte.lines();
+        let premiere = lignes.clone().next().unwrap_or_default();
+        return match premiere.strip_prefix('#') {
+            Some(kind) => Ok(Inventory {
+                kind: kind.to_owned(),
+                names: lignes.skip(1).map(str::to_owned).collect(),
+            }),
+            None => Ok(Inventory {
+                kind: KINDS[0].to_owned(),
+                names: lignes.map(str::to_owned).collect(),
+            }),
+        };
     }
-    Ok(noms)
+
+    // La première sorte qui donne quelque chose gagne. Une console bien dotée
+    // s'arrête au premier essai ; les autres en coûtent deux ou trois, une
+    // seule fois dans la vie de l'installation.
+    let mut dernier = String::new();
+    for kind in KINDS {
+        match fetch(system, kind) {
+            Ok(noms) if !noms.is_empty() => {
+                let _ = std::fs::create_dir_all(cache_dir);
+                let _ = std::fs::write(&cache, format!("#{kind}\n{}", noms.join("\n")));
+                return Ok(Inventory {
+                    kind: kind.to_owned(),
+                    names: noms,
+                });
+            }
+            Ok(_) => {}
+            Err(erreur) => dernier = erreur,
+        }
+    }
+
+    // Rien trouvé. On ne met pas cet échec en cache : ce serait retenir une
+    // panne de réseau pour toujours.
+    if dernier.is_empty() {
+        Ok(Inventory {
+            kind: KINDS[0].to_owned(),
+            names: Vec::new(),
+        })
+    } else {
+        Err(dernier)
+    }
 }
 
 /// Échappe ce qui doit l'être dans un segment d'adresse.
@@ -174,17 +230,58 @@ mod tests {
         assert_eq!(urlencode("DOS"), "DOS");
     }
 
-    #[test]
-    fn relit_l_inventaire_depuis_le_disque_sans_reseau() {
-        let base = std::env::temp_dir().join(format!("evachi-jaquettes-{}", std::process::id()));
+    /// Un dossier de cache à soi, effacé à la sortie.
+    fn bac(nom: &str) -> std::path::PathBuf {
+        let base = std::env::temp_dir().join(format!(
+            "evachi-jaquettes-{}-{nom}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&base);
         std::fs::create_dir_all(&base).expect("dossier");
-        std::fs::write(base.join("Sega---32X.txt"), "Doom (Europe)\nAfter Burner (USA)")
-            .expect("cache");
+        base
+    }
+
+    #[test]
+    fn relit_l_inventaire_depuis_le_disque_sans_reseau() {
+        let base = bac("relit");
+        std::fs::write(
+            base.join("Sega---32X.txt"),
+            "#Named_Boxarts\nDoom (Europe)\nAfter Burner (USA)",
+        )
+        .expect("cache");
 
         let lu = index("Sega - 32X", &base).expect("lecture");
         let _ = std::fs::remove_dir_all(&base);
 
-        assert_eq!(lu, vec!["Doom (Europe)", "After Burner (USA)"]);
+        assert_eq!(lu.kind, "Named_Boxarts");
+        assert_eq!(lu.names, vec!["Doom (Europe)", "After Burner (USA)"]);
+    }
+
+    #[test]
+    fn retient_la_sorte_d_image_trouvee() {
+        // Le DOS n'a pas de boîtes : son cache porte des écrans-titres, et il
+        // faut le savoir pour construire la bonne adresse.
+        let base = bac("sorte");
+        std::fs::write(base.join("DOS.txt"), "#Named_Titles\nDoom\nKeen").expect("cache");
+
+        let lu = index("DOS", &base).expect("lecture");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(lu.kind, "Named_Titles");
+        assert_eq!(lu.names, vec!["Doom", "Keen"]);
+    }
+
+    #[test]
+    fn relit_un_cache_ecrit_par_une_version_precedente() {
+        // Sans la ligne de sorte, c'étaient des boîtes : ne pas réécrire tous
+        // les caches déjà sur les disques pour si peu.
+        let base = bac("ancien");
+        std::fs::write(base.join("Sega---32X.txt"), "Doom (Europe)").expect("cache");
+
+        let lu = index("Sega - 32X", &base).expect("lecture");
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(lu.kind, "Named_Boxarts");
+        assert_eq!(lu.names, vec!["Doom (Europe)"]);
     }
 }

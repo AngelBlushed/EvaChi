@@ -222,8 +222,19 @@ export async function adoptSystemFile(path: string): Promise<Placed[]> {
  * Le serveur n'autorise pas la lecture de son index depuis la fenêtre : c'est
  * la coque native qui va le chercher, et le garde sur le disque.
  */
-export async function coverIndex(system: string): Promise<string[]> {
-  return invoke<string[]>('cover_index', { system });
+export async function coverIndex(system: string): Promise<CoverIndex> {
+  return invoke<CoverIndex>('cover_index', { system });
+}
+
+/**
+ * L'inventaire des vignettes d'une console.
+ *
+ * `kind` dit de quelle sorte d'image il s'agit : toutes les consoles n'ont pas
+ * de boîtes, et l'écran-titre ou une capture de jeu prennent alors le relais.
+ */
+export interface CoverIndex {
+  readonly kind: string;
+  readonly names: string[];
 }
 
 /** Ouvre le sélecteur pour désigner un dossier entier à ranger. */

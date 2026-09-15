@@ -112,6 +112,59 @@ describe('choix d’une jaquette', () => {
   });
 });
 
+describe('rapprochement approximatif', () => {
+  // Les cas qui laissaient une case vide alors que la jaquette existait.
+  const nes = index('Nintendo - Nintendo Entertainment System', [
+    'Mega Man (USA)',
+    'Mega Man 2 (USA)',
+    'Mega Man 3 (USA)',
+    'Castlevania (USA)',
+    'Castlevania II - Simon’s Quest (USA)',
+    'Super Mario Bros. (World)',
+    'Bomberman (USA)',
+    'Zelda II - The Adventure of Link (USA)',
+  ]);
+
+  it('se moque des espaces manquants', () => {
+    // C'est le cas qui revient le plus : les fichiers d'une collection
+    // écrivent « megaman », les jeux de noms officiels « Mega Man ».
+    assert.equal(chooseCover(nes, 'megaman.nes')?.name, 'Mega Man (USA)');
+    assert.equal(chooseCover(nes, 'MegaMan2.nes')?.name, 'Mega Man 2 (USA)');
+    assert.equal(chooseCover(nes, 'Bomber Man.nes')?.name, 'Bomberman (USA)');
+  });
+
+  it('accepte qu’un titre commence par l’autre', () => {
+    assert.equal(chooseCover(nes, 'Castlevania II.nes')?.name, 'Castlevania (USA)');
+  });
+
+  it('préfère se tromper de peu que ne rien montrer', () => {
+    // « Mega Man 6 » n'est pas là ; sa boîte manquera, mais la grille
+    // continuera de ressembler à une grille de jeux.
+    assert.equal(chooseCover(nes, 'Mega Man 6.nes')?.name, 'Mega Man (USA)');
+  });
+
+  it('rejoint deux écritures d’un même titre', () => {
+    // Ce que les deux ont en commun n'est pas au début du nom : c'est la
+    // ressemblance d'ensemble qui les réunit.
+    assert.equal(
+      chooseCover(nes, 'Zelda II - Adventure of Link.nes')?.name,
+      'Zelda II - The Adventure of Link (USA)',
+    );
+  });
+
+  it('ne rapproche pas deux jeux qui n’ont que le début en commun', () => {
+    // « Superman » et « Super Mario Bros. » partagent « super » : cinq
+    // lettres, mais pas la moitié du plus court. On préfère la case vide.
+    assert.equal(chooseCover(nes, 'Superman.nes'), null);
+    assert.equal(chooseCover(nes, 'Tetris.nes'), null);
+  });
+
+  it('ne joue pas à ce jeu-là sur un titre trop court', () => {
+    // Sur trois lettres, tout ressemble à tout.
+    assert.equal(chooseCover(nes, 'Zzz.nes'), null);
+  });
+});
+
 describe('dossiers de vignettes', () => {
   it('trouve le dossier d’un volet nommé comme une console', () => {
     assert.deepEqual(thumbnailFolders('Mega Drive-Genesis'), ['Sega - Mega Drive - Genesis']);

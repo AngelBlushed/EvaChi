@@ -742,11 +742,27 @@ pub fn adopt_external(
 /// console va chercher plusieurs milliers de noms, et le fil de la fenêtre n'a
 /// pas à l'attendre. Les fois suivantes, la liste vient du disque.
 #[tauri::command]
-pub async fn cover_index(system: String, paths: State<'_, Paths>) -> Result<Vec<String>, String> {
+pub async fn cover_index(system: String, paths: State<'_, Paths>) -> Result<CoverIndex, String> {
     let dossier = paths.covers.clone();
-    tauri::async_runtime::spawn_blocking(move || crate::covers::index(&system, &dossier))
-        .await
-        .map_err(|error| format!("inventaire interrompu : {error}"))?
+    let inventaire = tauri::async_runtime::spawn_blocking(move || {
+        crate::covers::index(&system, &dossier)
+    })
+    .await
+    .map_err(|error| format!("inventaire interrompu : {error}"))??;
+
+    Ok(CoverIndex {
+        kind: inventaire.kind,
+        names: inventaire.names,
+    })
+}
+
+/// Un inventaire de vignettes, tel que la fenêtre le reçoit.
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CoverIndex {
+    /// La sorte d'image trouvée : boîtes, écrans-titres ou captures.
+    pub kind: String,
+    pub names: Vec<String>,
 }
 
 /// Ouvre le sélecteur de fichiers pour désigner un émulateur.

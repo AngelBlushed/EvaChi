@@ -122,6 +122,7 @@ const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
+const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
 const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
@@ -158,7 +159,12 @@ const dialogs = {
  * regardent que l'affichage, et les lire coûterait un aller-retour au
  * démarrage — celui-là même qu'on vient de dégager.
  */
-const RETENU = { theme: 'evachi.theme', liaisons: 'evachi.liaisons', menu: 'evachi.menu' } as const;
+const RETENU = {
+  theme: 'evachi.theme',
+  liaisons: 'evachi.liaisons',
+  menu: 'evachi.menu',
+  jaquettes: 'evachi.jaquettes',
+} as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
 function retenu(cle: string): string | null {
@@ -255,6 +261,22 @@ function choisirMenu(id: string): void {
   renderMenus();
   renderGames();
 }
+
+/**
+ * Vrai quand on veut voir les jaquettes.
+ *
+ * Elles sont là par défaut — c'est ce qu'on attend d'une bibliothèque de jeux —
+ * mais elles vont chercher des images sur le réseau et changent beaucoup
+ * l'allure de la liste. On doit donc pouvoir les refuser.
+ */
+function jaquettesVoulues(): boolean {
+  return retenu(RETENU.jaquettes) !== 'non';
+}
+
+jaquettesCase.addEventListener('change', () => {
+  retenir(RETENU.jaquettes, jaquettesCase.checked ? 'oui' : 'non');
+  renderGames();
+});
 
 /** Dessine le choix de présentation, dans la même fenêtre que les thèmes. */
 function renderMenus(): void {
@@ -810,18 +832,20 @@ function renderGrille(shelves: Shelf[]): void {
     // Transparente et non masquée : un élément `hidden` n'a pas de boîte, et
     // l'observateur ne le voit donc jamais approcher de l'écran — la grille
     // restait entièrement dépourvue de jaquettes.
-    const jaquette = document.createElement('img');
-    jaquette.alt = '';
-    jaquette.loading = 'lazy';
-    jaquette.dataset.console = item.rom.folder;
-    jaquette.dataset.jeu = item.rom.name;
-    // La jaquette remplace l'initiale une fois arrivée, et pas avant : une
-    // image à moitié chargée sur fond vide fait clignoter toute la grille.
-    jaquette.addEventListener('load', () => {
-      initiale.hidden = true;
-    });
-    boite.append(jaquette);
-    regarderJaquette(jaquette);
+    if (jaquettesVoulues()) {
+      const jaquette = document.createElement('img');
+      jaquette.alt = '';
+      jaquette.loading = 'lazy';
+      jaquette.dataset.console = item.rom.folder;
+      jaquette.dataset.jeu = item.rom.name;
+      // La jaquette remplace l'initiale une fois arrivée, et pas avant : une
+      // image à moitié chargée sur fond vide fait clignoter toute la grille.
+      jaquette.addEventListener('load', () => {
+        initiale.hidden = true;
+      });
+      boite.append(jaquette);
+      regarderJaquette(jaquette);
+    }
 
     const nom = document.createElement('span');
     nom.className = 'nom';
@@ -982,7 +1006,7 @@ function inventaire(consoleLabel: string): Promise<Candidate[]> {
     ? Promise.all(
         dossiers.map((dossier) =>
           coverIndex(dossier)
-            .then((noms) => indexCovers(dossier, noms))
+            .then((inventaire) => indexCovers(dossier, inventaire.names, inventaire.kind))
             .catch(() => [] as Candidate[]),
         ),
       ).then((listes) => listes.flat())
@@ -1036,7 +1060,7 @@ async function habiller(img: HTMLImageElement): Promise<void> {
     // disparaît, et la ligne reprend sa place.
     img.addEventListener('error', () => img.classList.remove('vue'), { once: true });
     img.addEventListener('load', () => img.classList.add('vue'), { once: true });
-    img.src = coverUrl(trouve.folder, trouve.name);
+    img.src = coverUrl(trouve.folder, trouve.name, trouve.kind);
   } catch {
     // Pas de réseau, pas de jaquette : la bibliothèque marche sans.
   }
@@ -1052,21 +1076,26 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
   const name = document.createElement('td');
   name.className = 'name';
 
-  // La jaquette précède le titre. Elle n'est pas chargée ici : la vignette
-  // s'annonce, et l'observateur ira la chercher quand la ligne approchera de
-  // l'écran. Six cents images demandées d'un coup ne serviraient à rien.
-  const jaquette = document.createElement('img');
-  jaquette.className = 'jaquette';
-  jaquette.loading = 'lazy';
-  jaquette.alt = '';
-  jaquette.dataset.console = rom.folder;
-  jaquette.dataset.jeu = rom.name;
-  regarderJaquette(jaquette);
-
   const titre = document.createElement('span');
   titre.textContent = rom.name;
 
-  name.append(jaquette, titre);
+  // La jaquette précède le titre. Elle n'est pas chargée ici : la vignette
+  // s'annonce, et l'observateur ira la chercher quand la ligne approchera de
+  // l'écran. Six cents images demandées d'un coup ne serviraient à rien.
+  // Refusées, elles ne sont pas seulement masquées : une vignette vide
+  // réserverait sa place et décalerait tous les titres.
+  if (jaquettesVoulues()) {
+    const jaquette = document.createElement('img');
+    jaquette.className = 'jaquette';
+    jaquette.loading = 'lazy';
+    jaquette.alt = '';
+    jaquette.dataset.console = rom.folder;
+    jaquette.dataset.jeu = rom.name;
+    regarderJaquette(jaquette);
+    name.append(jaquette);
+  }
+
+  name.append(titre);
 
   // Le cœur se choisit au niveau du dossier ; la ligne dit lequel s'appliquera,
   // sauf pour un fichier hors dossier, que personne n'a classé.
@@ -1857,6 +1886,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   themes: () => {
     renderThemes();
     renderMenus();
+    jaquettesCase.checked = jaquettesVoulues();
     openDialog(dialogs.themes);
   },
   refresh: refreshLibrary,
