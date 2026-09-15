@@ -125,6 +125,7 @@ const keypadBox = $<HTMLDivElement>('keypad');
 const padStatus = $<HTMLElement>('pad-status');
 const folderList = $<HTMLUListElement>('folder-list');
 const aboutBody = $<HTMLDListElement>('about-body');
+const raccourcisClavier = $<HTMLDListElement>('raccourcis-clavier');
 const presetList = $<HTMLUListElement>('preset-list');
 const installOffer = $<HTMLButtonElement>('placeholder-install');
 const installList = $<HTMLUListElement>('install-list');
@@ -752,6 +753,9 @@ async function play(target: CatalogEntry, rom: RomEntry): Promise<void> {
   // Un émulateur externe est un autre programme : on le démarre avec le jeu en
   // argument et on n'en attend rien de plus.
   if (target.kind === 'externe') {
+    // La bibliothèque reste affichée derrière l'émulateur : la musique du menu
+    // ne s'arrêtait donc pas d'elle-même, et jouait par-dessus le jeu.
+    arreterMusique();
     try {
       const started = await launchExternal(target.label, rom.path);
       log(`${rom.name} — ${started}`, 'ok');
@@ -1052,12 +1056,7 @@ function naviguerMenu(): void {
     if (etat.pressed || etat.repeat) pas.push(sens);
   }
 
-  /** Le bruit n'est fait qu'ici : c'est la seule branche manette. */
-  const tic = (lance = false) => {
-    if (!sonsVoulus()) return;
-    if (lance) ticValidation();
-    else ticDeplacement();
-  };
+  const tic = (lance = false) => bruit(lance);
 
   // Pendant une partie, Select et Start ensemble ramènent à la bibliothèque.
   // Deux boutons à la fois plutôt qu'un seul : chacun d'eux sert au jeu, et
@@ -1104,7 +1103,13 @@ function naviguerMenu(): void {
 
 // --- Barre de menus à la manette --------------------------------------------
 
-/** Déplie un menu de la barre et vise sa première entrée. */
+/**
+ * Déplie un menu de la barre et vise sa première entrée.
+ *
+ * Quand tout y est grisé — « Émulation » hors partie — c'est le titre du menu
+ * qu'on vise. Sans cela la sélection disparaissait, et la manette semblait ne
+ * plus répondre alors qu'elle attendait sagement.
+ */
 function ouvrirBarre(rang: number): void {
   const menus = [...menubar.querySelectorAll<HTMLElement>('[data-menu]')];
   const menu = menus[Math.min(Math.max(rang, 0), menus.length - 1)];
@@ -1112,7 +1117,8 @@ function ouvrirBarre(rang: number): void {
 
   closeMenus();
   menu.setAttribute('data-open', '');
-  menu.querySelector<HTMLButtonElement>('.menu-items button:not([disabled])')?.focus();
+  const premier = menu.querySelector<HTMLButtonElement>('.menu-items button:not([disabled])');
+  (premier ?? menu.querySelector<HTMLButtonElement>('.menu-title'))?.focus();
 }
 
 /**
@@ -1250,6 +1256,19 @@ function conduireFenetre(
   }
 }
 
+/**
+ * Le petit bruit d'un déplacement ou d'une validation.
+ *
+ * Partagé entre la manette et le clavier : les deux conduisent les mêmes
+ * menus, et n'en sonoriser qu'un donnerait l'impression que l'autre ne compte
+ * pas tout à fait.
+ */
+function bruit(lance = false): void {
+  if (!sonsVoulus()) return;
+  if (lance) ticValidation();
+  else ticDeplacement();
+}
+
 /** Déplace la sélection de la vue en cours. */
 function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
   if (vue === 'grille') choisir(move(choisie, tuiles.length, colonnes(), sens));
@@ -1286,11 +1305,13 @@ document.addEventListener('keydown', (event) => {
     if (dansLaRecherche && (sens === 'gauche' || sens === 'droite')) return;
     event.preventDefault();
     pousser(vue, sens);
+    bruit();
     return;
   }
 
   if (event.key === 'Enter' && !dansLaRecherche) {
     event.preventDefault();
+    bruit(true);
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
   }
 });
@@ -2671,7 +2692,31 @@ menubar.addEventListener('click', (event) => {
   void actions[button.dataset.action ?? '']?.();
 });
 
+/**
+ * Les raccourcis clavier, énumérés là où on les cherche.
+ *
+ * Écrits ici plutôt que dans la page : ceux des menus se lisent déjà à côté de
+ * leur entrée, et les répéter à la main dans deux endroits garantit qu'ils
+ * finiront par se contredire.
+ */
+const RACCOURCIS_CLAVIER: readonly (readonly [string, string])[] = [
+  ['Flèches', 'Parcourir la grille et le menu animé'],
+  ['Entrée', 'Lancer le jeu choisi'],
+  ['P', 'Plein écran'],
+  ['F5', 'Actualiser la bibliothèque'],
+  ['Échap', 'Refermer une fenêtre'],
+];
+
 function renderAbout(): void {
+  raccourcisClavier.replaceChildren();
+  for (const [touche, quoi] of RACCOURCIS_CLAVIER) {
+    const dt = document.createElement('dt');
+    dt.textContent = touche;
+    const dd = document.createElement('dd');
+    dd.textContent = quoi;
+    raccourcisClavier.append(dt, dd);
+  }
+
   aboutBody.replaceChildren();
 
   const rows: [string, string][] = [
@@ -2808,9 +2853,16 @@ function pollControls(): void {
   // une seule d'entre elles oubliée laisserait la musique jouer sous la partie.
   if (musiqueEnCours() && (libraryView.hidden || xmbView.hidden)) arreterMusique();
 
-  if (!running && dialogs.controls.open) sampleInput();
-  capturerLiaison();
-  naviguerMenu();
+  // Tout est enveloppé : une exception ici romprait la chaîne des trames, et
+  // la manette cesserait de répondre jusqu'au prochain lancement — sans rien
+  // afficher qui permette de comprendre pourquoi.
+  try {
+    if (!running && dialogs.controls.open) sampleInput();
+    capturerLiaison();
+    naviguerMenu();
+  } catch (error) {
+    log(`commandes : ${error instanceof Error ? error.message : String(error)}`, 'err');
+  }
   requestAnimationFrame(pollControls);
 }
 requestAnimationFrame(pollControls);
