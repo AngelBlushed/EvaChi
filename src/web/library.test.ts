@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { RomEntry } from '../libretro/client.ts';
 import type { CatalogEntry } from './catalog.ts';
 import { JOYPAD } from './input.ts';
-import { coresFor, folderLabel, gameLabel, groupLibrary, hintedCore } from './library.ts';
+import { collapseDiscs, coresFor, folderLabel, gameLabel, groupLibrary, hintedCore } from './library.ts';
 
 /** Fabrique un cœur du catalogue. */
 function core(id: string, extensions: string[], label = id): CatalogEntry {
@@ -560,5 +560,119 @@ describe('Nintendo 3DS', () => {
     );
 
     assert.equal(shelf.preferred, 'melonds_libretro');
+  });
+});
+
+describe('un seul fichier par jeu sur disque', () => {
+  /** Un jeu de comptoir : nom, extension et chemin, le reste est sans effet. */
+  const fichier = (dossier: string, nom: string): RomEntry => ({
+    name: nom,
+    path: `D:/roms/${dossier}/${nom}`,
+    extension: nom.slice(nom.lastIndexOf('.') + 1).toLowerCase(),
+    size: 1,
+    folder: dossier,
+  });
+
+  const noms = (roms: readonly RomEntry[]) => roms.map((rom) => rom.name).sort();
+
+  it('garde le feuillet et écarte les pistes', () => {
+    // Le cas qui a motivé tout ceci : douze pistes et un feuillet, douze
+    // lignes identiques dans la liste alors qu'il n'y a qu'un jeu.
+    const dossier = 'Mega-CD';
+    const roms = [
+      fichier(dossier, '3 Ninjas Kick Back (USA) (Track 01).bin'),
+      fichier(dossier, '3 Ninjas Kick Back (USA) (Track 02).bin'),
+      fichier(dossier, '3 Ninjas Kick Back (USA) (Track 12).bin'),
+      fichier(dossier, '3 Ninjas Kick Back (USA).cue'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), ['3 Ninjas Kick Back (USA).cue']);
+  });
+
+  it('écarte aussi une piste unique portant le même nom', () => {
+    const roms = [
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 1).bin'),
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 1).cue'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), ['Final Fantasy IX (Europe) (Disc 1).cue']);
+  });
+
+  it('ne confond jamais deux disques d’un même jeu', () => {
+    // Deux disques se lancent séparément : en masquer un ferait disparaître
+    // la moitié du jeu.
+    const roms = [
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 1).cue'),
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 2).cue'),
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 1).bin'),
+      fichier('PlayStation', 'Final Fantasy IX (Europe) (Disc 2).bin'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), [
+      'Final Fantasy IX (Europe) (Disc 1).cue',
+      'Final Fantasy IX (Europe) (Disc 2).cue',
+    ]);
+  });
+
+  it('ne masque rien quand aucun feuillet n’accompagne les pistes', () => {
+    // Sans feuillet on ne sait pas lequel ouvrir : n'en montrer qu'un
+    // reviendrait à deviner, et deviner mal cache un jeu.
+    const roms = [
+      fichier('PC Engine', 'Jeu Sans Feuillet (Track 01).bin'),
+      fichier('PC Engine', 'Jeu Sans Feuillet (Track 02).bin'),
+    ];
+    assert.equal(collapseDiscs(roms).length, 2);
+  });
+
+  it('trouve le numéro de piste même au milieu du nom', () => {
+    const roms = [
+      fichier('PlayStation', 'Rayman 2 (E) (Track 1) [SLES-02906].bin'),
+      fichier('PlayStation', 'Rayman 2 (E) (Track 2) [SLES-02906].bin'),
+      fichier('PlayStation', 'Rayman 2 (E) [SLES-02906].cue'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), ['Rayman 2 (E) [SLES-02906].cue']);
+  });
+
+  it('suit un .ccd comme un .cue, et laisse le reste tranquille', () => {
+    // « Tuned Heart » a une image de disque dur à côté de son CD : elle se
+    // lance seule et n'est décrite par aucun feuillet.
+    const roms = [
+      fichier('PC-98', 'Tuned Heart.ccd'),
+      fichier('PC-98', 'Tuned Heart.img'),
+      fichier('PC-98', 'Tuned Heart.sub'),
+      fichier('PC-98', 'Tuned Heart.hdi'),
+      fichier('PC-98', 'Tuned Heart (Disk 1).hdm'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), [
+      'Tuned Heart (Disk 1).hdm',
+      'Tuned Heart.ccd',
+      'Tuned Heart.hdi',
+    ]);
+  });
+
+  it('ne laisse pas un feuillet en emporter un autre dans un autre dossier', () => {
+    // Deux jeux différents peuvent porter le même nom dans deux sous-dossiers ;
+    // le feuillet de l'un ne décrit pas les pistes de l'autre.
+    const roms = [
+      fichier('Saturn/japon', 'Dead or Alive (Track 01).bin'),
+      fichier('Saturn/usa', 'Dead or Alive (Track 01).bin'),
+      fichier('Saturn/japon', 'Dead or Alive.cue'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), [
+      'Dead or Alive (Track 01).bin',
+      'Dead or Alive.cue',
+    ]);
+  });
+
+  it('ne touche pas à une bibliothèque sans le moindre feuillet', () => {
+    const roms = [fichier('Nes', 'Zelda.nes'), fichier('Atari 2600', 'River Raid.bin')];
+    assert.equal(collapseDiscs(roms).length, 2);
+  });
+
+  it('laisse passer les formats qu’un feuillet ne décrit jamais', () => {
+    // Une cartouche `.32x` ou `.md` posée à côté d'un CD n'est pas une piste.
+    const roms = [
+      fichier('Mega-CD', 'Jeu CD.cue'),
+      fichier('Mega-CD', 'Jeu CD.bin'),
+      fichier('Mega-CD', 'Jeu CD.md'),
+    ];
+    assert.deepEqual(noms(collapseDiscs(roms)), ['Jeu CD.cue', 'Jeu CD.md']);
   });
 });

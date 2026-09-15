@@ -51,7 +51,7 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import { coresFor, effectiveCore, gameLabel, groupLibrary } from './library.ts';
+import { collapseDiscs, coresFor, effectiveCore, gameLabel, groupLibrary } from './library.ts';
 import type { Playable, Shelf } from './library.ts';
 import {
   BUTTON_COUNT,
@@ -133,6 +133,7 @@ const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
+const disquesCase = $<HTMLInputElement>('disques');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
 const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
@@ -174,6 +175,7 @@ const RETENU = {
   liaisons: 'evachi.liaisons',
   menu: 'evachi.menu',
   jaquettes: 'evachi.jaquettes',
+  disques: 'evachi.disques',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -291,6 +293,22 @@ function jaquettesVoulues(): boolean {
 
 jaquettesCase.addEventListener('change', () => {
   retenir(RETENU.jaquettes, jaquettesCase.checked ? 'oui' : 'non');
+  renderGames();
+});
+
+/**
+ * Vrai quand un jeu sur disque ne doit apparaître qu'une fois.
+ *
+ * Par défaut, oui : c'est ce qu'on attend d'une bibliothèque. Mais le réglage
+ * existe, car une collection mal rangée peut vouloir tout voir pour comprendre
+ * ce qu'elle contient.
+ */
+function disquesReplies(): boolean {
+  return retenu(RETENU.disques) !== 'non';
+}
+
+disquesCase.addEventListener('change', () => {
+  retenir(RETENU.disques, disquesCase.checked ? 'oui' : 'non');
   renderGames();
 });
 
@@ -1573,12 +1591,23 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 /** Redessine la bibliothèque, filtrée par la recherche. */
 function renderGames(): void {
   const needle = searchInput.value.trim().toLowerCase();
-  const shelves = groupLibrary(games, catalog, readFolderCores(), chosenCore, needle);
+  const shelves = groupLibrary(
+    games,
+    catalog,
+    readFolderCores(),
+    chosenCore,
+    needle,
+    disquesReplies(),
+  );
   volets = shelves;
 
   shelvesBox.replaceChildren();
 
-  const known = games.filter((rom) => coresFor(rom, catalog).length > 0).length;
+  // Compté sur ce qui est réellement montré : replier les disques change le
+  // nombre de jeux, et un compteur qui ne bouge pas donne l'impression que le
+  // réglage n'a rien fait.
+  const montres = disquesReplies() ? collapseDiscs(games) : games;
+  const known = montres.filter((rom) => coresFor(rom, catalog).length > 0).length;
   countsOut.textContent = `${plural(known, 'jeu', 'jeux')} · ${plural(catalog.length, 'cœur')}`;
 
   // Un cœur interne existe toujours ; ce sont les autres qui manquent quand
@@ -2331,6 +2360,7 @@ const actions: Record<string, () => void | Promise<void>> = {
     renderThemes();
     renderMenus();
     jaquettesCase.checked = jaquettesVoulues();
+    disquesCase.checked = disquesReplies();
     openDialog(dialogs.themes);
   },
   refresh: refreshLibrary,

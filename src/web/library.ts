@@ -213,6 +213,75 @@ export function hintedCore(label: string, candidates: readonly CatalogEntry[]): 
   return undefined;
 }
 
+/**
+ * Les fichiers qui ouvrent un disque, et ceux qui n'en sont qu'un morceau.
+ *
+ * Un jeu sur CD n'est presque jamais un fichier. Il arrive en un feuillet qui
+ * décrit le disque — le `.cue` — et en autant de fichiers de données que le
+ * disque avait de pistes. Lancer une piste ne marche pas, ou marche mal : c'est
+ * le feuillet qu'il faut ouvrir, et lui seul qu'il faut montrer.
+ */
+const FEUILLETS = ['cue', 'ccd', 'gdi', 'm3u', 'toc'];
+
+/**
+ * Ce qu'un feuillet peut décrire.
+ *
+ * Volontairement restreint à ce qui est vraiment un morceau de disque. Un
+ * format qu'on ne sait pas rattacher avec certitude n'est jamais masqué : mieux
+ * vaut une ligne en trop qu'un jeu devenu invisible.
+ */
+const MORCEAUX = ['bin', 'img', 'sub', 'iso', 'raw', 'ecm', 'ape', 'wav', 'mp3', 'ogg', 'flac'];
+
+/**
+ * Le nom d'un jeu, numéro de piste retiré.
+ *
+ * On retire `(Track 03)` où qu'il se trouve dans le nom — parfois au milieu,
+ * comme dans `Rayman 2 (Track 1) [SLES-02906]`. On ne touche surtout pas à
+ * `(Disc 2)` : deux disques d'un même jeu sont deux choses qu'on lance
+ * séparément, et les confondre en ferait disparaître une.
+ */
+export function discBase(name: string): string {
+  return name
+    .replace(/\.[^.]+$/, '')
+    .replace(/[([]\s*(?:track|piste)\s*\d+\s*[)\]]/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/** Le dossier qui contient réellement le fichier, séparateurs uniformisés. */
+function parentPath(path: string): string {
+  const normal = path.replace(/\\/g, '/');
+  return normal.slice(0, normal.lastIndexOf('/')).toLowerCase();
+}
+
+/**
+ * Ne garde qu'un fichier par jeu sur disque : celui qui le lance.
+ *
+ * Un morceau n'est écarté que si le feuillet qui le décrit est là, à côté de
+ * lui, sous le même nom. Sans feuillet, tout est conservé : on ne sait alors
+ * pas lequel ouvrir, et n'en montrer qu'un reviendrait à deviner.
+ *
+ * La comparaison se fait sur le dossier réel et non sur le volet : deux jeux
+ * rangés dans deux sous-dossiers peuvent porter le même nom, et l'un ne décrit
+ * pas l'autre.
+ */
+export function collapseDiscs(games: readonly RomEntry[]): RomEntry[] {
+  // Où se trouve un feuillet, et sous quel nom.
+  const feuillets = new Set<string>();
+  for (const rom of games) {
+    if (FEUILLETS.includes(rom.extension)) {
+      feuillets.add(`${parentPath(rom.path)}||${discBase(rom.name)}`);
+    }
+  }
+  if (feuillets.size === 0) return [...games];
+
+  return games.filter((rom) => {
+    if (!MORCEAUX.includes(rom.extension)) return true;
+    return !feuillets.has(`${parentPath(rom.path)}||${discBase(rom.name)}`);
+  });
+}
+
 /** Le cœur qui ouvrira ce jeu : le choix explicite, sinon celui du volet. */
 export function effectiveCore(
   rom: RomEntry,
@@ -233,6 +302,7 @@ export function effectiveCore(
  * classer : il se range alors sous le cœur qui l'ouvrira.
  *
  * @param needle recherche en cours, en minuscules ; vide pour tout garder.
+ * @param collapse ne montrer qu'un fichier par jeu sur disque.
  */
 export function groupLibrary(
   games: readonly RomEntry[],
@@ -240,8 +310,9 @@ export function groupLibrary(
   folderCores: Readonly<Record<string, string>>,
   chosen: ReadonlyMap<string, string>,
   needle: string,
+  collapse = true,
 ): Shelf[] {
-  const playable: Playable[] = games
+  const playable: Playable[] = (collapse ? collapseDiscs(games) : games)
     .map((rom) => ({ rom, cores: coresFor(rom, catalog) }))
     .filter(({ cores }) => cores.length > 0)
     .filter(({ rom }) => !needle || rom.name.toLowerCase().includes(needle));
