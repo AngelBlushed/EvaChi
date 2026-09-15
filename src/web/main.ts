@@ -23,14 +23,17 @@ import {
   adoptSystemFile,
   pickSystemFolder,
   adoptSystemFolder,
+  clearManualCover,
   coverIndex,
   directories,
   libraryFolders,
   listRoms,
+  manualCovers,
   pickContent,
   pickFolder,
   readContent,
   removeLibraryFolder,
+  setManualCover,
   note,
   takeMessages,
   adoptExternal,
@@ -143,6 +146,9 @@ const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
+const echelleList = $<HTMLDivElement>('echelle-list');
+const lissageList = $<HTMLDivElement>('lissage-list');
+const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const disquesCase = $<HTMLInputElement>('disques');
 const musiqueCase = $<HTMLInputElement>('musique');
@@ -172,6 +178,7 @@ const dialogs = {
   install: $<HTMLDialogElement>('install-dialog'),
   about: $<HTMLDialogElement>('about-dialog'),
   themes: $<HTMLDialogElement>('theme-dialog'),
+  graphics: $<HTMLDialogElement>('graphics-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -192,6 +199,9 @@ const RETENU = {
   musique: 'evachi.musique',
   sons: 'evachi.sons',
   favoris: 'evachi.favoris',
+  echelle: 'evachi.echelle',
+  lissage: 'evachi.lissage',
+  etats: 'evachi.etats',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -395,6 +405,8 @@ function ouvrirContextuel(event: MouseEvent, item: Playable): void {
   contextuel.replaceChildren();
 
   const favori = estFavori(item.rom.path);
+  const posee = jaquettesPosees[item.rom.path] !== undefined;
+
   const entrees: [string, string, () => void][] = [
     [
       favori ? '★' : '☆',
@@ -402,7 +414,9 @@ function ouvrirContextuel(event: MouseEvent, item: Playable): void {
       () => basculerFavori(item.rom.path),
     ],
     ['▶', 'Lancer', () => void jouerItem(item)],
+    ['🖼', posee ? 'Changer la jaquette…' : 'Choisir une jaquette…', () => void poserJaquette(item)],
   ];
+  if (posee) entrees.push(['✕', 'Retirer la jaquette', () => void enleverJaquette(item)]);
 
   for (const [signe, texte, faire] of entrees) {
     const bouton = document.createElement('button');
@@ -425,6 +439,227 @@ function ouvrirContextuel(event: MouseEvent, item: Playable): void {
   contextuel.style.left = `${Math.min(event.clientX, window.innerWidth - cadre.width - 6)}px`;
   contextuel.style.top = `${Math.min(event.clientY, window.innerHeight - cadre.height - 6)}px`;
   contextuel.querySelector('button')?.focus();
+}
+
+/**
+ * Désigne une image pour un jeu.
+ *
+ * C'est la seule réponse qui vaille pour la Switch et le CHIP-8 : le serveur de
+ * vignettes n'a même pas de dossier pour ces machines, et aucun réglage ne les
+ * y fera apparaître.
+ */
+async function poserJaquette(item: Playable): Promise<void> {
+  try {
+    const adresse = await setManualCover(item.rom.path);
+    if (!adresse) return;
+    jaquettesPosees = { ...jaquettesPosees, [item.rom.path]: adresse };
+    renderGames();
+    log(`${item.rom.name} — jaquette posée`, 'ok');
+  } catch (error) {
+    log(`jaquette — ${reason(error)}`, 'err');
+  }
+}
+
+/** Retire l'image posée sur un jeu, qui reprend celle du serveur s'il y en a une. */
+async function enleverJaquette(item: Playable): Promise<void> {
+  try {
+    await clearManualCover(item.rom.path);
+    const reste = { ...jaquettesPosees };
+    delete reste[item.rom.path];
+    jaquettesPosees = reste;
+    renderGames();
+  } catch (error) {
+    log(`jaquette — ${reason(error)}`, 'err');
+  }
+}
+
+// --- Sauvegarde rapide ------------------------------------------------------
+
+/**
+ * Les raccourcis de sauvegarde d'état, clavier et manette.
+ *
+ * Cœurs internes seulement : un émulateur externe a ses propres sauvegardes et
+ * ses propres touches, et EvaChi n'a aucun moyen de les lui commander.
+ *
+ * À la manette on prend deux boutons à la fois. Chacun d'eux sert au jeu — il
+ * n'y a pas de bouton libre sur une manette — et deux ensemble ne se pressent
+ * jamais par accident.
+ */
+interface Raccourci {
+  /** Code de touche clavier, ou vide. */
+  clavier: string;
+  /** Indices des boutons de manette à tenir ensemble, ou vide. */
+  pad: number[];
+}
+
+// Select + L1 pour sauvegarder, Select + R1 pour charger : les numéros du
+// format standard du W3C, écrits ici plutôt que pris dans la table des boutons,
+// qui est déclarée plus bas avec le reste de la navigation.
+const RACCOURCIS_PAR_DEFAUT: Record<'sauver' | 'charger', Raccourci> = {
+  sauver: { clavier: 'F2', pad: [8, 4] },
+  charger: { clavier: 'F4', pad: [8, 5] },
+};
+
+let raccourcisEtat: Record<'sauver' | 'charger', Raccourci> = lireRaccourcis();
+
+function lireRaccourcis(): Record<'sauver' | 'charger', Raccourci> {
+  try {
+    const brut = JSON.parse(retenu(RETENU.etats) ?? 'null');
+    if (!brut || typeof brut !== 'object') return structuredClone(RACCOURCIS_PAR_DEFAUT);
+    const lu = (quoi: 'sauver' | 'charger'): Raccourci => ({
+      clavier: typeof brut[quoi]?.clavier === 'string' ? brut[quoi].clavier : '',
+      pad: Array.isArray(brut[quoi]?.pad) ? brut[quoi].pad.filter(Number.isInteger) : [],
+    });
+    return { sauver: lu('sauver'), charger: lu('charger') };
+  } catch {
+    return structuredClone(RACCOURCIS_PAR_DEFAUT);
+  }
+}
+
+/** Écrit un raccourci en toutes lettres. */
+function direRaccourci(raccourci: Raccourci): string {
+  const morceaux: string[] = [];
+  if (raccourci.clavier) morceaux.push(raccourci.clavier);
+  if (raccourci.pad.length > 0) {
+    morceaux.push(raccourci.pad.map((index) => padButtonShort(index)).join(' + '));
+  }
+  return morceaux.join('   ou   ') || 'aucun';
+}
+
+/** Le raccourci qu'on est en train de redéfinir, s'il y en a un. */
+let raccourciEnAttente: 'sauver' | 'charger' | null = null;
+
+function renderRaccourcisEtat(): void {
+  raccourcisEtatBoite.replaceChildren();
+
+  for (const quoi of ['sauver', 'charger'] as const) {
+    const dt = document.createElement('dt');
+    dt.textContent = quoi === 'sauver' ? 'Sauvegarder' : 'Charger';
+
+    const dd = document.createElement('dd');
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'lien';
+    bouton.textContent =
+      raccourciEnAttente === quoi ? 'pressez une touche…' : direRaccourci(raccourcisEtat[quoi]);
+    bouton.addEventListener('click', () => {
+      raccourciEnAttente = raccourciEnAttente === quoi ? null : quoi;
+      renderRaccourcisEtat();
+    });
+    dd.append(bouton);
+    raccourcisEtatBoite.append(dt, dd);
+  }
+}
+
+function poserRaccourci(quoi: 'sauver' | 'charger', raccourci: Partial<Raccourci>): void {
+  raccourcisEtat = {
+    ...raccourcisEtat,
+    [quoi]: { ...raccourcisEtat[quoi], ...raccourci },
+  };
+  retenir(RETENU.etats, JSON.stringify(raccourcisEtat));
+  raccourciEnAttente = null;
+  renderRaccourcisEtat();
+}
+
+/** Vrai quand tous les boutons d'un raccourci sont tenus en même temps. */
+function raccourciTenu(pad: Gamepad, boutons: readonly number[]): boolean {
+  return boutons.length > 0 && boutons.every((index) => pad.buttons[index]?.pressed);
+}
+
+const etats = { sauver: new Held(1200, 1200), charger: new Held(1200, 1200) };
+
+/**
+ * Regarde si un raccourci de sauvegarde vient d'être fait à la manette.
+ *
+ * Seulement en cours de partie et sur un cœur interne : ailleurs il n'y a rien
+ * à sauvegarder, et laisser la combinaison agir donnerait l'impression d'un
+ * raccourci cassé.
+ */
+function surveillerEtats(pad: Gamepad, maintenant: number): void {
+  if (!core) return;
+  for (const quoi of ['sauver', 'charger'] as const) {
+    const tenu = raccourciTenu(pad, raccourcisEtat[quoi].pad);
+    if (etats[quoi].update(tenu, maintenant).pressed) {
+      if (sonsVoulus()) ticValidation();
+      void actions[quoi === 'sauver' ? 'save' : 'restore']?.();
+    }
+  }
+}
+
+// --- Graphisme --------------------------------------------------------------
+
+/**
+ * Comment l'image du jeu occupe la fenêtre.
+ *
+ * « Ajuster » remplit la place disponible en gardant les proportions ; les
+ * multiples entiers affichent chaque pixel de la console sur exactement deux,
+ * trois ou quatre pixels de l'écran. C'est ce qui fait la différence entre une
+ * image nette et une image dont une ligne sur trois est plus épaisse que les
+ * autres.
+ */
+const ECHELLES = [
+  ['ajuster', 'Ajuster', 'Remplit la fenêtre en gardant les proportions'],
+  ['1', '×1', 'Taille d’origine de la console, au pixel près'],
+  ['2', '×2', 'Chaque pixel sur quatre : net, sans déformation'],
+  ['3', '×3', 'Chaque pixel sur neuf'],
+  ['4', '×4', 'Chaque pixel sur seize — pour les grands écrans'],
+] as const;
+
+const LISSAGES = [
+  ['net', 'Net', 'Les pixels restent carrés, comme sur la machine d’origine'],
+  ['doux', 'Adouci', 'Les contours sont fondus — plus proche d’un vieux téléviseur'],
+] as const;
+
+function echelleImage(): string {
+  const garde = retenu(RETENU.echelle);
+  return ECHELLES.some(([id]) => id === garde) ? (garde as string) : 'ajuster';
+}
+
+function lissageImage(): string {
+  return retenu(RETENU.lissage) === 'doux' ? 'doux' : 'net';
+}
+
+/** Dessine un choix de réglage graphique, à la façon des présentations. */
+function renderChoix(
+  boite: HTMLElement,
+  options: readonly (readonly [string, string, string])[],
+  courant: string,
+  poser: (id: string) => void,
+): void {
+  boite.replaceChildren();
+  for (const [id, label, detail] of options) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    choix.className = 'menu-choix';
+    choix.setAttribute('aria-pressed', String(id === courant));
+    const nom = document.createElement('strong');
+    nom.textContent = label;
+    const dit = document.createElement('span');
+    dit.textContent = detail;
+    choix.append(nom, dit);
+    choix.addEventListener('click', () => poser(id));
+    boite.append(choix);
+  }
+}
+
+function renderGraphisme(): void {
+  renderChoix(echelleList, ECHELLES, echelleImage(), (id) => {
+    retenir(RETENU.echelle, id);
+    renderGraphisme();
+    fitScreen();
+  });
+  renderChoix(lissageList, LISSAGES, lissageImage(), (id) => {
+    retenir(RETENU.lissage, id);
+    renderGraphisme();
+    appliquerLissage();
+  });
+}
+
+/** Pose le lissage sur le canvas et sur le contexte de dessin. */
+function appliquerLissage(): void {
+  const doux = lissageImage() === 'doux';
+  canvas.style.imageRendering = doux ? 'auto' : 'pixelated';
+  if (context) context.imageSmoothingEnabled = doux;
 }
 
 /** Lance un jeu donné, avec le cœur retenu pour son volet. */
@@ -497,6 +732,15 @@ const audio = new AudioSink();
 const buttons: boolean[] = new Array(BUTTON_COUNT).fill(false);
 const keyboard: boolean[] = new Array(BUTTON_COUNT).fill(false);
 const buttonCells = new Map<number, HTMLButtonElement>();
+
+/**
+ * Les boutons de la manette, au format standard du W3C.
+ *
+ * Nommés plutôt que numérotés : `pad.buttons[9]` ne dit rien à la relecture, et
+ * confondre 8 et 9 donne une application qui se referme quand on voulait
+ * l'ouvrir.
+ */
+const BOUTON = { a: 0, b: 1, x: 2, y: 3, select: 8, start: 9, guide: 16 } as const;
 
 /** Index de la manette utilisée, ou -1 tant qu'aucune n'est branchée. */
 let padIndex = -1;
@@ -648,6 +892,22 @@ function fitScreen(available?: { width: number; height: number }): void {
     width = height * ratio;
   }
 
+  // Un multiple entier plutôt que la place disponible : chaque pixel de la
+  // console couvre alors exactement le même nombre de pixels d'écran. Sans
+  // cela, une ligne sur trois se dessine plus épaisse que ses voisines, et
+  // c'est ce qui donne aux vieux jeux un air de photocopie.
+  const voulu = echelleImage();
+  if (voulu !== 'ajuster') {
+    const facteur = Number(voulu);
+    const entier = canvas.width * facteur;
+    // On n'agrandit jamais au-delà de la fenêtre : mieux vaut un multiple plus
+    // petit qu'une image dont les bords sortent de l'écran.
+    if (entier <= box.width && canvas.height * facteur <= box.height) {
+      width = entier;
+      height = canvas.height * facteur;
+    }
+  }
+
   canvas.style.width = `${Math.floor(width)}px`;
   canvas.style.height = `${Math.floor(height)}px`;
 }
@@ -663,7 +923,7 @@ function present(frame: Frame): void {
     canvas.width = frame.width;
     canvas.height = frame.height;
     frameImage = new ImageData(frame.width, frame.height);
-    context!.imageSmoothingEnabled = false;
+    appliquerLissage();
     fitScreen();
   }
 
@@ -1026,6 +1286,7 @@ function renderGrille(shelves: Shelf[]): void {
       jaquette.loading = 'lazy';
       jaquette.dataset.console = item.rom.folder;
       jaquette.dataset.jeu = item.rom.name;
+      jaquette.dataset.chemin = item.rom.path;
       // La jaquette remplace l'initiale une fois arrivée, et pas avant : une
       // image à moitié chargée sur fond vide fait clignoter toute la grille.
       jaquette.addEventListener('load', () => {
@@ -1139,15 +1400,6 @@ function vueManette(): 'grille' | 'xmb' | null {
   return null;
 }
 
-/**
- * Les boutons de la manette, au format standard du W3C.
- *
- * Nommés plutôt que numérotés : `pad.buttons[9]` ne dit rien à la relecture, et
- * confondre 8 et 9 donne une application qui se referme quand on voulait
- * l'ouvrir.
- */
-const BOUTON = { a: 0, b: 1, x: 2, y: 3, select: 8, start: 9, guide: 16 } as const;
-
 /** Les filtres d'appui des boutons autres que les directions. */
 const boutons = {
   b: new Held(1000, 1000),
@@ -1195,6 +1447,7 @@ function naviguerMenu(): void {
   // Deux boutons à la fois plutôt qu'un seul : chacun d'eux sert au jeu, et
   // les deux ensemble ne se pressent jamais par hasard.
   if (libraryView.hidden) {
+    surveillerEtats(pad, maintenant);
     const ensemble = appuye(BOUTON.select) && appuye(BOUTON.start);
     if (boutons.retour.update(ensemble, maintenant).pressed) {
       tic(true);
@@ -1417,6 +1670,37 @@ function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
   else deplacerXmb(sens);
 }
 
+/**
+ * Les raccourcis d'état au clavier : capture et déclenchement.
+ *
+ * Posé avant tout le reste de la page — `capture` — pour prendre la touche
+ * avant qu'un champ de saisie ne s'en empare.
+ */
+document.addEventListener(
+  'keydown',
+  (event) => {
+    if (raccourciEnAttente) {
+      event.preventDefault();
+      if (event.key === 'Escape') {
+        raccourciEnAttente = null;
+        renderRaccourcisEtat();
+        return;
+      }
+      poserRaccourci(raccourciEnAttente, { clavier: event.key });
+      return;
+    }
+
+    if (!core || !libraryView.hidden) return;
+    for (const quoi of ['sauver', 'charger'] as const) {
+      if (raccourcisEtat[quoi].clavier && raccourcisEtat[quoi].clavier === event.key) {
+        event.preventDefault();
+        void actions[quoi === 'sauver' ? 'save' : 'restore']?.();
+      }
+    }
+  },
+  true,
+);
+
 /** Les flèches du clavier, comme la croix de la manette. */
 const FLECHES: Record<string, Direction> = {
   ArrowLeft: 'gauche',
@@ -1581,6 +1865,7 @@ function renderEntreesXmb(): void {
       jaquette.loading = 'lazy';
       jaquette.dataset.console = item.rom.folder;
       jaquette.dataset.jeu = item.rom.name;
+      jaquette.dataset.chemin = item.rom.path;
       jaquette.addEventListener('load', () => {
         initiale.hidden = true;
       });
@@ -1682,6 +1967,13 @@ function poserAffiche(item: Playable | undefined): void {
   xmbAfficheImage.removeAttribute('src');
 
   if (!item || !jaquettesVoulues()) return;
+
+  // Une jaquette posée à la main n'a rien à aller chercher : elle est déjà là.
+  const posee = jaquettesPosees[item.rom.path];
+  if (posee) {
+    xmbAfficheImage.src = posee;
+    return;
+  }
 
   afficheMinuterie = window.setTimeout(async () => {
     try {
@@ -1929,10 +2221,35 @@ function regarderJaquette(img: HTMLImageElement): void {
   else void habiller(img);
 }
 
+/**
+ * Les jaquettes posées à la main, relues une fois au démarrage.
+ *
+ * Elles passent avant le serveur de vignettes : si quelqu'un a pris la peine
+ * d'en désigner une, c'est qu'aucune autre ne convenait.
+ */
+let jaquettesPosees: Record<string, string> = {};
+
+async function relireJaquettesPosees(): Promise<void> {
+  try {
+    jaquettesPosees = await manualCovers();
+  } catch {
+    jaquettesPosees = {};
+  }
+}
+
 /** Cherche la jaquette qui convient et la pose, ou laisse la place vide. */
 async function habiller(img: HTMLImageElement): Promise<void> {
   const consoleLabel = img.dataset.console ?? '';
   const jeu = img.dataset.jeu ?? '';
+  const chemin = img.dataset.chemin ?? '';
+
+  const posee = jaquettesPosees[chemin];
+  if (posee) {
+    img.addEventListener('load', () => img.classList.add('vue'), { once: true });
+    img.src = posee;
+    return;
+  }
+
   if (!consoleLabel || !jeu) return;
 
   try {
@@ -1975,6 +2292,7 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
     jaquette.alt = '';
     jaquette.dataset.console = rom.folder;
     jaquette.dataset.jeu = rom.name;
+    jaquette.dataset.chemin = rom.path;
     regarderJaquette(jaquette);
     name.append(jaquette);
   }
@@ -2837,7 +3155,14 @@ const actions: Record<string, () => void | Promise<void>> = {
   stop: stopPlaying,
 
   fullscreen: toggleFullscreen,
-  controls: () => openDialog(dialogs.controls),
+  graphics: () => {
+    renderGraphisme();
+    openDialog(dialogs.graphics);
+  },
+  controls: () => {
+    renderRaccourcisEtat();
+    openDialog(dialogs.controls);
+  },
   settings: () => openDialog(dialogs.settings),
   log: () => openDialog(dialogs.log),
   about: () => {
@@ -3020,6 +3345,7 @@ function pollControls(): void {
   try {
     if (!running && dialogs.controls.open) sampleInput();
     capturerLiaison();
+    capturerRaccourciPad();
     naviguerMenu();
   } catch (error) {
     log(`commandes : ${error instanceof Error ? error.message : String(error)}`, 'err');
@@ -3063,6 +3389,40 @@ function poserLiaisons(suivantes: AllOverrides): void {
  * n'émet rien, il faut aller voir. On ne retient que le premier bouton trouvé —
  * en presser deux à la fois ne doit pas en lier deux au hasard.
  */
+/**
+ * Capture une combinaison de manette pour un raccourci d'état.
+ *
+ * On attend que tous les boutons soient relâchés avant de valider : autrement
+ * le premier bouton pressé serait pris seul, et on n'obtiendrait jamais une
+ * combinaison à deux.
+ */
+let combinaisonEnCours: number[] = [];
+
+function capturerRaccourciPad(): void {
+  if (!raccourciEnAttente) {
+    combinaisonEnCours = [];
+    return;
+  }
+  const pads = navigator.getGamepads?.() ?? [];
+  const pad = padIndex >= 0 ? pads[padIndex] : null;
+  if (!pad) return;
+
+  const presses = pad.buttons
+    .map((bouton, index) => (bouton?.pressed ? index : -1))
+    .filter((index) => index >= 0);
+
+  if (presses.length > 0) {
+    // On garde la plus grande combinaison vue pendant l'appui.
+    if (presses.length >= combinaisonEnCours.length) combinaisonEnCours = presses;
+    return;
+  }
+
+  if (combinaisonEnCours.length > 0) {
+    poserRaccourci(raccourciEnAttente, { pad: combinaisonEnCours });
+    combinaisonEnCours = [];
+  }
+}
+
 function capturerLiaison(): void {
   if (enAttente === null) return;
   const pads = navigator.getGamepads?.() ?? [];
@@ -3212,6 +3572,10 @@ async function start(): Promise<void> {
   // Avant tout le reste : la fenêtre doit apparaître aux couleurs choisies, et
   // non passer de l'une à l'autre sous les yeux.
   applyTheme(themeActuel, document.documentElement);
+
+  // Les jaquettes posées à la main sont relues une fois, avant le premier
+  // dessin : les chercher après ferait clignoter la bibliothèque.
+  await relireJaquettesPosees();
 
   try {
     // Chrome publie la disposition réelle du clavier ; on affiche alors les

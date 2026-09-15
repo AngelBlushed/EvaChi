@@ -765,6 +765,55 @@ pub struct CoverIndex {
     pub names: Vec<String>,
 }
 
+/// Les jaquettes posées à la main, par chemin de jeu.
+#[tauri::command]
+pub async fn manual_covers(
+    paths: State<'_, Paths>,
+) -> Result<std::collections::BTreeMap<String, String>, String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::manual::toutes(&dossier))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
+}
+
+/// Désigne une image et la rattache à un jeu. Rend l'adresse à afficher.
+#[tauri::command]
+pub async fn set_manual_cover(
+    app: tauri::AppHandle,
+    rom_path: String,
+    paths: State<'_, Paths>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let choix = app
+        .dialog()
+        .file()
+        .set_title("Choisir une jaquette")
+        .add_filter("Images", &["png", "jpg", "jpeg", "webp", "gif"])
+        .blocking_pick_file();
+
+    let Some(fichier) = choix else { return Ok(None) };
+    let image = std::path::PathBuf::from(fichier.to_string());
+    let dossier = paths.covers.clone();
+
+    tauri::async_runtime::spawn_blocking(move || crate::manual::poser(&dossier, &rom_path, &image))
+        .await
+        .map_err(|error| format!("copie interrompue : {error}"))?
+        .map(Some)
+}
+
+/// Détache la jaquette posée sur un jeu.
+#[tauri::command]
+pub async fn clear_manual_cover(
+    rom_path: String,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::manual::retirer(&dossier, &rom_path))
+        .await
+        .map_err(|error| format!("retrait interrompu : {error}"))?
+}
+
 /// Ouvre le sélecteur de fichiers pour désigner un émulateur.
 #[tauri::command]
 pub fn pick_executable(app: tauri::AppHandle) -> Option<String> {

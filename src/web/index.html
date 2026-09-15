@@ -1119,6 +1119,7 @@
             </button>
             <hr />
             <button type="button" data-action="themes">Thèmes…</button>
+            <button type="button" data-action="graphics">Graphisme…</button>
             <button type="button" data-action="controls">Commandes…</button>
             <button type="button" data-action="settings">Paramètres du cœur…</button>
             <button type="button" data-action="log">Journal…</button>
@@ -1389,6 +1390,31 @@
       </div>
     </dialog>
 
+    <dialog id="graphics-dialog">
+      <h2>Graphisme</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Ces réglages ne touchent qu'aux cœurs internes. Un émulateur externe
+          a les siens, et EvaChi ne s'en mêle pas.
+        </p>
+
+        <h3 class="section">Taille de l'image</h3>
+        <div class="menus" id="echelle-list"></div>
+
+        <h3 class="section">Lissage</h3>
+        <div class="menus" id="lissage-list"></div>
+
+        <h3 class="section">Shaders</h3>
+        <p class="hint-text">
+          À venir : filtres de tube cathodique, quadrillage, balayage. La place
+          est prête, les filtres arriveront ici.
+        </p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
     <dialog id="controls-dialog">
       <h2>Commandes</h2>
       <div class="dialog-body">
@@ -1409,6 +1435,14 @@
           <button type="button" id="controls-reset" class="lien">Liaisons d'origine</button>
         </p>
         <div class="pad" id="keypad"></div>
+
+        <h3 class="section">Sauvegarde rapide</h3>
+        <p class="hint-text">
+          Cœurs internes seulement. Cliquez un raccourci puis pressez la touche
+          ou le bouton voulu ; à la manette on prend deux boutons à la fois,
+          car chacun d'eux sert déjà au jeu.
+        </p>
+        <dl class="about raccourcis" id="raccourcis-etat"></dl>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>

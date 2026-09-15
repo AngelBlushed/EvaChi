@@ -237,6 +237,21 @@ export interface CoverIndex {
   readonly names: string[];
 }
 
+/** Les jaquettes posées à la main, par chemin de jeu. */
+export async function manualCovers(): Promise<Record<string, string>> {
+  return invoke<Record<string, string>>('manual_covers');
+}
+
+/** Ouvre le sélecteur d'image et rattache le choix à un jeu. */
+export async function setManualCover(romPath: string): Promise<string | null> {
+  return invoke<string | null>('set_manual_cover', { romPath });
+}
+
+/** Détache la jaquette posée sur un jeu. */
+export async function clearManualCover(romPath: string): Promise<void> {
+  return invoke<void>('clear_manual_cover', { romPath });
+}
+
 /** Ouvre le sélecteur pour désigner un dossier entier à ranger. */
 export async function pickSystemFolder(): Promise<string | null> {
   return invoke<string | null>('pick_system_folder');

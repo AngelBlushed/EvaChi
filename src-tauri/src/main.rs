@@ -19,6 +19,7 @@ mod commands;
 mod covers;
 mod emulators;
 mod install;
+mod manual;
 mod pads;
 mod skeleton;
 
@@ -151,6 +152,9 @@ fn main() {
             commands::installable_emulators,
             commands::install_emulator,
             commands::cover_index,
+            commands::manual_covers,
+            commands::set_manual_cover,
+            commands::clear_manual_cover,
             commands::note,
         ])
         .run(tauri::generate_context!())
