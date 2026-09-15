@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import type { RomEntry } from '../libretro/client.ts';
 import type { CatalogEntry } from './catalog.ts';
 import { JOYPAD } from './input.ts';
-import { collapseDiscs, coresFor, folderLabel, gameLabel, groupLibrary, hintedCore } from './library.ts';
+import { FAVORIS, collapseDiscs, coresFor, folderLabel, gameLabel, groupLibrary, hintedCore, withFavourites } from './library.ts';
+import type { Shelf } from './library.ts';
 
 /** Fabrique un cœur du catalogue. */
 function core(id: string, extensions: string[], label = id): CatalogEntry {
@@ -702,5 +703,59 @@ describe('poids d’un jeu sur disque', () => {
   it('laisse son poids à un fichier que rien n’accompagne', () => {
     const roms = [pese('Nes', 'Zelda.nes', 131_072)];
     assert.equal(collapseDiscs(roms)[0].size, 131_072);
+  });
+});
+
+describe('volet de favoris', () => {
+  const jeu = (nom: string, dossier: string): RomEntry => ({
+    name: nom, path: `D:/roms/${dossier}/${nom}`,
+    extension: nom.slice(nom.lastIndexOf('.') + 1), size: 1, folder: dossier,
+  });
+  const coeur = (id: string): CatalogEntry =>
+    ({ id, label: id, path: id, extensions: ['nes', 'md'], kind: 'libretro' } as unknown as CatalogEntry);
+
+  const volets = (): Shelf[] => [
+    {
+      key: 'Nes', label: 'Nes',
+      games: [{ rom: jeu('Zelda.nes', 'Nes'), cores: [coeur('mesen')] }],
+      candidates: [coeur('mesen')], preferred: 'mesen',
+    },
+    {
+      key: 'Md', label: 'Mega Drive',
+      games: [{ rom: jeu('Sonic.md', 'Md'), cores: [coeur('gpgx')] }],
+      candidates: [coeur('gpgx')], preferred: 'gpgx',
+    },
+  ];
+
+  it('met les favoris en tête sans les retirer de leur console', () => {
+    // Un favori reste à sa console : on cherche un jeu là où on l'a rangé au
+    // moins aussi souvent que dans ses favoris.
+    const avec = withFavourites(volets(), ['D:/roms/Md/Sonic.md']);
+    assert.equal(avec[0].key, FAVORIS);
+    assert.deepEqual(avec[0].games.map((g) => g.rom.name), ['Sonic.md']);
+    assert.equal(avec.length, 3);
+    assert.deepEqual(avec[2].games.map((g) => g.rom.name), ['Sonic.md']);
+  });
+
+  it('garde l’ordre des favoris, pas celui des consoles', () => {
+    // C'est une liste qu'on se fait : elle doit garder la forme qu'on lui a
+    // donnée.
+    const avec = withFavourites(volets(), ['D:/roms/Md/Sonic.md', 'D:/roms/Nes/Zelda.nes']);
+    assert.deepEqual(avec[0].games.map((g) => g.rom.name), ['Sonic.md', 'Zelda.nes']);
+  });
+
+  it('ne propose que les cœurs qui ouvrent un favori', () => {
+    const avec = withFavourites(volets(), ['D:/roms/Nes/Zelda.nes']);
+    assert.deepEqual(avec[0].candidates.map((c) => c.id), ['mesen']);
+  });
+
+  it('n’ajoute rien quand il n’y a pas de favori', () => {
+    assert.equal(withFavourites(volets(), []).length, 2);
+  });
+
+  it('oublie un favori dont le jeu a disparu', () => {
+    // Un disque débranché, un fichier renommé : le volet ne doit pas afficher
+    // une ligne qui ne mène nulle part.
+    assert.equal(withFavourites(volets(), ['D:/roms/Nes/Efface.nes']).length, 2);
   });
 });

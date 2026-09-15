@@ -331,6 +331,17 @@
       .xmb-tete,
       .xmb-rail,
       .xmb-liste,
+      /* L'étoile d'un favori : posée par-dessus, jamais dans le flux, pour ne
+         décaler ni un titre ni une jaquette. */
+      .xmb-entree .etoile { margin-left: auto; color: var(--accent); font-size: calc(14px * var(--ech)); }
+      .tuile .boite .etoile {
+        place-self: start end;
+        margin: 5px;
+        color: var(--accent);
+        font-size: 15px;
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+      }
+
       .xmb-pied { position: absolute; left: 0; right: 0; }
 
       .xmb-tete {

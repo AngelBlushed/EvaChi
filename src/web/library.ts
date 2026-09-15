@@ -296,6 +296,46 @@ export function collapseDiscs(games: readonly RomEntry[]): RomEntry[] {
     );
 }
 
+/** La clé sous laquelle un volet de favoris se reconnaît. */
+export const FAVORIS = 'favoris';
+
+/**
+ * Un volet de favoris, en tête de bibliothèque.
+ *
+ * Les jeux y sont repris, pas déplacés : un favori reste à sa console. On
+ * cherche un jeu là où on l'a rangé au moins aussi souvent que dans ses
+ * favoris, et l'en retirer surprendrait.
+ *
+ * L'ordre suit celui des favoris eux-mêmes et non celui des consoles : c'est
+ * une liste qu'on se fait, elle doit garder la forme qu'on lui a donnée.
+ */
+export function withFavourites(
+  shelves: readonly Shelf[],
+  favourites: readonly string[],
+): Shelf[] {
+  if (favourites.length === 0) return [...shelves];
+
+  const parChemin = new Map<string, Playable>();
+  for (const shelf of shelves) {
+    for (const item of shelf.games) parChemin.set(item.rom.path, item);
+  }
+
+  const games = favourites
+    .map((chemin) => parChemin.get(chemin))
+    .filter((item): item is Playable => item !== undefined);
+
+  if (games.length === 0) return [...shelves];
+
+  // Les cœurs proposés sont ceux qui ouvrent au moins un des favoris, sans
+  // quoi le sélecteur du volet offrirait des cœurs sans rapport.
+  const candidates = [...new Map(games.flatMap((item) => item.cores).map((c) => [c.id, c])).values()];
+
+  return [
+    { key: FAVORIS, label: 'Favoris', games, candidates, preferred: undefined },
+    ...shelves,
+  ];
+}
+
 /** Le cœur qui ouvrira ce jeu : le choix explicite, sinon celui du volet. */
 export function effectiveCore(
   rom: RomEntry,

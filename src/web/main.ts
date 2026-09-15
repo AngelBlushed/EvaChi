@@ -51,7 +51,15 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import { collapseDiscs, coresFor, effectiveCore, gameLabel, groupLibrary } from './library.ts';
+import {
+  FAVORIS,
+  collapseDiscs,
+  coresFor,
+  effectiveCore,
+  gameLabel,
+  groupLibrary,
+  withFavourites,
+} from './library.ts';
 import type { Playable, Shelf } from './library.ts';
 import {
   BUTTON_COUNT,
@@ -183,6 +191,7 @@ const RETENU = {
   disques: 'evachi.disques',
   musique: 'evachi.musique',
   sons: 'evachi.sons',
+  favoris: 'evachi.favoris',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -318,6 +327,48 @@ disquesCase.addEventListener('change', () => {
   retenir(RETENU.disques, disquesCase.checked ? 'oui' : 'non');
   renderGames();
 });
+
+/**
+ * Les jeux mis de côté, dans l'ordre où on les a choisis.
+ *
+ * Retenus par chemin et non par nom : deux consoles peuvent contenir un
+ * « Sonic », et un favori doit désigner celui qu'on a vraiment mis de côté.
+ */
+let favoris: string[] = lireFavoris();
+
+function lireFavoris(): string[] {
+  try {
+    const brut = JSON.parse(retenu(RETENU.favoris) ?? '[]');
+    return Array.isArray(brut) ? brut.filter((x): x is string => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Vrai quand ce jeu est dans les favoris. */
+function estFavori(chemin: string): boolean {
+  return favoris.includes(chemin);
+}
+
+/**
+ * Met un jeu de côté, ou l'en retire.
+ *
+ * Ajouté à la fin : la liste garde l'ordre dans lequel on l'a faite, ce qui la
+ * rend reconnaissable d'une fois sur l'autre.
+ */
+function basculerFavori(chemin: string): boolean {
+  favoris = estFavori(chemin) ? favoris.filter((autre) => autre !== chemin) : [...favoris, chemin];
+  retenir(RETENU.favoris, JSON.stringify(favoris));
+  renderGames();
+  return estFavori(chemin);
+}
+
+/** Le jeu actuellement visé, quelle que soit la vue. */
+function jeuVise(): Playable | undefined {
+  if (enGrille()) return tuiles[choisie];
+  if (enXmb()) return voletsXmb[colonneXmb]?.games[entreeXmb];
+  return undefined;
+}
 
 /** Vrai quand le menu animé doit avoir sa musique. */
 function musiqueVoulue(): boolean {
@@ -914,6 +965,13 @@ function renderGrille(shelves: Shelf[]): void {
       regarderJaquette(jaquette);
     }
 
+    if (estFavori(item.rom.path)) {
+      const etoile = document.createElement('span');
+      etoile.className = 'etoile';
+      etoile.textContent = '★';
+      boite.append(etoile);
+    }
+
     const nom = document.createElement('span');
     nom.className = 'nom';
     nom.textContent = gameLabel(item.rom.name);
@@ -1021,6 +1079,7 @@ const boutons = {
   b: new Held(1000, 1000),
   start: new Held(1000, 1000),
   retour: new Held(1000, 1000),
+  favori: new Held(1000, 1000),
 };
 
 /**
@@ -1098,6 +1157,15 @@ function naviguerMenu(): void {
   if (a) {
     tic(true);
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
+  }
+
+  if (boutons.favori.update(appuye(BOUTON.y), maintenant).pressed) {
+    const item = jeuVise();
+    if (item) {
+      tic();
+      const mis = basculerFavori(item.rom.path);
+      log(`${item.rom.name} — ${mis ? 'mis en favori' : 'retiré des favoris'}`, 'ok');
+    }
   }
 }
 
@@ -1400,7 +1468,9 @@ function renderColonnesXmb(): void {
 
     const rond = document.createElement('span');
     rond.className = 'rond';
-    rond.textContent = initiales(shelf.label);
+    // Les favoris portent une étoile plutôt que des initiales : c'est le seul
+    // volet qu'on ne reconnaît pas à sa console.
+    rond.textContent = shelf.key === FAVORIS ? '★' : initiales(shelf.label);
 
     const etiquette = document.createElement('span');
     etiquette.className = 'etiquette';
@@ -1458,6 +1528,13 @@ function renderEntreesXmb(): void {
 
     texte.append(titre, detail);
     entree.append(vignette, texte);
+    if (estFavori(item.rom.path)) {
+      const etoile = document.createElement('span');
+      etoile.className = 'etoile';
+      etoile.textContent = '★';
+      etoile.title = 'Favori';
+      entree.append(etoile);
+    }
     entree.addEventListener('click', () => {
       if (rang === entreeXmb) void jouerXmb();
       else allerEntree(rang);
@@ -1587,7 +1664,14 @@ async function jouerXmb(): Promise<void> {
 
 /** Dessine tout le menu animé à partir des volets déjà classés. */
 function renderXmb(shelves: Shelf[]): void {
+  // On retient la console d'avant pour y revenir : mettre un jeu en favori
+  // insère un volet en tête, et la sélection glissait alors d'un cran — on
+  // pressait « favori » sur un jeu 32X et on se retrouvait dans les favoris.
+  const avant = voletsXmb[colonneXmb]?.key;
+
   voletsXmb = shelves;
+  const retrouve = avant === undefined ? -1 : shelves.findIndex((shelf) => shelf.key === avant);
+  if (retrouve >= 0) colonneXmb = retrouve;
   colonneXmb = step(colonneXmb, shelves.length, 0);
   const shelf = shelves[colonneXmb];
   entreeXmb = step(entreeXmb, shelf?.games.length ?? 0, 0);
@@ -1799,7 +1883,7 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
   name.className = 'name';
 
   const titre = document.createElement('span');
-  titre.textContent = rom.name;
+  titre.textContent = estFavori(rom.path) ? `★ ${rom.name}` : rom.name;
 
   // La jaquette précède le titre. Elle n'est pas chargée ici : la vignette
   // s'annonce, et l'observateur ira la chercher quand la ligne approchera de
@@ -1862,13 +1946,9 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 /** Redessine la bibliothèque, filtrée par la recherche. */
 function renderGames(): void {
   const needle = searchInput.value.trim().toLowerCase();
-  const shelves = groupLibrary(
-    games,
-    catalog,
-    readFolderCores(),
-    chosenCore,
-    needle,
-    disquesReplies(),
+  const shelves = withFavourites(
+    groupLibrary(games, catalog, readFolderCores(), chosenCore, needle, disquesReplies()),
+    favoris,
   );
   volets = shelves;
 

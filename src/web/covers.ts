@@ -119,8 +119,31 @@ export function thumbnailFolders(label: string): readonly string[] {
  * les articles rejetés en fin de titre. « Legend of Zelda, The - The Minish Cap
  * (U) » et « The Legend of Zelda - The Minish Cap (USA) » se rejoignent ainsi.
  */
+/**
+ * Retire ce qu'une sauvegarde de cartouche accroche autour du titre.
+ *
+ * Une carte 3DS lue proprement donne un nom comme
+ * « 0004000000030800 Mario Kart 7 CTR-P-AMKE v2.4.0 U.legit Game-decrypted » :
+ * un identifiant de seize chiffres devant, puis le code produit et tout ce que
+ * l'outil de lecture a jugé bon d'ajouter. Le titre est au milieu.
+ *
+ * On coupe au code produit plutôt que de retirer les mots un à un : c'est la
+ * première chose qui vient après le titre, et tout ce qui suit lui appartient.
+ */
+function sansHabillage(title: string): string {
+  // L'identifiant de titre, seize chiffres hexadécimaux, toujours en tête.
+  let propre = title.replace(/^\s*[0-9a-f]{16}\s+/i, '');
+
+  // Le code produit — CTR-P-AMKE, NTR-P-ASME, RVL-S-XYZW — puis le numéro de
+  // version, selon ce qui vient le premier.
+  const coupure = /\s+(?:[A-Z]{3}-[A-Z]-[A-Z0-9]{4}\b|v\d+(?:\.\d+)+\b)/.exec(propre);
+  if (coupure) propre = propre.slice(0, coupure.index);
+
+  return propre.trim() || title;
+}
+
 export function normalise(title: string): string {
-  return title
+  return sansHabillage(title)
     .replace(/\.[a-z0-9]{1,5}$/i, '')
     .replace(/[([][^)\]]*[)\]]/g, ' ')
     .normalize('NFD')

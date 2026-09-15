@@ -200,3 +200,36 @@ describe('adresse d’une jaquette', () => {
     assert.ok(url.endsWith('Doom%20(Europe).png'));
   });
 });
+
+describe('noms de cartouches sauvegardées', () => {
+  it('retrouve le titre sous l’habillage d’une carte 3DS', () => {
+    // Le vrai nom d'un fichier de la bibliothèque : identifiant de titre,
+    // code produit, version, et les ajouts de l'outil de lecture.
+    assert.equal(
+      normalise('0004000000030800 Mario Kart 7 CTR-P-AMKE v2.4.0 U.legit Game-decrypted.cci'),
+      'mario kart 7',
+    );
+  });
+
+  it('coupe au numéro de version quand il n’y a pas de code produit', () => {
+    assert.equal(normalise('0004000000055D00 Pokemon X v1.5.0 decrypted.3ds'), 'pokemon x');
+  });
+
+  it('ne coupe pas un titre qui contient des chiffres', () => {
+    // « Mario Kart 8 » ne doit pas perdre son 8, ni « F-Zero » son tiret.
+    assert.equal(normalise('Mario Kart 8 (USA).wux'), 'mario kart 8');
+    assert.equal(normalise('F-Zero GX (USA).iso'), 'f zero gx');
+  });
+
+  it('laisse tranquille un nom qui n’a pas d’identifiant', () => {
+    assert.equal(normalise('Sonic The Hedgehog (USA, Europe).md'), 'sonic the hedgehog');
+  });
+
+  it('rapproche vraiment la cartouche de sa jaquette', () => {
+    const cartes = index('Nintendo - Nintendo 3DS', ['Mario Kart 7 (USA)']);
+    assert.equal(
+      chooseCover(cartes, '0004000000030800 Mario Kart 7 CTR-P-AMKE v2.4.0 U.legit Game-decrypted.cci')?.name,
+      'Mario Kart 7 (USA)',
+    );
+  });
+});
