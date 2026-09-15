@@ -29,6 +29,8 @@ pub struct Paths {
     /// Chez elle plutôt que dans `Program Files` : rien à désinstaller, rien
     /// qui traîne ailleurs, et l'ensemble se déplace d'un bloc.
     pub emulators: PathBuf,
+    /// Inventaires de jaquettes, un fichier par console.
+    pub covers: PathBuf,
     /// Réglages conservés entre deux lancements.
     pub config: PathBuf,
 }
@@ -46,6 +48,7 @@ impl Paths {
             saves: base.join("saves"),
             roms: library_root(roms_beside_exe(), &base),
             emulators: base.join("emulators"),
+            covers: base.join("covers"),
             config: base.join("config.json"),
         };
 
@@ -731,6 +734,19 @@ pub fn adopt_external(
         },
         paths,
     )
+}
+
+/// L'inventaire des jaquettes d'une console.
+///
+/// Asynchrone, comme tout ce qui parle au réseau : la première demande d'une
+/// console va chercher plusieurs milliers de noms, et le fil de la fenêtre n'a
+/// pas à l'attendre. Les fois suivantes, la liste vient du disque.
+#[tauri::command]
+pub async fn cover_index(system: String, paths: State<'_, Paths>) -> Result<Vec<String>, String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::covers::index(&system, &dossier))
+        .await
+        .map_err(|error| format!("inventaire interrompu : {error}"))?
 }
 
 /// Ouvre le sélecteur de fichiers pour désigner un émulateur.
@@ -1530,6 +1546,7 @@ fn headless_paths() -> Option<Paths> {
         saves: base.join("saves"),
         roms: library_root(roms_beside_exe(), &base),
         emulators: base.join("emulators"),
+        covers: base.join("covers"),
         config: base.join("config.json"),
     })
 }
@@ -2337,6 +2354,7 @@ mod config_tests {
             saves: base.join("saves"),
             roms: base.join("roms"),
             emulators: base.join("emulators"),
+            covers: base.join("covers"),
             config: base.join("config.json"),
         };
         (base, paths)
@@ -2669,6 +2687,7 @@ mod preset_args_tests {
             saves: base.join("saves"),
             roms: base.join("roms"),
             emulators: base.join("emulators"),
+            covers: base.join("covers"),
             config: base.join("config.json"),
         };
         (base, paths)

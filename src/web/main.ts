@@ -23,6 +23,7 @@ import {
   adoptSystemFile,
   pickSystemFolder,
   adoptSystemFolder,
+  coverIndex,
   directories,
   libraryFolders,
   listRoms,
@@ -73,6 +74,8 @@ import {
   withoutBindings,
 } from './bindings.ts';
 import type { AllOverrides } from './bindings.ts';
+import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
+import type { Candidate } from './covers.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -679,6 +682,81 @@ function writeCollapsed(collapsed: Set<string>): void {
 }
 
 
+// --- Jaquettes --------------------------------------------------------------
+
+/** Les inventaires déjà relevés, par console. */
+const inventaires = new Map<string, Promise<Candidate[]>>();
+
+/** L'inventaire d'une console, demandé une seule fois par séance. */
+function inventaire(consoleLabel: string): Promise<Candidate[]> {
+  const deja = inventaires.get(consoleLabel);
+  if (deja) return deja;
+
+  const dossiers = thumbnailFolders(consoleLabel);
+  const promesse: Promise<Candidate[]> = dossiers.length
+    ? Promise.all(
+        dossiers.map((dossier) =>
+          coverIndex(dossier)
+            .then((noms) => indexCovers(dossier, noms))
+            .catch(() => [] as Candidate[]),
+        ),
+      ).then((listes) => listes.flat())
+    : Promise.resolve([]);
+
+  inventaires.set(consoleLabel, promesse);
+  return promesse;
+}
+
+/**
+ * Va chercher la jaquette d'une ligne quand elle approche de l'écran.
+ *
+ * Un observateur plutôt qu'un chargement à la construction : une bibliothèque
+ * de six cents jeux demanderait six cents images dont trente sont visibles.
+ * L'image est ensuite lâchée — elle ne sera plus redemandée, le cache du
+ * navigateur s'en charge.
+ */
+const guetteur =
+  typeof IntersectionObserver === 'undefined'
+    ? null
+    : new IntersectionObserver(
+        (entrees, moi) => {
+          for (const entree of entrees) {
+            if (!entree.isIntersecting) continue;
+            const img = entree.target as HTMLImageElement;
+            moi.unobserve(img);
+            void habiller(img);
+          }
+        },
+        { rootMargin: '300px' },
+      );
+
+/** Met une ligne sous surveillance. */
+function regarderJaquette(img: HTMLImageElement): void {
+  if (guetteur) guetteur.observe(img);
+  else void habiller(img);
+}
+
+/** Cherche la jaquette qui convient et la pose, ou laisse la place vide. */
+async function habiller(img: HTMLImageElement): Promise<void> {
+  const consoleLabel = img.dataset.console ?? '';
+  const jeu = img.dataset.jeu ?? '';
+  if (!consoleLabel || !jeu) return;
+
+  try {
+    const disponibles = await inventaire(consoleLabel);
+    const trouve = chooseCover(disponibles, jeu);
+    if (!trouve) return;
+
+    // Une image qui n'arrive pas ne laisse pas de cadre brisé : la vignette
+    // disparaît, et la ligne reprend sa place.
+    img.addEventListener('error', () => img.classList.remove('vue'), { once: true });
+    img.addEventListener('load', () => img.classList.add('vue'), { once: true });
+    img.src = coverUrl(trouve.folder, trouve.name);
+  } catch {
+    // Pas de réseau, pas de jaquette : la bibliothèque marche sans.
+  }
+}
+
 /** Construit la ligne d'un jeu. */
 function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTMLTableRowElement {
   const target = effectiveCore(rom, cores, chosenCore, preferred);
@@ -688,7 +766,22 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 
   const name = document.createElement('td');
   name.className = 'name';
-  name.textContent = rom.name;
+
+  // La jaquette précède le titre. Elle n'est pas chargée ici : la vignette
+  // s'annonce, et l'observateur ira la chercher quand la ligne approchera de
+  // l'écran. Six cents images demandées d'un coup ne serviraient à rien.
+  const jaquette = document.createElement('img');
+  jaquette.className = 'jaquette';
+  jaquette.loading = 'lazy';
+  jaquette.alt = '';
+  jaquette.dataset.console = rom.folder;
+  jaquette.dataset.jeu = rom.name;
+  regarderJaquette(jaquette);
+
+  const titre = document.createElement('span');
+  titre.textContent = rom.name;
+
+  name.append(jaquette, titre);
 
   // Le cœur se choisit au niveau du dossier ; la ligne dit lequel s'appliquera,
   // sauf pour un fichier hors dossier, que personne n'a classé.

@@ -216,6 +216,16 @@ export async function adoptSystemFile(path: string): Promise<Placed[]> {
   return invoke<Placed[]>('adopt_system_file', { path });
 }
 
+/**
+ * Les noms de jaquettes publiés pour cette console.
+ *
+ * Le serveur n'autorise pas la lecture de son index depuis la fenêtre : c'est
+ * la coque native qui va le chercher, et le garde sur le disque.
+ */
+export async function coverIndex(system: string): Promise<string[]> {
+  return invoke<string[]>('cover_index', { system });
+}
+
 /** Ouvre le sélecteur pour désigner un dossier entier à ranger. */
 export async function pickSystemFolder(): Promise<string | null> {
   return invoke<string | null>('pick_system_folder');

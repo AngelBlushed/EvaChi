@@ -208,6 +208,20 @@
       }
       table.games tbody tr:hover { background: var(--row); }
       td.name { width: 55%; }
+      /* La vignette reste en ligne : faire de la cellule une boîte flexible la
+         sortirait du calcul des colonnes, et le tableau entier se désalignerait.
+         Et elle ne prend de la place qu'une fois arrivée — tant qu'aucune
+         jaquette n'existe pour ce jeu, la ligne garde la hauteur qu'elle avait,
+         pour qu'une bibliothèque à moitié illustrée ne se lise pas en escalier. */
+      .jaquette {
+        width: 0;
+        height: 24px;
+        object-fit: contain;
+        vertical-align: -7px;
+        border-radius: 2px;
+        transition: width 120ms;
+      }
+      .jaquette.vue { width: 20px; margin-right: 9px; }
       td.size, td.format { color: var(--muted); font-family: var(--mono); font-size: 12px; }
       td.system select { padding: 2px 6px; font-size: 12px; max-width: 190px; }
       td.system .single { color: var(--muted); }

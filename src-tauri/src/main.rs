@@ -16,6 +16,7 @@
 mod adopt;
 mod bios;
 mod commands;
+mod covers;
 mod emulators;
 mod install;
 mod pads;
@@ -149,6 +150,7 @@ fn main() {
             commands::adopt_system_folder,
             commands::installable_emulators,
             commands::install_emulator,
+            commands::cover_index,
             commands::note,
         ])
         .run(tauri::generate_context!())
