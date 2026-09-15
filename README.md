@@ -299,6 +299,24 @@ W X C V  →  A 0 B F              A  /  Z       →  L  /  R
 
 (Étiquettes AZERTY ; l'interface affiche celles de votre clavier.)
 
+La manette se réassigne depuis la même fenêtre : `Affichage → Commandes…`, puis
+**Réassigner**. On clique la touche à changer, on presse le bouton voulu, c'est
+lié. Un bouton du cœur n'est jamais tenu par deux boutons de manette à la fois
+— le nouveau venu libère l'ancien, sans quoi la touche resterait enfoncée dès
+que l'un des deux est pressé. `Liaisons d'origine` revient au réglage d'usine.
+
+### Habillages
+
+`Affichage → Thèmes…` propose dix palettes, dont trois claires. Le choix est
+retenu d'un lancement à l'autre, dans le stockage du navigateur — un réglage
+d'affichage n'a pas à coûter un aller-retour natif au démarrage.
+
+Chacune renseigne les mêmes dix variables CSS, et rien d'autre dans la mise en
+page ne connaît de couleur : ajouter un thème ne demande donc pas d'y toucher.
+Un test vérifie le contraste de chaque palette — texte sur fond, texte discret,
+accent — parce qu'une palette qu'on trouve jolie et qu'on ne peut pas lire est
+une palette ratée.
+
 ## ROMs
 
 Le dépôt ne contient et ne contiendra **aucune ROM commerciale ni BIOS**. Écrire

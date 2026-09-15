@@ -201,7 +201,7 @@
       table.games { width: 100%; border-collapse: collapse; }
       table.games td {
         padding: 6px 12px;
-        border-bottom: 1px solid #202429;
+        border-bottom: 1px solid var(--edge);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -242,7 +242,7 @@
       .player {
         display: grid;
         place-items: center;
-        background: #0d090c;
+        background: var(--bg);
         overflow: hidden;
       }
       .player[hidden] { display: none; }
@@ -285,6 +285,8 @@
         max-width: min(720px, 92vw);
       }
       dialog::backdrop { background: rgba(0, 0, 0, 0.55); }
+      /* Sur une palette claire, le même voile noircirait toute la fenêtre. */
+      :root[data-scheme="light"] dialog::backdrop { background: rgba(70, 40, 55, 0.24); }
 
       dialog h2 {
         margin: 0;
@@ -369,11 +371,53 @@
       /* Deux actions à la suite ont besoin d'air : collées, elles se lisent
          comme une seule phrase soulignée. */
       button.lien + button.lien { margin-left: 14px; }
+
+      /* Chaque vignette se peint de ses propres couleurs plutôt que de celles
+         en cours : on choisit sur ce qu'on voit, pas sur un nom. */
+      .themes {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 10px;
+      }
+      .theme {
+        border: 2px solid var(--edge);
+        border-radius: 8px;
+        padding: 0;
+        cursor: pointer;
+        overflow: hidden;
+        text-align: left;
+        font: inherit;
+        background: none;
+      }
+      .theme[aria-pressed="true"] { border-color: var(--accent); }
+      .theme .apercu {
+        display: block;
+        padding: 10px 12px 12px;
+      }
+      .theme .nom {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      /* Trois barres : le texte courant, le discret, l'accent. Elles disent
+         d'un coup d'œil ce que la palette fait d'un titre et d'une ligne. */
+      .theme .barres { display: flex; gap: 5px; }
+      .theme .barres i {
+        height: 9px;
+        flex: 1;
+        border-radius: 5px;
+      }
+      .theme .coche {
+        display: block;
+        font-size: 11px;
+        margin-top: 8px;
+        min-height: 14px;
+      }
       /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
       #bios-adopted:empty { display: none; }
       /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
          cette fenêtre : tout le reste peut attendre. */
-      .preset-list .state.manque { color: #e58b8b; }
+      .preset-list .state.manque { color: var(--warn); }
       .dialog-body h3.section {
         margin: 18px 0 8px;
         font-size: 12px;
@@ -453,7 +497,34 @@
       }
       .key .label { font-size: 12px; }
       .key .phys { font-size: 9px; color: var(--muted); }
+      /* Rien ne doit sortir d'une case : elle est carrée et petite, et un
+         débordement se pose sur la voisine plutôt que de s'arrêter. */
+      .key { overflow: hidden; }
+      .key .pad {
+        font-size: 9px;
+        font-weight: 600;
+        color: var(--accent);
+        min-height: 11px;
+        max-width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
       .key.down { background: var(--accent-soft); border-color: var(--accent); }
+      /* En réassignation la grille ne joue plus : le curseur le dit, et la
+         touche qui attend son bouton clignote pour qu'on ne la cherche pas. */
+      .pad.remappage .key { cursor: crosshair; }
+      .key.attente {
+        border-color: var(--accent);
+        border-style: dashed;
+        animation: respire 1.1s ease-in-out infinite;
+      }
+      @keyframes respire {
+        50% { background: var(--accent-soft); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .key.attente { animation: none; background: var(--accent-soft); }
+      }
 
       .log {
         font-family: var(--mono);
@@ -513,6 +584,7 @@
               Plein écran<span class="shortcut">P</span>
             </button>
             <hr />
+            <button type="button" data-action="themes">Thèmes…</button>
             <button type="button" data-action="controls">Commandes…</button>
             <button type="button" data-action="settings">Paramètres du cœur…</button>
             <button type="button" data-action="log">Journal…</button>
@@ -673,10 +745,31 @@
       </div>
     </dialog>
 
+    <dialog id="theme-dialog">
+      <h2>Thèmes</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Le choix est retenu d'un lancement à l'autre. Chacun a été vérifié
+          lisible : le texte garde partout un contraste suffisant sur son fond.
+        </p>
+        <div class="themes" id="theme-list"></div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
     <dialog id="controls-dialog">
       <h2>Commandes</h2>
       <div class="dialog-body">
         <p class="field" id="pad-status">Aucune manette détectée.</p>
+        <p class="hint-text">
+          Appuyez sur un bouton de la manette : la touche correspondante
+          s'allume. Pour en changer une, passez en réassignation, cliquez la
+          touche à modifier, puis pressez le bouton voulu.
+          <button type="button" id="controls-remap" class="lien">Réassigner…</button>
+          <button type="button" id="controls-reset" class="lien">Liaisons d'origine</button>
+        </p>
         <div class="pad" id="keypad"></div>
       </div>
       <div class="dialog-foot">

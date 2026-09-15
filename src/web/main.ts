@@ -63,6 +63,16 @@ import {
   STICK_DEADZONE,
 } from './input.ts';
 import type { ButtonLayout } from './input.ts';
+import { THEMES, applyTheme, themeById } from './themes.ts';
+import {
+  padButtonName,
+  padButtonShort,
+  parseOverrides,
+  resolveBindings,
+  withBinding,
+  withoutBindings,
+} from './bindings.ts';
+import type { AllOverrides } from './bindings.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -100,6 +110,7 @@ const emulatorList = $<HTMLUListElement>('emulator-list');
 const biosList = $<HTMLUListElement>('bios-list');
 const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
+const themeList = $<HTMLDivElement>('theme-list');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
 const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
@@ -124,7 +135,89 @@ const dialogs = {
   external: $<HTMLDialogElement>('external-dialog'),
   install: $<HTMLDialogElement>('install-dialog'),
   about: $<HTMLDialogElement>('about-dialog'),
+  themes: $<HTMLDialogElement>('theme-dialog'),
 };
+
+// --- Habillage --------------------------------------------------------------
+
+/**
+ * Ce qu'on retient d'un lancement à l'autre, côté interface.
+ *
+ * Le stockage du navigateur plutôt que les réglages natifs : ces choix ne
+ * regardent que l'affichage, et les lire coûterait un aller-retour au
+ * démarrage — celui-là même qu'on vient de dégager.
+ */
+const RETENU = { theme: 'evachi.theme', liaisons: 'evachi.liaisons' } as const;
+
+/** Lit une valeur retenue, en survivant à un stockage indisponible. */
+function retenu(cle: string): string | null {
+  try {
+    return localStorage.getItem(cle);
+  } catch {
+    return null;
+  }
+}
+
+/** Retient une valeur, sans faire d'histoire si c'est refusé. */
+function retenir(cle: string, valeur: string): void {
+  try {
+    localStorage.setItem(cle, valeur);
+  } catch {
+    // Mode privé, stockage plein : le choix vaudra pour cette séance.
+  }
+}
+
+let themeActuel = themeById(retenu(RETENU.theme));
+
+/** Pose un thème, le retient, et rafraîchit la fenêtre de choix. */
+function choisirTheme(id: string): void {
+  themeActuel = themeById(id);
+  applyTheme(themeActuel, document.documentElement);
+  retenir(RETENU.theme, themeActuel.id);
+  renderThemes();
+}
+
+/** Dessine les vignettes, chacune peinte de ses propres couleurs. */
+function renderThemes(): void {
+  themeList.replaceChildren();
+
+  for (const theme of THEMES) {
+    const vignette = document.createElement('button');
+    vignette.type = 'button';
+    vignette.className = 'theme';
+    vignette.setAttribute('aria-pressed', String(theme.id === themeActuel.id));
+    vignette.title = theme.scheme === 'light' ? 'thème clair' : 'thème sombre';
+
+    const apercu = document.createElement('span');
+    apercu.className = 'apercu';
+    // La vignette ne se peint pas des couleurs en cours mais des siennes :
+    // on choisit sur ce qu'on voit, pas sur un nom.
+    apercu.style.background = theme.palette.bg;
+    apercu.style.color = theme.palette.ink;
+
+    const nom = document.createElement('span');
+    nom.className = 'nom';
+    nom.textContent = theme.label;
+
+    const barres = document.createElement('span');
+    barres.className = 'barres';
+    for (const couleur of [theme.palette.ink, theme.palette.muted, theme.palette.accent]) {
+      const barre = document.createElement('i');
+      barre.style.background = couleur;
+      barres.append(barre);
+    }
+
+    const coche = document.createElement('span');
+    coche.className = 'coche';
+    coche.style.color = theme.palette.accent;
+    coche.textContent = theme.id === themeActuel.id ? '● en cours' : '';
+
+    apercu.append(nom, barres, coche);
+    vignette.append(apercu);
+    vignette.addEventListener('click', () => choisirTheme(theme.id));
+    themeList.append(vignette);
+  }
+}
 
 const audio = new AudioSink();
 
@@ -1369,6 +1462,10 @@ const actions: Record<string, () => void | Promise<void>> = {
   folders: () => openDialog(dialogs.folders),
   install: openInstall,
   external: () => openDialog(dialogs.external),
+  themes: () => {
+    renderThemes();
+    openDialog(dialogs.themes);
+  },
   refresh: refreshLibrary,
 
   toggle: async () => {
@@ -1515,7 +1612,7 @@ function sampleInput(): void {
 
   const pad = currentPad();
   if (pad) {
-    for (const [source, target] of layout.gamepad) {
+    for (const [source, target] of padBindings()) {
       if (pad.buttons[source]?.pressed) buttons[target] = true;
     }
 
@@ -1530,7 +1627,7 @@ function sampleInput(): void {
       [PAD_DOWN, y > STICK_DEADZONE],
     ];
     for (const [source, active] of stick) {
-      const target = layout.gamepad.get(source);
+      const target = padBindings().get(source);
       if (active && target !== undefined) buttons[target] = true;
     }
   }
@@ -1558,9 +1655,81 @@ window.addEventListener('gamepaddisconnected', () => void currentPad());
  */
 function pollControls(): void {
   if (!running && dialogs.controls.open) sampleInput();
+  capturerLiaison();
   requestAnimationFrame(pollControls);
 }
 requestAnimationFrame(pollControls);
+
+// --- Réassignation de la manette --------------------------------------------
+
+let liaisons: AllOverrides = parseOverrides(retenu(RETENU.liaisons));
+
+/** Le bouton du cœur qui attend qu'on lui désigne un bouton de manette. */
+let enAttente: number | null = null;
+
+/** Vrai quand la grille sert à réassigner plutôt qu'à jouer. */
+let remappage = false;
+
+/**
+ * Les liaisons à appliquer maintenant : celles d'origine, corrigées.
+ *
+ * Recalculées à chaque trame plutôt que gardées de côté : la disposition change
+ * avec le cœur chargé, et une correspondance figée survivrait au changement en
+ * envoyant les boutons d'une console dans ceux d'une autre.
+ */
+function padBindings(): ReadonlyMap<number, number> {
+  return resolveBindings(layout.gamepad, liaisons[layout.id]);
+}
+
+/** Retient les liaisons et redessine la grille. */
+function poserLiaisons(suivantes: AllOverrides): void {
+  liaisons = suivantes;
+  retenir(RETENU.liaisons, JSON.stringify(liaisons));
+  buildKeypad();
+}
+
+/**
+ * Regarde si un bouton vient d'être pressé, pour le lier à celui qui attend.
+ *
+ * Appelée entre deux trames, comme la lecture des entrées : l'API des manettes
+ * n'émet rien, il faut aller voir. On ne retient que le premier bouton trouvé —
+ * en presser deux à la fois ne doit pas en lier deux au hasard.
+ */
+function capturerLiaison(): void {
+  if (enAttente === null) return;
+  const pads = navigator.getGamepads?.() ?? [];
+  const pad = padIndex >= 0 ? pads[padIndex] : null;
+  if (!pad) return;
+
+  const presse = pad.buttons.findIndex((bouton) => bouton?.pressed);
+  if (presse < 0) return;
+
+  const cible = enAttente;
+  enAttente = null;
+  poserLiaisons({
+    ...liaisons,
+    [layout.id]: withBinding(liaisons[layout.id], presse, cible),
+  });
+  log(`${layout.labels[cible] ?? cible} ← ${padButtonName(presse)}`, 'ok');
+}
+
+const remapButton = $<HTMLButtonElement>('controls-remap');
+const resetBindings = $<HTMLButtonElement>('controls-reset');
+
+remapButton.addEventListener('click', () => {
+  remappage = !remappage;
+  enAttente = null;
+  remapButton.textContent = remappage ? 'Terminer' : 'Réassigner…';
+  keypadBox.classList.toggle('remappage', remappage);
+  buildKeypad();
+});
+
+resetBindings.addEventListener('click', () => {
+  if (!liaisons[layout.id]) return;
+  enAttente = null;
+  poserLiaisons(withoutBindings(liaisons, layout.id));
+  log('liaisons de manette remises d’origine');
+});
 
 let keyLabels: Map<string, string> | null = null;
 
@@ -1590,10 +1759,32 @@ function buildKeypad(): void {
     key.className = 'phys';
     key.textContent = physical.toUpperCase();
 
-    cell.append(label, key);
+    // Ce que la manette envoie sur cette touche, en toutes lettres : sans
+    // cela, réassigner revient à deviner ce qu'on est en train de changer.
+    const manette = document.createElement('span');
+    manette.className = 'pad';
+    const source = [...padBindings()].find(([, cible]) => cible === index)?.[0];
+    if (enAttente === index) {
+      manette.textContent = '…';
+      cell.title = 'pressez le bouton voulu sur la manette';
+    } else if (source !== undefined) {
+      manette.textContent = padButtonShort(source);
+      cell.title = `manette : ${padButtonName(source)}`;
+    } else {
+      manette.textContent = '';
+    }
+
+    cell.append(label, key, manette);
+    if (enAttente === index) cell.classList.add('attente');
 
     cell.addEventListener('pointerdown', (event) => {
       event.preventDefault();
+      // En mode réassignation, la grille ne joue plus : elle désigne.
+      if (remappage) {
+        enAttente = enAttente === index ? null : index;
+        buildKeypad();
+        return;
+      }
       cell.setPointerCapture(event.pointerId);
       setButton(index, true);
       void audio.unlock();
@@ -1650,6 +1841,10 @@ window.addEventListener('blur', () => {
 // --- Démarrage --------------------------------------------------------------
 
 async function start(): Promise<void> {
+  // Avant tout le reste : la fenêtre doit apparaître aux couleurs choisies, et
+  // non passer de l'une à l'autre sous les yeux.
+  applyTheme(themeActuel, document.documentElement);
+
   try {
     // Chrome publie la disposition réelle du clavier ; on affiche alors les
     // vraies touches plutôt que celles d'un QWERTY supposé.
