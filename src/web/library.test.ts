@@ -676,3 +676,31 @@ describe('un seul fichier par jeu sur disque', () => {
     assert.deepEqual(noms(collapseDiscs(roms)), ['Jeu CD.cue', 'Jeu CD.md']);
   });
 });
+
+describe('poids d’un jeu sur disque', () => {
+  const pese = (dossier: string, nom: string, size: number): RomEntry => ({
+    name: nom,
+    path: `D:/roms/${dossier}/${nom}`,
+    extension: nom.slice(nom.lastIndexOf('.') + 1).toLowerCase(),
+    size,
+    folder: dossier,
+  });
+
+  it('additionne les pistes derrière le feuillet', () => {
+    // Un feuillet fait quelques centaines d'octets : annoncer « 7 Ko » pour un
+    // jeu Mega-CD se lit comme une erreur.
+    const roms = [
+      pese('Mega-CD', 'Jeu (Track 01).bin', 300_000_000),
+      pese('Mega-CD', 'Jeu (Track 02).bin', 40_000_000),
+      pese('Mega-CD', 'Jeu.cue', 700),
+    ];
+    const reste = collapseDiscs(roms);
+    assert.equal(reste.length, 1);
+    assert.equal(reste[0].size, 340_000_700);
+  });
+
+  it('laisse son poids à un fichier que rien n’accompagne', () => {
+    const roms = [pese('Nes', 'Zelda.nes', 131_072)];
+    assert.equal(collapseDiscs(roms)[0].size, 131_072);
+  });
+});

@@ -276,10 +276,24 @@ export function collapseDiscs(games: readonly RomEntry[]): RomEntry[] {
   }
   if (feuillets.size === 0) return [...games];
 
-  return games.filter((rom) => {
-    if (!MORCEAUX.includes(rom.extension)) return true;
-    return !feuillets.has(`${parentPath(rom.path)}||${discBase(rom.name)}`);
-  });
+  const cle = (rom: RomEntry) => `${parentPath(rom.path)}||${discBase(rom.name)}`;
+
+  // Ce que pèse le disque entier. Un feuillet fait quelques centaines
+  // d'octets : annoncer « 7 Ko » pour un jeu Mega-CD se lit comme une erreur,
+  // alors que c'est bien la taille du fichier qu'on lance.
+  const poids = new Map<string, number>();
+  for (const rom of games) {
+    if (!MORCEAUX.includes(rom.extension) && !FEUILLETS.includes(rom.extension)) continue;
+    poids.set(cle(rom), (poids.get(cle(rom)) ?? 0) + rom.size);
+  }
+
+  return games
+    .filter((rom) => !MORCEAUX.includes(rom.extension) || !feuillets.has(cle(rom)))
+    .map((rom) =>
+      FEUILLETS.includes(rom.extension) && feuillets.has(cle(rom))
+        ? { ...rom, size: poids.get(cle(rom)) ?? rom.size }
+        : rom,
+    );
 }
 
 /** Le cœur qui ouvrira ce jeu : le choix explicite, sinon celui du volet. */

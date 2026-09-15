@@ -81,6 +81,7 @@ import { Held, columnsFor, echelle, move, step } from './navigation.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
+import { SELECTEUR_ACTIF, gestePour, premierUtile, tourne } from './focus.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -997,18 +998,35 @@ const valider = new Held(1000, 1000);
 /** Vrai quand une vue manette est à l'écran et qu'elle a de quoi montrer. */
 function vueManette(): 'grille' | 'xmb' | null {
   if (libraryView.hidden) return null;
-  // Une fenêtre ouverte prend la main : sans cela, régler ses touches ferait
-  // défiler la bibliothèque derrière.
-  if (document.querySelector('dialog[open]')) return null;
   if (enGrille() && tuiles.length > 0) return 'grille';
   if (enXmb() && voletsXmb.length > 0) return 'xmb';
   return null;
 }
 
-function naviguerMenu(): void {
-  const vue = vueManette();
-  if (!vue) return;
+/**
+ * Les boutons de la manette, au format standard du W3C.
+ *
+ * Nommés plutôt que numérotés : `pad.buttons[9]` ne dit rien à la relecture, et
+ * confondre 8 et 9 donne une application qui se referme quand on voulait
+ * l'ouvrir.
+ */
+const BOUTON = { a: 0, b: 1, y: 3, select: 8, start: 9, guide: 16 } as const;
 
+/** Les filtres d'appui des boutons autres que les directions. */
+const boutons = {
+  b: new Held(1000, 1000),
+  start: new Held(1000, 1000),
+  retour: new Held(1000, 1000),
+};
+
+/**
+ * Conduit toute l'application à la manette.
+ *
+ * Trois terrains, dans cet ordre : une fenêtre ouverte, la barre de menus
+ * dépliée, sinon la bibliothèque. Le premier qui répond prend tout — sans quoi
+ * un même appui ferait deux choses à la fois, et on ne saurait jamais laquelle.
+ */
+function naviguerMenu(): void {
   // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
   // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
   const pad = currentPad();
@@ -1023,18 +1041,212 @@ function naviguerMenu(): void {
     bas: pad.buttons[13]?.pressed || y > STICK_DEADZONE,
   };
 
+  const appuye = (index: number) => pad.buttons[index]?.pressed ?? false;
+  const a = valider.update(appuye(BOUTON.a), maintenant).pressed;
+  const b = boutons.b.update(appuye(BOUTON.b), maintenant).pressed;
+  const start = boutons.start.update(appuye(BOUTON.start), maintenant).pressed;
+
+  const pas: Direction[] = [];
   for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
     const etat = directions[sens].update(pousse[sens], maintenant);
-    if (!etat.pressed && !etat.repeat) continue;
-    pousser(vue, sens);
-    // Le bruit n'est fait qu'ici : c'est la branche manette. À la souris on a
-    // déjà le retour du clic, et au clavier celui de la touche.
-    if (sonsVoulus()) ticDeplacement();
+    if (etat.pressed || etat.repeat) pas.push(sens);
   }
 
-  if (valider.update(pad.buttons[0]?.pressed ?? false, maintenant).pressed) {
-    if (sonsVoulus()) ticValidation();
+  /** Le bruit n'est fait qu'ici : c'est la seule branche manette. */
+  const tic = (lance = false) => {
+    if (!sonsVoulus()) return;
+    if (lance) ticValidation();
+    else ticDeplacement();
+  };
+
+  // Pendant une partie, Select et Start ensemble ramènent à la bibliothèque.
+  // Deux boutons à la fois plutôt qu'un seul : chacun d'eux sert au jeu, et
+  // les deux ensemble ne se pressent jamais par hasard.
+  if (libraryView.hidden) {
+    const ensemble = appuye(BOUTON.select) && appuye(BOUTON.start);
+    if (boutons.retour.update(ensemble, maintenant).pressed) {
+      tic(true);
+      void actions.stop?.();
+    }
+    return;
+  }
+
+  const fenetre = document.querySelector<HTMLDialogElement>('dialog[open]');
+  if (fenetre) {
+    conduireFenetre(fenetre, { pas, a, b }, tic);
+    return;
+  }
+
+  if (menubar.querySelector('[data-open]')) {
+    conduireBarre({ pas, a, b: b || start }, tic);
+    return;
+  }
+
+  if (start) {
+    tic();
+    ouvrirBarre(0);
+    return;
+  }
+
+  const vue = vueManette();
+  if (!vue) return;
+
+  for (const sens of pas) {
+    pousser(vue, sens);
+    tic();
+  }
+
+  if (a) {
+    tic(true);
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
+  }
+}
+
+// --- Barre de menus à la manette --------------------------------------------
+
+/** Déplie un menu de la barre et vise sa première entrée. */
+function ouvrirBarre(rang: number): void {
+  const menus = [...menubar.querySelectorAll<HTMLElement>('[data-menu]')];
+  const menu = menus[Math.min(Math.max(rang, 0), menus.length - 1)];
+  if (!menu) return;
+
+  closeMenus();
+  menu.setAttribute('data-open', '');
+  menu.querySelector<HTMLButtonElement>('.menu-items button:not([disabled])')?.focus();
+}
+
+/**
+ * Parcourt la barre de menus dépliée.
+ *
+ * Gauche et droite changent de menu, haut et bas d'entrée, A valide, B replie.
+ * C'est exactement ce que fait un clavier sur n'importe quelle barre de menus :
+ * il n'y a rien à apprendre.
+ */
+function conduireBarre(
+  entree: { pas: Direction[]; a: boolean; b: boolean },
+  tic: (lance?: boolean) => void,
+): void {
+  // Rien de pressé, rien à faire : interroger le document à chaque trame pour
+  // constater qu'on n'a rien demandé coûte une mise en page pour rien.
+  if (entree.pas.length === 0 && !entree.a && !entree.b) return;
+
+  const menus = [...menubar.querySelectorAll<HTMLElement>('[data-menu]')];
+  const ouvert = menus.findIndex((menu) => menu.hasAttribute('data-open'));
+
+  if (entree.b) {
+    tic();
+    closeMenus();
+    return;
+  }
+
+  for (const sens of entree.pas) {
+    if (sens === 'gauche' || sens === 'droite') {
+      tic();
+      ouvrirBarre(tourne(ouvert, menus.length, sens === 'droite' ? 1 : -1));
+      continue;
+    }
+
+    const items = [...menus[ouvert].querySelectorAll<HTMLButtonElement>(
+      '.menu-items button:not([disabled])',
+    )];
+    const courant = items.indexOf(document.activeElement as HTMLButtonElement);
+    const suivant = items[tourne(courant < 0 ? 0 : courant, items.length, sens === 'bas' ? 1 : -1)];
+    if (suivant) {
+      tic();
+      suivant.focus();
+    }
+  }
+
+  if (entree.a) {
+    tic(true);
+    const vise = document.activeElement as HTMLElement | null;
+    closeMenus();
+    vise?.click();
+  }
+}
+
+// --- Fenêtres à la manette --------------------------------------------------
+
+/** Les éléments d'une fenêtre qui répondent, dans l'ordre où on les voit. */
+function actifsDe(fenetre: HTMLElement): HTMLElement[] {
+  return [...fenetre.querySelectorAll<HTMLElement>(SELECTEUR_ACTIF)].filter(
+    // Mesuré plutôt que déduit d'un style : viser un élément replié ou masqué
+    // donnerait une manette qui ne répond plus, sans explication. L'élément
+    // déjà visé est gardé quoi qu'il arrive, faute de quoi la position se
+    // perdrait au moment même où une section se déplie.
+    (element) => element.getBoundingClientRect().width > 0 || element === document.activeElement,
+  );
+}
+
+/**
+ * Parcourt une fenêtre ouverte.
+ *
+ * Haut et bas passent d'un réglage à l'autre, A l'actionne, B referme. Gauche
+ * et droite servent à ce qu'un appui ne peut pas faire : pousser un curseur,
+ * dérouler une liste — et, à défaut, se déplacent comme haut et bas, ce qui
+ * rend les grilles de vignettes naturelles à parcourir.
+ */
+function conduireFenetre(
+  fenetre: HTMLDialogElement,
+  entree: { pas: Direction[]; a: boolean; b: boolean },
+  tic: (lance?: boolean) => void,
+): void {
+  if (entree.b) {
+    tic();
+    fenetre.close();
+    return;
+  }
+  if (entree.pas.length === 0 && !entree.a) return;
+
+  const actifs = actifsDe(fenetre);
+  if (actifs.length === 0) return;
+
+  let courant = actifs.indexOf(document.activeElement as HTMLElement);
+  if (courant < 0) {
+    courant = premierUtile(actifs.map((element) => element.textContent ?? ''));
+    actifs[courant]?.focus();
+  }
+
+  for (const sens of entree.pas) {
+    const vise = actifs[courant];
+    const geste = gestePour(vise?.tagName ?? '', (vise as HTMLInputElement)?.type ?? '');
+
+    if ((sens === 'gauche' || sens === 'droite') && geste === 'glisser') {
+      const curseur = vise as HTMLInputElement;
+      const enjambee = Number(curseur.step) || 1;
+      curseur.value = String(Number(curseur.value) + (sens === 'droite' ? enjambee : -enjambee));
+      curseur.dispatchEvent(new Event('input', { bubbles: true }));
+      curseur.dispatchEvent(new Event('change', { bubbles: true }));
+      tic();
+      continue;
+    }
+
+    if ((sens === 'gauche' || sens === 'droite') && geste === 'derouler') {
+      const liste = vise as HTMLSelectElement;
+      liste.selectedIndex = tourne(
+        liste.selectedIndex,
+        liste.options.length,
+        sens === 'droite' ? 1 : -1,
+      );
+      liste.dispatchEvent(new Event('change', { bubbles: true }));
+      tic();
+      continue;
+    }
+
+    courant = tourne(courant, actifs.length, sens === 'bas' || sens === 'droite' ? 1 : -1);
+    actifs[courant]?.focus();
+    tic();
+  }
+
+  if (entree.a) {
+    const vise = actifs[courant];
+    if (!vise) return;
+    tic(true);
+    // Une case à cocher se clique, ce qui la bascule et prévient l'application.
+    // Un curseur et une liste ne répondent pas au clic : ils ont déjà été
+    // servis par gauche et droite, et un appui ne doit rien leur faire.
+    const geste = gestePour(vise.tagName, (vise as HTMLInputElement).type ?? '');
+    if (geste === 'cliquer' || geste === 'cocher') vise.click();
   }
 }
 
@@ -1063,6 +1275,9 @@ const FLECHES: Record<string, Direction> = {
 document.addEventListener('keydown', (event) => {
   const vue = vueManette();
   if (!vue) return;
+  // Une fenêtre ouverte prend la main : sans cela, régler ses touches ferait
+  // défiler la bibliothèque derrière, hors de vue.
+  if (document.querySelector('dialog[open]') || menubar.querySelector('[data-open]')) return;
 
   const dansLaRecherche = event.target === searchInput;
   const sens = FLECHES[event.key];

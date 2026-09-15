@@ -516,6 +516,15 @@
        * posé sur la liste, il s'arrêtait à la largeur de celle-ci et laissait
        * un rectangle plus sombre visible en travers du fond.
        */
+      .xmb-pied {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+      }
+      /* Le rappel des boutons, comme sur une console : discret, toujours là,
+         et c'est ainsi qu'on apprend qu'il y en a d'autres que A. */
+      .xmb-touches { opacity: 0.7; white-space: nowrap; }
+
       .xmb-pied::before {
         content: "";
         position: absolute;
@@ -1067,7 +1076,10 @@
                 <img alt="" id="xmb-affiche-image" />
               </span>
             </div>
-            <div class="xmb-pied"><span id="xmb-pied"></span></div>
+            <div class="xmb-pied">
+              <span id="xmb-pied"></span>
+              <span class="xmb-touches">A lancer · B retour · Start menu</span>
+            </div>
           </div>
 
           <div class="placeholder" id="placeholder">
@@ -1279,6 +1291,14 @@
           Appuyez sur un bouton de la manette : la touche correspondante
           s'allume. Pour en changer une, passez en réassignation, cliquez la
           touche à modifier, puis pressez le bouton voulu.
+        </p>
+        <p class="hint-text">
+          <strong>Hors jeu, tout se fait à la manette :</strong> les directions
+          parcourent la bibliothèque, les fenêtres et la barre de menus ;
+          <strong>A</strong> valide, <strong>B</strong> revient en arrière,
+          <strong>Start</strong> ouvre la barre de menus. En cours de partie,
+          <strong>Select et Start ensemble</strong> ramènent à la bibliothèque —
+          deux boutons à la fois, car chacun d'eux sert au jeu.
           <button type="button" id="controls-remap" class="lien">Réassigner…</button>
           <button type="button" id="controls-reset" class="lien">Liaisons d'origine</button>
         </p>
