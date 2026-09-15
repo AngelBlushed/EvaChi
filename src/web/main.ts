@@ -363,6 +363,76 @@ function basculerFavori(chemin: string): boolean {
   return estFavori(chemin);
 }
 
+/**
+ * Le menu du clic droit.
+ *
+ * Une seule liste pour toute l'application, quelle que soit la vue : deux menus
+ * contextuels finiraient par ne plus dire la même chose. Chaque vue se contente
+ * de désigner le jeu sous le curseur.
+ */
+const contextuel = $<HTMLDivElement>('contextuel');
+
+/** Ferme le menu du clic droit, sans faire d'histoire s'il est déjà fermé. */
+function fermerContextuel(): void {
+  contextuel.hidden = true;
+  contextuel.replaceChildren();
+}
+
+document.addEventListener('click', fermerContextuel);
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') fermerContextuel();
+});
+
+/**
+ * Ouvre le menu du clic droit sur un jeu.
+ *
+ * Replacé dans la fenêtre s'il déborde : ouvert sur le dernier jeu d'une
+ * colonne, il sortait par le bas et ses entrées devenaient inatteignables.
+ */
+function ouvrirContextuel(event: MouseEvent, item: Playable): void {
+  event.preventDefault();
+  event.stopPropagation();
+  contextuel.replaceChildren();
+
+  const favori = estFavori(item.rom.path);
+  const entrees: [string, string, () => void][] = [
+    [
+      favori ? '★' : '☆',
+      favori ? 'Retirer des favoris' : 'Mettre en favoris',
+      () => basculerFavori(item.rom.path),
+    ],
+    ['▶', 'Lancer', () => void jouerItem(item)],
+  ];
+
+  for (const [signe, texte, faire] of entrees) {
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    const marque = document.createElement('span');
+    marque.className = 'etoile';
+    marque.textContent = signe;
+    const nom = document.createElement('span');
+    nom.textContent = texte;
+    bouton.append(marque, nom);
+    bouton.addEventListener('click', () => {
+      fermerContextuel();
+      faire();
+    });
+    contextuel.append(bouton);
+  }
+
+  contextuel.hidden = false;
+  const cadre = contextuel.getBoundingClientRect();
+  contextuel.style.left = `${Math.min(event.clientX, window.innerWidth - cadre.width - 6)}px`;
+  contextuel.style.top = `${Math.min(event.clientY, window.innerHeight - cadre.height - 6)}px`;
+  contextuel.querySelector('button')?.focus();
+}
+
+/** Lance un jeu donné, avec le cœur retenu pour son volet. */
+async function jouerItem(item: Playable): Promise<void> {
+  const cœur = effectiveCore(item.rom, item.cores, chosenCore, preferePour(item));
+  if (cœur) await play(cœur, item.rom);
+}
+
 /** Le jeu actuellement visé, quelle que soit la vue. */
 function jeuVise(): Playable | undefined {
   if (enGrille()) return tuiles[choisie];
@@ -981,6 +1051,10 @@ function renderGrille(shelves: Shelf[]): void {
       choisir(rang);
       void jouerChoisie();
     });
+    tuile.addEventListener('contextmenu', (event) => {
+      choisir(rang);
+      ouvrirContextuel(event, item);
+    });
     grilleTuiles.append(tuile);
   }
 
@@ -1072,7 +1146,7 @@ function vueManette(): 'grille' | 'xmb' | null {
  * confondre 8 et 9 donne une application qui se referme quand on voulait
  * l'ouvrir.
  */
-const BOUTON = { a: 0, b: 1, y: 3, select: 8, start: 9, guide: 16 } as const;
+const BOUTON = { a: 0, b: 1, x: 2, y: 3, select: 8, start: 9, guide: 16 } as const;
 
 /** Les filtres d'appui des boutons autres que les directions. */
 const boutons = {
@@ -1159,7 +1233,7 @@ function naviguerMenu(): void {
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
   }
 
-  if (boutons.favori.update(appuye(BOUTON.y), maintenant).pressed) {
+  if (boutons.favori.update(appuye(BOUTON.x), maintenant).pressed) {
     const item = jeuVise();
     if (item) {
       tic();
@@ -1538,6 +1612,10 @@ function renderEntreesXmb(): void {
     entree.addEventListener('click', () => {
       if (rang === entreeXmb) void jouerXmb();
       else allerEntree(rang);
+    });
+    entree.addEventListener('contextmenu', (event) => {
+      allerEntree(rang);
+      ouvrirContextuel(event, item);
     });
     xmbEntrees.append(entree);
   }
@@ -1940,6 +2018,9 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 
   row.append(name, system, format, size);
   row.addEventListener('dblclick', () => void play(target, rom));
+  row.addEventListener('contextmenu', (event) =>
+    ouvrirContextuel(event, { rom, cores }),
+  );
   return row;
 }
 

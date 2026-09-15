@@ -109,12 +109,20 @@ describe('nombre de colonnes', () => {
 });
 
 describe('mise à l’échelle du menu', () => {
-  it('laisse la petite fenêtre telle quelle', () => {
-    // Les tailles sont posées pour cette hauteur-là : elle n'a rien à gagner
-    // d'un agrandissement, et beaucoup à perdre d'un rétrécissement.
+  it('vaut un à la hauteur de référence', () => {
     assert.equal(echelle(660), 1);
-    assert.equal(echelle(500), 1);
-    assert.equal(echelle(120), 1);
+  });
+
+  it('rétrécit aussi, plutôt que de laisser tout se chevaucher', () => {
+    // À 259 pixels, la liste tombait à zéro hauteur et la rangée des consoles
+    // se posait sur les jeux. C'est ce qu'on a vu à l'écran.
+    assert.ok(echelle(495) < 1);
+    assert.equal(echelle(495), 0.75);
+  });
+
+  it('s’arrête avant l’illisible', () => {
+    assert.equal(echelle(120), 0.55);
+    assert.equal(echelle(1), 0.55);
   });
 
   it('grossit avec la hauteur', () => {

@@ -82,14 +82,16 @@ export function columnsFor(width: number, tile: number, gap: number): number {
  * que d'ajouter des lignes — un menu de salon se regarde de loin, il doit
  * grossir avec l'écran.
  *
- * Jamais en dessous de 1 : une petite fenêtre garde la disposition d'origine,
- * qui lui va déjà. Jamais au-dessus de 2,2 non plus, faute de quoi trois jeux
- * rempliraient un écran de cinéma.
+ * Elle descend aussi : sous six cents pixels, les hauteurs d'origine ne
+ * tiennent plus, la liste se retrouve à zéro hauteur et la rangée des consoles
+ * vient se poser par-dessus les jeux. On s'arrête à 0,55 — en deçà plus rien
+ * n'est lisible — et à 2,2 vers le haut, faute de quoi trois jeux rempliraient
+ * un écran de cinéma.
  */
 export function echelle(hauteur: number): number {
   const REFERENCE = 660;
   if (hauteur <= 0) return 1;
-  return Math.min(2.2, Math.max(1, hauteur / REFERENCE));
+  return Math.min(2.2, Math.max(0.55, hauteur / REFERENCE));
 }
 
 /** Un appui qui vient d'avoir lieu, par opposition à un bouton tenu. */
