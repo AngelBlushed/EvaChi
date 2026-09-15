@@ -51,7 +51,8 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import { coresFor, effectiveCore, groupLibrary } from './library.ts';
+import { coresFor, effectiveCore, folderLabel, groupLibrary } from './library.ts';
+import type { Playable, Shelf } from './library.ts';
 import {
   BUTTON_COUNT,
   FALLBACK_KEY_LABELS,
@@ -76,6 +77,8 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
+import { Held, columnsFor, move } from './navigation.ts';
+import type { Direction } from './navigation.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -93,6 +96,10 @@ const toolbar = $<HTMLDivElement>('toolbar');
 const libraryView = $<HTMLDivElement>('library');
 const playerView = $<HTMLDivElement>('player');
 const shelvesBox = $<HTMLDivElement>('games');
+const grilleView = $<HTMLDivElement>('grille');
+const grilleTuiles = $<HTMLDivElement>('grille-tuiles');
+const grilleTitre = $<HTMLElement>('grille-titre');
+const grilleDetail = $<HTMLElement>('grille-detail');
 const placeholder = $<HTMLDivElement>('placeholder');
 const placeholderPath = $<HTMLElement>('placeholder-path');
 const searchInput = $<HTMLInputElement>('search');
@@ -114,6 +121,7 @@ const biosList = $<HTMLUListElement>('bios-list');
 const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
+const menuList = $<HTMLDivElement>('menu-list');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
 const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
@@ -150,7 +158,7 @@ const dialogs = {
  * regardent que l'affichage, et les lire coûterait un aller-retour au
  * démarrage — celui-là même qu'on vient de dégager.
  */
-const RETENU = { theme: 'evachi.theme', liaisons: 'evachi.liaisons' } as const;
+const RETENU = { theme: 'evachi.theme', liaisons: 'evachi.liaisons', menu: 'evachi.menu' } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
 function retenu(cle: string): string | null {
@@ -219,6 +227,54 @@ function renderThemes(): void {
     vignette.append(apercu);
     vignette.addEventListener('click', () => choisirTheme(theme.id));
     themeList.append(vignette);
+  }
+}
+
+/** Les deux façons de présenter la bibliothèque. */
+const MENUS = [
+  {
+    id: 'liste',
+    label: 'Liste',
+    detail: 'Un volet par console, en tableau. Le plus dense à la souris.',
+  },
+  {
+    id: 'grille',
+    label: 'Grille',
+    detail: 'Les jaquettes en grand, parcourues à la manette. Pensé pour le canapé.',
+  },
+] as const;
+
+/** Le mode d'affichage retenu ; la liste tant que rien n'a été choisi. */
+function menuActuel(): string {
+  return retenu(RETENU.menu) === 'grille' ? 'grille' : 'liste';
+}
+
+/** Change de présentation et redessine aussitôt la bibliothèque. */
+function choisirMenu(id: string): void {
+  retenir(RETENU.menu, id);
+  renderMenus();
+  renderGames();
+}
+
+/** Dessine le choix de présentation, dans la même fenêtre que les thèmes. */
+function renderMenus(): void {
+  menuList.replaceChildren();
+  const courant = menuActuel();
+
+  for (const menu of MENUS) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    choix.className = 'menu-choix';
+    choix.setAttribute('aria-pressed', String(menu.id === courant));
+
+    const nom = document.createElement('strong');
+    nom.textContent = menu.label;
+    const detail = document.createElement('span');
+    detail.textContent = menu.detail;
+
+    choix.append(nom, detail);
+    choix.addEventListener('click', () => choisirMenu(menu.id));
+    menuList.append(choix);
   }
 }
 
@@ -635,6 +691,9 @@ async function play(target: CatalogEntry, rom: RomEntry): Promise<void> {
 // --- Bibliothèque -----------------------------------------------------------
 
 function humanSize(bytes: number): string {
+  // Une image de Wii U pèse six mille méga-octets ; annoncée ainsi, le nombre
+  // ne se lit plus.
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} Go`;
   if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
   if (bytes >= 1024) return `${Math.round(bytes / 1024)} Ko`;
   return `${bytes} o`;
@@ -681,6 +740,232 @@ function writeCollapsed(collapsed: Set<string>): void {
   }
 }
 
+
+// --- Vue en grille ----------------------------------------------------------
+
+/** Les jeux de la grille, à plat, dans l'ordre affiché. */
+let tuiles: Playable[] = [];
+/** La case choisie. */
+let choisie = 0;
+
+/** Vrai quand la bibliothèque s'affiche en grille plutôt qu'en liste. */
+function enGrille(): boolean {
+  return menuActuel() === 'grille';
+}
+
+/** Largeur d'une tuile et écart entre deux, tels que la feuille de style les pose. */
+const TUILE = { largeur: 124, ecart: 18 };
+
+/** Le nombre de colonnes réellement affichées. */
+function colonnes(): number {
+  return columnsFor(grilleTuiles.clientWidth - 44, TUILE.largeur, TUILE.ecart);
+}
+
+/**
+ * Range la grille : ni cases affichées, ni sélection qui traîne.
+ *
+ * Sans cela, une recherche sans résultat masquait la grille mais lui laissait
+ * ses six cents cases et sa sélection : le bouton A lançait alors un jeu qui
+ * n'était plus à l'écran.
+ */
+function viderGrille(): void {
+  grilleView.hidden = true;
+  grilleTuiles.replaceChildren();
+  tuiles = [];
+  grilleTitre.textContent = '';
+  grilleDetail.textContent = '';
+}
+
+/** De quoi reconnaître que la grille montre bien les mêmes jeux qu'avant. */
+function signature(liste: readonly Playable[]): string {
+  return `${liste.length}|${liste[0]?.rom.path ?? ''}|${liste.at(-1)?.rom.path ?? ''}`;
+}
+let signatureAffichee = '';
+
+/** Dessine la grille à partir des volets déjà classés. */
+function renderGrille(shelves: Shelf[]): void {
+  grilleTuiles.replaceChildren();
+  tuiles = shelves.flatMap((shelf) => shelf.games);
+
+  // Une sélection ne se transporte pas d'une liste à l'autre : la case 40 d'une
+  // recherche ne désigne pas le même jeu que la case 40 de la bibliothèque.
+  const empreinte = signature(tuiles);
+  if (empreinte !== signatureAffichee) choisie = 0;
+  signatureAffichee = empreinte;
+
+  for (const [rang, item] of tuiles.entries()) {
+    const tuile = document.createElement('button');
+    tuile.type = 'button';
+    tuile.className = 'tuile';
+    tuile.title = item.rom.path;
+
+    const boite = document.createElement('span');
+    boite.className = 'boite';
+
+    const initiale = document.createElement('span');
+    initiale.className = 'initiale';
+    initiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
+    boite.append(initiale);
+
+    // Transparente et non masquée : un élément `hidden` n'a pas de boîte, et
+    // l'observateur ne le voit donc jamais approcher de l'écran — la grille
+    // restait entièrement dépourvue de jaquettes.
+    const jaquette = document.createElement('img');
+    jaquette.alt = '';
+    jaquette.loading = 'lazy';
+    jaquette.dataset.console = item.rom.folder;
+    jaquette.dataset.jeu = item.rom.name;
+    // La jaquette remplace l'initiale une fois arrivée, et pas avant : une
+    // image à moitié chargée sur fond vide fait clignoter toute la grille.
+    jaquette.addEventListener('load', () => {
+      initiale.hidden = true;
+    });
+    boite.append(jaquette);
+    regarderJaquette(jaquette);
+
+    const nom = document.createElement('span');
+    nom.className = 'nom';
+    nom.textContent = folderLabel(item.rom.name.replace(/\.[^.]+$/, ''));
+
+    tuile.append(boite, nom);
+    tuile.addEventListener('click', () => {
+      choisir(rang);
+      void jouerChoisie();
+    });
+    grilleTuiles.append(tuile);
+  }
+
+  choisir(choisie);
+}
+
+/** Désigne une case, la met en vue, et annonce ce qu'elle porte. */
+function choisir(rang: number): void {
+  choisie = Math.min(Math.max(rang, 0), Math.max(0, tuiles.length - 1));
+
+  const cases = [...grilleTuiles.children] as HTMLElement[];
+  for (const [index, element] of cases.entries()) {
+    element.setAttribute('aria-selected', String(index === choisie));
+  }
+
+  const courante = cases[choisie];
+  if (courante) courante.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  const item = tuiles[choisie];
+  grilleTitre.textContent = item ? item.rom.name : '';
+  if (item) {
+    // La console d'abord : la grille est à plat, et six cents jaquettes à la
+    // suite ne disent plus sur quelle machine on se trouve.
+    const volet = voletDe(item);
+    const cœur = effectiveCore(item.rom, item.cores, chosenCore, volet?.preferred);
+    grilleDetail.textContent = [volet?.label, cœur?.label ?? '—', humanSize(item.rom.size)]
+      .filter(Boolean)
+      .join(' · ');
+  } else {
+    grilleDetail.textContent = '';
+  }
+}
+
+/** Les volets tels qu'ils viennent d'être classés. */
+let volets: Shelf[] = [];
+
+/** Le volet d'où ce jeu vient. */
+function voletDe(item: Playable): Shelf | undefined {
+  return volets.find((shelf) => shelf.games.includes(item));
+}
+
+/** Le cœur retenu pour le volet dont ce jeu vient. */
+function preferePour(item: Playable): string | undefined {
+  return voletDe(item)?.preferred;
+}
+
+/** Lance le jeu choisi. */
+async function jouerChoisie(): Promise<void> {
+  const item = tuiles[choisie];
+  if (!item) return;
+  const cœur = effectiveCore(item.rom, item.cores, chosenCore, preferePour(item));
+  if (cœur) await play(cœur, item.rom);
+}
+
+/**
+ * Fait vivre la grille à la manette.
+ *
+ * Appelée depuis la même boucle que le panneau des commandes. Les directions
+ * passent par un filtre d'appui : sans lui, une direction tenue traverse six
+ * cents jeux en deux secondes.
+ */
+const directions = {
+  gauche: new Held(),
+  droite: new Held(),
+  haut: new Held(),
+  bas: new Held(),
+};
+const valider = new Held(1000, 1000);
+
+function naviguerGrille(): void {
+  if (!enGrille() || libraryView.hidden || tuiles.length === 0) return;
+  // Une fenêtre ouverte prend la main : sans cela, régler ses touches ferait
+  // défiler la bibliothèque derrière.
+  if (document.querySelector('dialog[open]')) return;
+
+  // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
+  // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
+  const pad = currentPad();
+  if (!pad) return;
+
+  const [x = 0, y = 0] = pad.axes;
+  const maintenant = performance.now();
+  const pousse: Record<Direction, boolean> = {
+    gauche: pad.buttons[14]?.pressed || x < -STICK_DEADZONE,
+    droite: pad.buttons[15]?.pressed || x > STICK_DEADZONE,
+    haut: pad.buttons[12]?.pressed || y < -STICK_DEADZONE,
+    bas: pad.buttons[13]?.pressed || y > STICK_DEADZONE,
+  };
+
+  for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
+    const etat = directions[sens].update(pousse[sens], maintenant);
+    if (etat.pressed || etat.repeat) choisir(move(choisie, tuiles.length, colonnes(), sens));
+  }
+
+  if (valider.update(pad.buttons[0]?.pressed ?? false, maintenant).pressed) {
+    void jouerChoisie();
+  }
+}
+
+/** Les flèches du clavier, comme la croix de la manette. */
+const FLECHES: Record<string, Direction> = {
+  ArrowLeft: 'gauche',
+  ArrowRight: 'droite',
+  ArrowUp: 'haut',
+  ArrowDown: 'bas',
+};
+
+/*
+ * La grille se parcourt aussi au clavier.
+ *
+ * Elle est faite pour la manette, mais elle reste en place une fois choisie :
+ * s'en servir sans manette ne doit pas obliger à repasser en liste. Les
+ * flèches horizontales sont laissées au champ de recherche quand on y écrit —
+ * elles y déplacent le curseur, et on ne prend pas ce qui sert déjà.
+ */
+document.addEventListener('keydown', (event) => {
+  if (!enGrille() || libraryView.hidden || tuiles.length === 0) return;
+  if (document.querySelector('dialog[open]')) return;
+
+  const dansLaRecherche = event.target === searchInput;
+  const sens = FLECHES[event.key];
+
+  if (sens) {
+    if (dansLaRecherche && (sens === 'gauche' || sens === 'droite')) return;
+    event.preventDefault();
+    choisir(move(choisie, tuiles.length, colonnes(), sens));
+    return;
+  }
+
+  if (event.key === 'Enter' && !dansLaRecherche) {
+    event.preventDefault();
+    void jouerChoisie();
+  }
+});
 
 // --- Jaquettes --------------------------------------------------------------
 
@@ -827,6 +1112,7 @@ function gameRow(rom: RomEntry, cores: CatalogEntry[], preferred?: string): HTML
 function renderGames(): void {
   const needle = searchInput.value.trim().toLowerCase();
   const shelves = groupLibrary(games, catalog, readFolderCores(), chosenCore, needle);
+  volets = shelves;
 
   shelvesBox.replaceChildren();
 
@@ -840,6 +1126,7 @@ function renderGames(): void {
 
   if (shelves.length === 0) {
     shelvesBox.hidden = true;
+    viderGrille();
     placeholder.hidden = false;
 
     const heading = placeholder.querySelector('strong');
@@ -869,6 +1156,18 @@ function renderGames(): void {
   }
 
   placeholder.hidden = true;
+
+  // Les deux vues partagent le même classement ; seul le dessin diffère. On ne
+  // dessine que celle qu'on regarde : six cents lignes construites pour rester
+  // masquées coûtent exactement le même temps que six cents lignes affichées.
+  if (enGrille()) {
+    shelvesBox.hidden = true;
+    grilleView.hidden = false;
+    renderGrille(shelves);
+    return;
+  }
+
+  viderGrille();
   shelvesBox.hidden = false;
 
   const collapsed = readCollapsed();
@@ -1557,6 +1856,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   external: () => openDialog(dialogs.external),
   themes: () => {
     renderThemes();
+    renderMenus();
     openDialog(dialogs.themes);
   },
   refresh: refreshLibrary,
@@ -1749,6 +2049,7 @@ window.addEventListener('gamepaddisconnected', () => void currentPad());
 function pollControls(): void {
   if (!running && dialogs.controls.open) sampleInput();
   capturerLiaison();
+  naviguerGrille();
   requestAnimationFrame(pollControls);
 }
 requestAnimationFrame(pollControls);

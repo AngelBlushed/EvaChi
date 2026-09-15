@@ -164,6 +164,114 @@
       .library { overflow: auto; }
       .library[hidden] { display: none; }
 
+      /* --- Vue en grille --- */
+
+      /*
+       * Le pied est fixe et les tuiles défilent dessous : le titre du jeu
+       * choisi doit rester lisible sans quitter la grille des yeux, comme sur
+       * une console.
+       */
+      .grille {
+        height: 100%;
+        display: grid;
+        grid-template-rows: minmax(0, 1fr) auto;
+      }
+      .grille[hidden] { display: none; }
+
+      .grille-tuiles {
+        overflow-y: auto;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(124px, 1fr));
+        gap: 18px;
+        padding: 22px;
+        align-content: start;
+      }
+
+      .tuile {
+        position: relative;
+        border: 0;
+        padding: 0;
+        background: none;
+        cursor: pointer;
+        font: inherit;
+        color: var(--muted);
+        display: grid;
+        gap: 7px;
+        justify-items: center;
+        /* La transition porte sur la transformation seule : animer une
+           dimension ferait recalculer la mise en page de toute la grille
+           soixante fois par seconde. */
+        transition: transform 150ms ease, color 150ms;
+      }
+
+      .tuile .boite {
+        width: 100%;
+        aspect-ratio: 3 / 4;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        border-radius: 7px;
+        background: var(--raised);
+        border: 2px solid transparent;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
+        transition: border-color 150ms, box-shadow 150ms;
+      }
+      /* L'initiale et la jaquette occupent la même case : l'une remplace
+         l'autre sans que la tuile change de hauteur au passage. */
+      .tuile .boite > * { grid-area: 1 / 1; }
+      .tuile .boite img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 180ms ease;
+      }
+      .tuile .boite img.vue { opacity: 1; }
+
+      /* Sans jaquette, l'initiale du titre : une case vide au milieu d'une
+         grille illustrée se lit comme une image qui n'a pas chargé. */
+      .tuile .initiale {
+        font-size: 34px;
+        font-weight: 600;
+        color: var(--muted);
+        opacity: 0.55;
+      }
+
+      .tuile .nom {
+        font-size: 11px;
+        line-height: 1.3;
+        text-align: center;
+        max-height: 2.6em;
+        overflow: hidden;
+      }
+
+      .tuile[aria-selected="true"] {
+        transform: scale(1.09);
+        color: var(--ink);
+        z-index: 2;
+      }
+      .tuile[aria-selected="true"] .boite {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft), 0 10px 24px rgba(0, 0, 0, 0.45);
+      }
+
+      .grille-pied {
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+        padding: 9px 22px;
+        border-top: 1px solid var(--edge);
+        background: var(--panel);
+        min-height: 36px;
+      }
+      .grille-pied strong { font-weight: 600; }
+      .grille-pied span { color: var(--muted); font-size: 12px; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .tuile { transition: none; }
+        .tuile[aria-selected="true"] { transform: none; }
+      }
+
       .shelves { padding: 8px 0 24px; }
       .shelves[hidden] { display: none; }
 
@@ -427,6 +535,28 @@
         margin-top: 8px;
         min-height: 14px;
       }
+      /* Le choix de présentation : deux pavés côte à côte plutôt qu'une liste
+         déroulante, pour que la description tienne sous chaque nom. */
+      .menus {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+        gap: 10px;
+      }
+      .menu-choix {
+        display: grid;
+        gap: 4px;
+        text-align: left;
+        font: inherit;
+        color: var(--ink);
+        background: var(--raised);
+        border: 2px solid var(--edge);
+        border-radius: 8px;
+        padding: 10px 12px;
+        cursor: pointer;
+      }
+      .menu-choix[aria-pressed="true"] { border-color: var(--accent); }
+      .menu-choix span { color: var(--muted); font-size: 11px; line-height: 1.4; }
+
       /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
       #bios-adopted:empty { display: none; }
       /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
@@ -625,6 +755,16 @@
         <div class="library" id="library">
           <div class="shelves" id="games"></div>
 
+          <!-- La vue en grille. Vide et masquée tant qu'on est en liste : les
+               deux vues partagent la même bibliothèque, pas le même dessin. -->
+          <div class="grille" id="grille" hidden>
+            <div class="grille-tuiles" id="grille-tuiles"></div>
+            <div class="grille-pied">
+              <strong id="grille-titre"></strong>
+              <span id="grille-detail"></span>
+            </div>
+          </div>
+
           <div class="placeholder" id="placeholder">
             <strong>Aucun jeu</strong>
             <span>Indiquez le dossier où se trouvent vos jeux.</span>
@@ -767,6 +907,9 @@
           lisible : le texte garde partout un contraste suffisant sur son fond.
         </p>
         <div class="themes" id="theme-list"></div>
+
+        <h3 class="section">Présentation</h3>
+        <div class="menus" id="menu-list"></div>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>
