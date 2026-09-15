@@ -80,6 +80,7 @@ import type { Candidate } from './covers.ts';
 import { Held, columnsFor, echelle, move, step } from './navigation.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
+import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -134,6 +135,8 @@ const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const disquesCase = $<HTMLInputElement>('disques');
+const musiqueCase = $<HTMLInputElement>('musique');
+const sonsCase = $<HTMLInputElement>('sons');
 const biosAdopt = $<HTMLButtonElement>('bios-adopt');
 const biosAdoptFolder = $<HTMLButtonElement>('bios-adopt-folder');
 const biosAdopted = $<HTMLElement>('bios-adopted');
@@ -176,6 +179,8 @@ const RETENU = {
   menu: 'evachi.menu',
   jaquettes: 'evachi.jaquettes',
   disques: 'evachi.disques',
+  musique: 'evachi.musique',
+  sons: 'evachi.sons',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -310,6 +315,29 @@ function disquesReplies(): boolean {
 disquesCase.addEventListener('change', () => {
   retenir(RETENU.disques, disquesCase.checked ? 'oui' : 'non');
   renderGames();
+});
+
+/** Vrai quand le menu animé doit avoir sa musique. */
+function musiqueVoulue(): boolean {
+  return retenu(RETENU.musique) !== 'non';
+}
+
+/** Vrai quand la manette doit faire un bruit en se déplaçant. */
+function sonsVoulus(): boolean {
+  return retenu(RETENU.sons) !== 'non';
+}
+
+musiqueCase.addEventListener('change', () => {
+  retenir(RETENU.musique, musiqueCase.checked ? 'oui' : 'non');
+  // Décochée en cours d'écoute, la musique doit se taire tout de suite ;
+  // recochée, repartir sans qu'on ait à quitter le menu.
+  if (musiqueCase.checked && enXmb() && !libraryView.hidden) demarrerMusique();
+  else arreterMusique();
+});
+
+sonsCase.addEventListener('change', () => {
+  retenir(RETENU.sons, sonsCase.checked ? 'oui' : 'non');
+  if (sonsCase.checked) ticDeplacement();
 });
 
 /** Dessine le choix de présentation, dans la même fenêtre que les thèmes. */
@@ -997,10 +1025,15 @@ function naviguerMenu(): void {
 
   for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
     const etat = directions[sens].update(pousse[sens], maintenant);
-    if (etat.pressed || etat.repeat) pousser(vue, sens);
+    if (!etat.pressed && !etat.repeat) continue;
+    pousser(vue, sens);
+    // Le bruit n'est fait qu'ici : c'est la branche manette. À la souris on a
+    // déjà le retour du clic, et au clavier celui de la touche.
+    if (sonsVoulus()) ticDeplacement();
   }
 
   if (valider.update(pad.buttons[0]?.pressed ?? false, maintenant).pressed) {
+    if (sonsVoulus()) ticValidation();
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
   }
 }
@@ -1324,6 +1357,7 @@ function renderXmb(shelves: Shelf[]): void {
   entreeXmb = step(entreeXmb, shelf?.games.length ?? 0, 0);
 
   poserEchelle();
+  if (musiqueVoulue()) demarrerMusique();
   renderColonnesXmb();
   renderEntreesXmb();
   placerXmb();
@@ -1366,6 +1400,7 @@ window.addEventListener('resize', () => {
 
 /** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
 function viderXmb(): void {
+  arreterMusique();
   xmbView.hidden = true;
   xmbColonnes.replaceChildren();
   xmbEntrees.replaceChildren();
@@ -2361,6 +2396,8 @@ const actions: Record<string, () => void | Promise<void>> = {
     renderMenus();
     jaquettesCase.checked = jaquettesVoulues();
     disquesCase.checked = disquesReplies();
+    musiqueCase.checked = musiqueVoulue();
+    sonsCase.checked = sonsVoulus();
     openDialog(dialogs.themes);
   },
   refresh: refreshLibrary,
@@ -2551,6 +2588,11 @@ window.addEventListener('gamepaddisconnected', () => void currentPad());
  * que la manette n'était pas reconnue — alors que le jeu, lui, l'aurait vue.
  */
 function pollControls(): void {
+  // La musique appartient au menu animé et à lui seul. Surveillé ici plutôt
+  // qu'au lancement d'un jeu : il y a plusieurs façons de quitter le menu, et
+  // une seule d'entre elles oubliée laisserait la musique jouer sous la partie.
+  if (musiqueEnCours() && (libraryView.hidden || xmbView.hidden)) arreterMusique();
+
   if (!running && dialogs.controls.open) sampleInput();
   capturerLiaison();
   naviguerMenu();
