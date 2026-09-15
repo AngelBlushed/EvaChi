@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { Held, columnsFor, move } from './navigation.ts';
+import { Held, columnsFor, move, step } from './navigation.ts';
 
 /*  Grille de référence, 4 colonnes, 10 jeux :
  *
@@ -69,6 +69,29 @@ describe('déplacement dans la grille', () => {
   it('survit à une grille d’une seule colonne', () => {
     assert.equal(move(0, 3, 1, 'bas'), 1);
     assert.equal(move(2, 3, 1, 'droite'), 2);
+  });
+});
+
+describe('pas dans une file', () => {
+  it('avance et recule', () => {
+    assert.equal(step(2, 5, 1), 3);
+    assert.equal(step(2, 5, -1), 1);
+  });
+
+  it('s’arrête aux deux bouts plutôt que de boucler', () => {
+    assert.equal(step(0, 5, -1), 0);
+    assert.equal(step(4, 5, 1), 4);
+  });
+
+  it('rattrape un indice devenu impossible', () => {
+    // La bibliothèque change ; la sélection peut désigner une console qui
+    // n'est plus là.
+    assert.equal(step(99, 5, 1), 4);
+    assert.equal(step(-3, 5, -1), 0);
+  });
+
+  it('survit à une file vide', () => {
+    assert.equal(step(0, 0, 1), 0);
   });
 });
 

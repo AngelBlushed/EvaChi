@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { RomEntry } from '../libretro/client.ts';
 import type { CatalogEntry } from './catalog.ts';
 import { JOYPAD } from './input.ts';
-import { coresFor, folderLabel, groupLibrary, hintedCore } from './library.ts';
+import { coresFor, folderLabel, gameLabel, groupLibrary, hintedCore } from './library.ts';
 
 /** Fabrique un cœur du catalogue. */
 function core(id: string, extensions: string[], label = id): CatalogEntry {
@@ -48,6 +48,33 @@ const CATALOG: CatalogEntry[] = [
 ];
 
 const NO_CHOICE = new Map<string, string>();
+
+describe('nom de jeu', () => {
+  it('retire la région et les marques de version', () => {
+    assert.equal(gameLabel('Sonic The Hedgehog (USA, Europe).md'), 'Sonic The Hedgehog');
+    assert.equal(gameLabel('Super Mario Kart (U) [!].sfc'), 'Super Mario Kart');
+    assert.equal(gameLabel('Zelda (Europe) (Rev 2).wux'), 'Zelda');
+  });
+
+  it('garde le numéro de piste', () => {
+    // Un jeu Mega-CD arrive en vingt fichiers dont seul ce numéro diffère.
+    // Le retirer donnait vingt lignes rigoureusement identiques.
+    assert.equal(
+      gameLabel('A-Rank Thunder - Tanjou-hen (Japan) (Track 02).bin'),
+      'A-Rank Thunder - Tanjou-hen (Japan) (Track 02)',
+    );
+    assert.equal(gameLabel('Final Fantasy VII (USA) (Disc 2).bin'), 'Final Fantasy VII (USA) (Disc 2)');
+  });
+
+  it('laisse tranquille un nom qui ne porte aucune marque', () => {
+    assert.equal(gameLabel('megaman.zip'), 'megaman');
+    assert.equal(gameLabel('ShovelKnight.rpx'), 'ShovelKnight');
+  });
+
+  it('ne vide pas un nom qui n’est qu’une marque', () => {
+    assert.equal(gameLabel('(USA).bin'), '(USA)');
+  });
+});
 
 describe('nom de volet', () => {
   it('retire les formats entre parenthèses', () => {

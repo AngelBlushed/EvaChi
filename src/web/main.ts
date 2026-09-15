@@ -51,7 +51,7 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import { coresFor, effectiveCore, folderLabel, groupLibrary } from './library.ts';
+import { coresFor, effectiveCore, gameLabel, groupLibrary } from './library.ts';
 import type { Playable, Shelf } from './library.ts';
 import {
   BUTTON_COUNT,
@@ -77,8 +77,9 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
-import { Held, columnsFor, move } from './navigation.ts';
+import { Held, columnsFor, move, step } from './navigation.ts';
 import type { Direction } from './navigation.ts';
+import { draw as dessinerRubans } from './ribbon.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -100,6 +101,15 @@ const grilleView = $<HTMLDivElement>('grille');
 const grilleTuiles = $<HTMLDivElement>('grille-tuiles');
 const grilleTitre = $<HTMLElement>('grille-titre');
 const grilleDetail = $<HTMLElement>('grille-detail');
+const xmbView = $<HTMLDivElement>('xmb');
+const xmbFond = $<HTMLCanvasElement>('xmb-fond');
+const xmbColonnes = $<HTMLDivElement>('xmb-colonnes');
+const xmbEntrees = $<HTMLDivElement>('xmb-entrees');
+const xmbConsole = $<HTMLElement>('xmb-console');
+const xmbHeure = $<HTMLElement>('xmb-heure');
+const xmbPied = $<HTMLElement>('xmb-pied');
+const xmbAfficheInitiale = $<HTMLElement>('xmb-affiche-initiale');
+const xmbAfficheImage = $<HTMLImageElement>('xmb-affiche-image');
 const placeholder = $<HTMLDivElement>('placeholder');
 const placeholderPath = $<HTMLElement>('placeholder-path');
 const searchInput = $<HTMLInputElement>('search');
@@ -248,11 +258,17 @@ const MENUS = [
     label: 'Grille',
     detail: 'Les jaquettes en grand, parcourues à la manette. Pensé pour le canapé.',
   },
+  {
+    id: 'xmb',
+    label: 'Menu animé',
+    detail: 'Les consoles en rangée, les jeux en colonne, un fond qui ondule. Façon console de salon.',
+  },
 ] as const;
 
 /** Le mode d'affichage retenu ; la liste tant que rien n'a été choisi. */
 function menuActuel(): string {
-  return retenu(RETENU.menu) === 'grille' ? 'grille' : 'liste';
+  const garde = retenu(RETENU.menu);
+  return MENUS.some((menu) => menu.id === garde) ? (garde as string) : 'liste';
 }
 
 /** Change de présentation et redessine aussitôt la bibliothèque. */
@@ -849,7 +865,7 @@ function renderGrille(shelves: Shelf[]): void {
 
     const nom = document.createElement('span');
     nom.className = 'nom';
-    nom.textContent = folderLabel(item.rom.name.replace(/\.[^.]+$/, ''));
+    nom.textContent = gameLabel(item.rom.name);
 
     tuile.append(boite, nom);
     tuile.addEventListener('click', () => {
@@ -911,11 +927,15 @@ async function jouerChoisie(): Promise<void> {
 }
 
 /**
- * Fait vivre la grille à la manette.
+ * Fait vivre les vues manette à la manette.
  *
  * Appelée depuis la même boucle que le panneau des commandes. Les directions
  * passent par un filtre d'appui : sans lui, une direction tenue traverse six
  * cents jeux en deux secondes.
+ *
+ * Les filtres sont partagés entre la grille et le menu animé. Deux jeux de
+ * filtres liraient la même manette deux fois par trame, et un appui compterait
+ * double le jour où les deux vues seraient éveillées ensemble.
  */
 const directions = {
   gauche: new Held(),
@@ -925,11 +945,20 @@ const directions = {
 };
 const valider = new Held(1000, 1000);
 
-function naviguerGrille(): void {
-  if (!enGrille() || libraryView.hidden || tuiles.length === 0) return;
+/** Vrai quand une vue manette est à l'écran et qu'elle a de quoi montrer. */
+function vueManette(): 'grille' | 'xmb' | null {
+  if (libraryView.hidden) return null;
   // Une fenêtre ouverte prend la main : sans cela, régler ses touches ferait
   // défiler la bibliothèque derrière.
-  if (document.querySelector('dialog[open]')) return;
+  if (document.querySelector('dialog[open]')) return null;
+  if (enGrille() && tuiles.length > 0) return 'grille';
+  if (enXmb() && voletsXmb.length > 0) return 'xmb';
+  return null;
+}
+
+function naviguerMenu(): void {
+  const vue = vueManette();
+  if (!vue) return;
 
   // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
   // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
@@ -947,12 +976,18 @@ function naviguerGrille(): void {
 
   for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
     const etat = directions[sens].update(pousse[sens], maintenant);
-    if (etat.pressed || etat.repeat) choisir(move(choisie, tuiles.length, colonnes(), sens));
+    if (etat.pressed || etat.repeat) pousser(vue, sens);
   }
 
   if (valider.update(pad.buttons[0]?.pressed ?? false, maintenant).pressed) {
-    void jouerChoisie();
+    void (vue === 'grille' ? jouerChoisie() : jouerXmb());
   }
+}
+
+/** Déplace la sélection de la vue en cours. */
+function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
+  if (vue === 'grille') choisir(move(choisie, tuiles.length, colonnes(), sens));
+  else deplacerXmb(sens);
 }
 
 /** Les flèches du clavier, comme la croix de la manette. */
@@ -964,16 +999,16 @@ const FLECHES: Record<string, Direction> = {
 };
 
 /*
- * La grille se parcourt aussi au clavier.
+ * Les deux vues se parcourent aussi au clavier.
  *
- * Elle est faite pour la manette, mais elle reste en place une fois choisie :
- * s'en servir sans manette ne doit pas obliger à repasser en liste. Les
- * flèches horizontales sont laissées au champ de recherche quand on y écrit —
- * elles y déplacent le curseur, et on ne prend pas ce qui sert déjà.
+ * Elles sont faites pour la manette, mais elles restent en place une fois
+ * choisies : s'en servir sans manette ne doit pas obliger à repasser en liste.
+ * Les flèches horizontales sont laissées au champ de recherche quand on y
+ * écrit — elles y déplacent le curseur, et on ne prend pas ce qui sert déjà.
  */
 document.addEventListener('keydown', (event) => {
-  if (!enGrille() || libraryView.hidden || tuiles.length === 0) return;
-  if (document.querySelector('dialog[open]')) return;
+  const vue = vueManette();
+  if (!vue) return;
 
   const dansLaRecherche = event.target === searchInput;
   const sens = FLECHES[event.key];
@@ -981,15 +1016,371 @@ document.addEventListener('keydown', (event) => {
   if (sens) {
     if (dansLaRecherche && (sens === 'gauche' || sens === 'droite')) return;
     event.preventDefault();
-    choisir(move(choisie, tuiles.length, colonnes(), sens));
+    pousser(vue, sens);
     return;
   }
 
   if (event.key === 'Enter' && !dansLaRecherche) {
     event.preventDefault();
-    void jouerChoisie();
+    void (vue === 'grille' ? jouerChoisie() : jouerXmb());
   }
 });
+
+// --- Menu animé -------------------------------------------------------------
+
+/**
+ * La présentation façon console de salon : une rangée de consoles, une colonne
+ * de jeux, un fond qui ondule.
+ *
+ * Rien ne défile au sens habituel. Les deux pistes sont translatées pour
+ * amener la sélection sous un repère fixe — la pastille en haut à gauche, la
+ * ligne en vue à mi-hauteur. La sélection ne bouge donc jamais des yeux, ce
+ * qui est tout l'intérêt d'un menu qu'on parcourt à trois mètres de l'écran.
+ */
+
+/**
+ * Largeur d'une pastille de console, hauteur d'une entrée, et à quelle ligne
+ * se tient la sélection. Les deux premières valeurs doivent suivre la feuille
+ * de style : c'est d'elles que se déduit le décalage des pistes.
+ *
+ * L'ancre est à zéro : le jeu choisi se tient juste sous la rangée des
+ * consoles, et la liste descend sous lui. C'est la disposition d'une console
+ * de salon — ce qui est choisi est en haut, ce qui reste à voir en dessous.
+ * Ancré plus bas, le menu s'ouvrait sur un grand vide.
+ */
+const XMB = { colonne: 86, entree: 54, ancre: 0 };
+
+/** Les volets tels que le menu animé les montre. */
+let voletsXmb: Shelf[] = [];
+/** La console en cours, et le jeu en cours dans cette console. */
+let colonneXmb = 0;
+let entreeXmb = 0;
+/** Le rang retenu pour chaque console : on y revient là où on l'avait laissée. */
+const rangsXmb = new Map<string, number>();
+
+/** Vrai quand la bibliothèque s'affiche façon console de salon. */
+function enXmb(): boolean {
+  return menuActuel() === 'xmb';
+}
+
+/**
+ * Les initiales d'une console, pour sa pastille.
+ *
+ * Trois lettres au plus : au-delà, le texte ne tient plus dans le rond. Ce sont
+ * des repères de position, pas des noms — le nom complet est écrit sous la
+ * pastille en cours et dans le titre, en haut à gauche.
+ */
+function initiales(label: string): string {
+  const propre = label.replace(/[^a-z0-9 ]/gi, ' ').trim();
+  // « 32X », « NES », « PSP » se lisent tels quels.
+  if (propre.length <= 4 && !propre.includes(' ')) return propre.toUpperCase();
+
+  const mots = propre.split(/\s+/).filter(Boolean);
+  if (mots.length === 0) return '?';
+  if (mots.length === 1) return mots[0].slice(0, 3).toUpperCase();
+  return mots
+    .slice(0, 3)
+    .map((mot) => mot[0])
+    .join('')
+    .toUpperCase();
+}
+
+/** Redessine la rangée des consoles. */
+function renderColonnesXmb(): void {
+  xmbColonnes.replaceChildren();
+
+  for (const [rang, shelf] of voletsXmb.entries()) {
+    const pastille = document.createElement('button');
+    pastille.type = 'button';
+    pastille.className = 'xmb-console';
+    pastille.title = `${shelf.label} — ${plural(shelf.games.length, 'jeu', 'jeux')}`;
+
+    const rond = document.createElement('span');
+    rond.className = 'rond';
+    rond.textContent = initiales(shelf.label);
+
+    const etiquette = document.createElement('span');
+    etiquette.className = 'etiquette';
+    etiquette.textContent = shelf.label;
+
+    pastille.append(rond, etiquette);
+    pastille.addEventListener('click', () => allerColonne(rang));
+    xmbColonnes.append(pastille);
+  }
+}
+
+/** Redessine la colonne des jeux de la console en cours. */
+function renderEntreesXmb(): void {
+  xmbEntrees.replaceChildren();
+  const shelf = voletsXmb[colonneXmb];
+  if (!shelf) return;
+
+  for (const [rang, item] of shelf.games.entries()) {
+    const entree = document.createElement('button');
+    entree.type = 'button';
+    entree.className = 'xmb-entree';
+    entree.title = item.rom.path;
+
+    const vignette = document.createElement('span');
+    vignette.className = 'vignette';
+
+    const initiale = document.createElement('span');
+    initiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
+    vignette.append(initiale);
+
+    if (jaquettesVoulues()) {
+      const jaquette = document.createElement('img');
+      jaquette.alt = '';
+      jaquette.loading = 'lazy';
+      jaquette.dataset.console = item.rom.folder;
+      jaquette.dataset.jeu = item.rom.name;
+      jaquette.addEventListener('load', () => {
+        initiale.hidden = true;
+      });
+      vignette.append(jaquette);
+      regarderJaquette(jaquette);
+    }
+
+    const texte = document.createElement('span');
+    texte.className = 'texte';
+
+    const titre = document.createElement('span');
+    titre.className = 'titre';
+    titre.textContent = gameLabel(item.rom.name);
+
+    const detail = document.createElement('span');
+    detail.className = 'detail';
+    const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
+    detail.textContent = `${cœur?.label ?? 'aucun émulateur'} · ${humanSize(item.rom.size)}`;
+
+    texte.append(titre, detail);
+    entree.append(vignette, texte);
+    entree.addEventListener('click', () => {
+      if (rang === entreeXmb) void jouerXmb();
+      else allerEntree(rang);
+    });
+    xmbEntrees.append(entree);
+  }
+}
+
+/**
+ * Amène la sélection sous son repère et marque ce qui est choisi.
+ *
+ * Les pistes sont translatées plutôt que défilées : une transformation ne
+ * refait aucune mise en page, et c'est ce qui permet d'animer soixante fois
+ * par seconde sans que la fenêtre s'essouffle.
+ */
+function placerXmb(): void {
+  const shelf = voletsXmb[colonneXmb];
+
+  const consoles = [...xmbColonnes.children] as HTMLElement[];
+  for (const [rang, pastille] of consoles.entries()) {
+    pastille.setAttribute('aria-selected', String(rang === colonneXmb));
+  }
+  // La console en cours vient se placer à gauche, à une pastille du bord.
+  xmbColonnes.style.transform = `translateX(${XMB.colonne - colonneXmb * XMB.colonne}px)`;
+
+  const entrees = [...xmbEntrees.children] as HTMLElement[];
+  for (const [rang, entree] of entrees.entries()) {
+    entree.setAttribute('aria-selected', String(rang === entreeXmb));
+  }
+  // Le jeu en cours vient se placer à la troisième ligne : assez bas pour
+  // qu'on voie d'où l'on vient, assez haut pour qu'on voie où l'on va.
+  xmbEntrees.style.transform = `translateY(${(XMB.ancre - entreeXmb) * XMB.entree}px)`;
+
+  xmbConsole.textContent = shelf?.label ?? '—';
+  const item = shelf?.games[entreeXmb];
+  xmbPied.textContent = shelf
+    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${entreeXmb + 1} sur ${shelf.games.length}${item ? ` · ${item.rom.extension}` : ''}`
+    : '';
+  void poserAffiche(item);
+}
+
+/**
+ * Pose la jaquette en grand du jeu sous le repère.
+ *
+ * Un jeton plutôt qu'une file d'attente : à la manette, on traverse dix jeux
+ * avant que la première jaquette soit résolue, et sans ce garde-fou la
+ * dernière arrivée l'emporterait sur la bonne.
+ */
+let afficheJeton = 0;
+
+async function poserAffiche(item: Playable | undefined): Promise<void> {
+  const jeton = ++afficheJeton;
+
+  xmbAfficheInitiale.textContent = item ? item.rom.name.slice(0, 1).toUpperCase() : '';
+  xmbAfficheInitiale.hidden = false;
+  xmbAfficheImage.classList.remove('vue');
+  xmbAfficheImage.removeAttribute('src');
+
+  if (!item || !jaquettesVoulues()) return;
+
+  try {
+    const trouve = chooseCover(await inventaire(item.rom.folder), item.rom.name);
+    if (jeton !== afficheJeton || !trouve) return;
+    xmbAfficheImage.src = coverUrl(trouve.folder, trouve.name, trouve.kind);
+  } catch {
+    // Pas de réseau : l'initiale reste, et le menu marche sans.
+  }
+}
+
+xmbAfficheImage.addEventListener('load', () => {
+  xmbAfficheImage.classList.add('vue');
+  xmbAfficheInitiale.hidden = true;
+});
+
+/** Change de console, en retrouvant le jeu où on l'avait laissé. */
+function allerColonne(rang: number): void {
+  const precedente = voletsXmb[colonneXmb];
+  if (precedente) rangsXmb.set(precedente.key, entreeXmb);
+
+  colonneXmb = step(rang, voletsXmb.length, 0);
+  const suivante = voletsXmb[colonneXmb];
+  entreeXmb = suivante
+    ? Math.min(rangsXmb.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
+    : 0;
+
+  renderEntreesXmb();
+  placerXmb();
+}
+
+/** Change de jeu dans la console en cours. */
+function allerEntree(rang: number): void {
+  const shelf = voletsXmb[colonneXmb];
+  entreeXmb = step(rang, shelf?.games.length ?? 0, 0);
+  placerXmb();
+}
+
+/** Un pas de manette dans le menu animé. */
+function deplacerXmb(sens: Direction): void {
+  const shelf = voletsXmb[colonneXmb];
+  if (sens === 'gauche' || sens === 'droite') {
+    allerColonne(step(colonneXmb, voletsXmb.length, sens === 'droite' ? 1 : -1));
+  } else {
+    allerEntree(step(entreeXmb, shelf?.games.length ?? 0, sens === 'bas' ? 1 : -1));
+  }
+}
+
+/** Lance le jeu sous le repère. */
+async function jouerXmb(): Promise<void> {
+  const shelf = voletsXmb[colonneXmb];
+  const item = shelf?.games[entreeXmb];
+  if (!shelf || !item) return;
+  const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
+  if (cœur) await play(cœur, item.rom);
+}
+
+/** Dessine tout le menu animé à partir des volets déjà classés. */
+function renderXmb(shelves: Shelf[]): void {
+  voletsXmb = shelves;
+  colonneXmb = step(colonneXmb, shelves.length, 0);
+  const shelf = shelves[colonneXmb];
+  entreeXmb = step(entreeXmb, shelf?.games.length ?? 0, 0);
+
+  renderColonnesXmb();
+  renderEntreesXmb();
+  placerXmb();
+  poserHeure();
+  animerFond();
+}
+
+/**
+ * L'heure, en haut à droite.
+ *
+ * Un menu de salon donne l'heure : on y passe le temps qu'on veut, et c'est
+ * souvent la seule horloge en vue quand la fenêtre occupe l'écran. Mise à jour
+ * à la demi-minute, et seulement quand le menu est là.
+ */
+function poserHeure(): void {
+  if (xmbView.hidden) return;
+  const maintenant = new Date();
+  xmbHeure.textContent = maintenant.toLocaleString('fr-FR', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+setInterval(poserHeure, 30_000);
+
+/** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
+function viderXmb(): void {
+  xmbView.hidden = true;
+  xmbColonnes.replaceChildren();
+  xmbEntrees.replaceChildren();
+  voletsXmb = [];
+}
+
+// --- Fond animé -------------------------------------------------------------
+
+/**
+ * Le fond ondule tant qu'on le regarde, et pas une trame de plus.
+ *
+ * Une boucle qui tournerait pendant la partie volerait des trames au jeu, et
+ * sur un portable elle viderait la batterie devant un menu fermé. La boucle
+ * s'arrête donc d'elle-même dès que le menu n'est plus à l'écran.
+ */
+let fondEnCours = false;
+
+/** La couleur des rubans, relue à chaque changement de thème. */
+function encreDuFond(): string {
+  const styles = getComputedStyle(document.documentElement);
+  const accent = styles.getPropertyValue('--accent').trim();
+  const composantes = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(accent);
+  if (!composantes) return '255, 255, 255';
+  return composantes
+    .slice(1)
+    .map((paire) => Number.parseInt(paire, 16))
+    .join(', ');
+}
+
+function animerFond(): void {
+  if (fondEnCours) return;
+  const contexte = xmbFond.getContext('2d');
+  if (!contexte) return;
+
+  fondEnCours = true;
+  let encre = encreDuFond();
+  let derniereMesure = 0;
+  let dernierDessin = 0;
+
+  const trame = (temps: number): void => {
+    if (xmbView.hidden || libraryView.hidden) {
+      fondEnCours = false;
+      return;
+    }
+
+    // Trente images par seconde suffisent largement : les rubans mettent une
+    // minute à faire un tour. Sur un écran à cent quarante hertz, dessiner à
+    // chaque rafraîchissement quadruplerait le travail sans que rien ne se
+    // voie de plus — et viderait la batterie devant un menu.
+    if (temps - dernierDessin < 32) {
+      requestAnimationFrame(trame);
+      return;
+    }
+    dernierDessin = temps;
+
+    // Le canevas est redimensionné et la couleur relue deux fois par seconde :
+    // les lire à chaque trame obligerait le navigateur à recalculer la mise en
+    // page soixante fois par seconde pour des valeurs qui ne bougent pas.
+    if (temps - derniereMesure > 500) {
+      derniereMesure = temps;
+      encre = encreDuFond();
+      const largeur = xmbView.clientWidth;
+      const hauteur = xmbView.clientHeight;
+      if (xmbFond.width !== largeur || xmbFond.height !== hauteur) {
+        xmbFond.width = largeur;
+        xmbFond.height = hauteur;
+      }
+    }
+
+    dessinerRubans(contexte, xmbFond.width, xmbFond.height, temps / 1000, encre);
+    requestAnimationFrame(trame);
+  };
+
+  requestAnimationFrame(trame);
+}
 
 // --- Jaquettes --------------------------------------------------------------
 
@@ -1156,6 +1547,7 @@ function renderGames(): void {
   if (shelves.length === 0) {
     shelvesBox.hidden = true;
     viderGrille();
+    viderXmb();
     placeholder.hidden = false;
 
     const heading = placeholder.querySelector('strong');
@@ -1191,12 +1583,22 @@ function renderGames(): void {
   // masquées coûtent exactement le même temps que six cents lignes affichées.
   if (enGrille()) {
     shelvesBox.hidden = true;
+    viderXmb();
     grilleView.hidden = false;
     renderGrille(shelves);
     return;
   }
 
+  if (enXmb()) {
+    shelvesBox.hidden = true;
+    viderGrille();
+    xmbView.hidden = false;
+    renderXmb(shelves);
+    return;
+  }
+
   viderGrille();
+  viderXmb();
   shelvesBox.hidden = false;
 
   const collapsed = readCollapsed();
@@ -2079,7 +2481,7 @@ window.addEventListener('gamepaddisconnected', () => void currentPad());
 function pollControls(): void {
   if (!running && dialogs.controls.open) sampleInput();
   capturerLiaison();
-  naviguerGrille();
+  naviguerMenu();
   requestAnimationFrame(pollControls);
 }
 requestAnimationFrame(pollControls);

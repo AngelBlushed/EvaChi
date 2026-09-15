@@ -49,6 +49,18 @@ export function move(index: number, count: number, columns: number, direction: D
 }
 
 /**
+ * Un pas dans une simple file, sans en sortir.
+ *
+ * La grille a deux dimensions, le menu animé n'en a qu'une par axe : une
+ * rangée de consoles, une colonne de jeux. On ne boucle pas — arriver à la
+ * dernière console et se retrouver à la première déroute plus que ça n'aide.
+ */
+export function step(index: number, count: number, delta: number): number {
+  if (count <= 0) return 0;
+  return Math.min(Math.max(index + delta, 0), count - 1);
+}
+
+/**
  * Le nombre de colonnes qui tiennent dans une largeur donnée.
  *
  * Calculé plutôt que figé : la fenêtre se redimensionne, et une grille dont le

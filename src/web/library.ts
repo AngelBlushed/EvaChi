@@ -43,6 +43,38 @@ export function folderLabel(folder: string): string {
 }
 
 /**
+ * Ce qui distingue une pièce d'une autre : numéro de piste, de disque, de face.
+ *
+ * Un jeu CD arrive en une vingtaine de fichiers dont seul ce numéro diffère.
+ * C'est donc la seule chose du nom qu'il ne faut surtout pas retirer.
+ */
+const DISTINGUE = /\b(track|piste|disc|disque|disk|side|face|cd)\b/i;
+
+/**
+ * Nettoie un nom de jeu pour l'affichage.
+ *
+ * On retire les marques de région et de version accrochées en fin de titre —
+ * `(USA)`, `(U)`, `[!]`, `(Rev 2)` — qui ne disent rien qu'on veuille lire dans
+ * une liste. On s'arrête net devant un numéro de piste : sans lui, les vingt
+ * fichiers d'un jeu Mega-CD s'affichent tous sous le même nom, et la liste
+ * paraît répéter la même ligne à l'infini.
+ */
+export function gameLabel(name: string): string {
+  let titre = name.replace(/\.[^.]+$/, '').trim();
+
+  // Plusieurs marques se suivent souvent : « (U) [!] », « (Europe) (Rev 2) ».
+  for (;;) {
+    const marque = /\s*[([]([^)\]]*)[)\]]\s*$/.exec(titre);
+    if (!marque || DISTINGUE.test(marque[1])) break;
+    const raccourci = titre.slice(0, marque.index).trim();
+    if (!raccourci) break;
+    titre = raccourci;
+  }
+
+  return titre || name;
+}
+
+/**
  * L'émulateur qui convient à une console, quand son nom se lit dans le dossier.
  *
  * Le classement par nombre de fichiers ouverts ne suffit pas à départager des
