@@ -296,6 +296,76 @@ export function collapseDiscs(games: readonly RomEntry[]): RomEntry[] {
     );
 }
 
+/**
+ * Ce qui trahit un dossier de jeu déballé plutôt qu'un dossier de jeux.
+ *
+ * Un jeu PS Vita ou PSP sorti de son paquet donne une vingtaine de fichiers —
+ * `eboot.bin`, `param.sfo`, des bibliothèques `.suprx`, des icônes, des bases
+ * de données. Ce ne sont pas vingt jeux, c'est un seul, et dix-neuf de ces
+ * fichiers ne se lancent pas.
+ *
+ * Les deux ensemble sont une signature sûre : `param.sfo` est le descriptif
+ * qu'une console Sony écrit toujours à côté de l'exécutable. L'un sans
+ * l'autre ne prouve rien, et on ne masque alors rien.
+ */
+const DESCRIPTIF = 'param.sfo';
+const EXECUTABLE = 'eboot.bin';
+
+/** Le dossier système qu'une console Sony pose toujours à côté du jeu. */
+const SCE_SYS = 'sce_sys';
+
+/**
+ * Les racines des jeux déballés trouvées dans la bibliothèque.
+ *
+ * Deux dispositions existent. Une carte PSP pose son descriptif à côté de
+ * l'exécutable ; une Vita le range dans un sous-dossier `sce_sys`, avec les
+ * icônes. On reconnaît les deux, et la racine est dans les deux cas le dossier
+ * qui contient l'exécutable.
+ */
+function racinesDeballees(games: readonly RomEntry[]): Set<string> {
+  const chemin = (rom: RomEntry) => rom.path.replace(/\\/g, '/').toLowerCase();
+
+  const descriptifs = new Set<string>();
+  const executables = new Set<string>();
+
+  for (const rom of games) {
+    const propre = chemin(rom);
+    if (propre.endsWith(`/${EXECUTABLE}`)) {
+      executables.add(propre.slice(0, propre.length - EXECUTABLE.length - 1));
+    }
+    if (!propre.endsWith(`/${DESCRIPTIF}`)) continue;
+
+    const dossier = propre.slice(0, propre.length - DESCRIPTIF.length - 1);
+    descriptifs.add(dossier);
+    // Rangé dans `sce_sys` : c'est le dossier au-dessus qui est la racine.
+    if (dossier.endsWith(`/${SCE_SYS}`)) {
+      descriptifs.add(dossier.slice(0, dossier.length - SCE_SYS.length - 1));
+    }
+  }
+
+  return new Set([...descriptifs].filter((dossier) => executables.has(dossier)));
+}
+
+/**
+ * Ne garde qu'une entrée par dossier de jeu déballé.
+ *
+ * C'est l'exécutable qu'on garde : c'est le seul fichier du lot qui désigne le
+ * jeu. Tout ce qui se trouve sous la racine est masqué — les sous-dossiers
+ * compris, car les bibliothèques et les icônes y sont rangées — mais seulement
+ * sous une racine qui porte la signature complète. Un dossier de jeux
+ * ordinaire ne perd donc rien.
+ */
+export function collapseExtracted(games: readonly RomEntry[]): RomEntry[] {
+  const racines = racinesDeballees(games);
+  if (racines.size === 0) return [...games];
+
+  return games.filter((rom) => {
+    const propre = rom.path.replace(/\\/g, '/').toLowerCase();
+    const racine = [...racines].find((base) => propre.startsWith(`${base}/`));
+    return racine === undefined || propre === `${racine}/${EXECUTABLE}`;
+  });
+}
+
 /** La clé sous laquelle un volet de favoris se reconnaît. */
 export const FAVORIS = 'favoris';
 
@@ -366,7 +436,7 @@ export function groupLibrary(
   needle: string,
   collapse = true,
 ): Shelf[] {
-  const playable: Playable[] = (collapse ? collapseDiscs(games) : games)
+  const playable: Playable[] = (collapse ? collapseExtracted(collapseDiscs(games)) : games)
     .map((rom) => ({ rom, cores: coresFor(rom, catalog) }))
     .filter(({ cores }) => cores.length > 0)
     .filter(({ rom }) => !needle || rom.name.toLowerCase().includes(needle));

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import type { RomEntry } from '../libretro/client.ts';
 import type { CatalogEntry } from './catalog.ts';
 import { JOYPAD } from './input.ts';
-import { FAVORIS, collapseDiscs, coresFor, folderLabel, gameLabel, groupLibrary, hintedCore, withFavourites } from './library.ts';
+import { FAVORIS, collapseDiscs, collapseExtracted, coresFor, folderLabel, gameLabel, groupLibrary, hintedCore, withFavourites } from './library.ts';
 import type { Shelf } from './library.ts';
 
 /** Fabrique un cœur du catalogue. */
@@ -757,5 +757,79 @@ describe('volet de favoris', () => {
     // Un disque débranché, un fichier renommé : le volet ne doit pas afficher
     // une ligne qui ne mène nulle part.
     assert.equal(withFavourites(volets(), ['D:/roms/Nes/Efface.nes']).length, 2);
+  });
+});
+
+describe('dossier de jeu déballé', () => {
+  /** Un fichier, désigné par son chemin complet sous la bibliothèque. */
+  const f = (chemin: string): RomEntry => {
+    const nom = chemin.slice(chemin.lastIndexOf('/') + 1);
+    return {
+      name: nom,
+      path: `D:/roms/${chemin}`,
+      extension: nom.slice(nom.lastIndexOf('.') + 1).toLowerCase(),
+      size: 1,
+      folder: chemin.split('/')[0],
+    };
+  };
+  const noms = (roms: readonly RomEntry[]) => roms.map((r) => r.name).sort();
+
+  /** L'arborescence exacte d'un jeu Vita de la bibliothèque. */
+  const vita = [
+    f('PS Vita/PCSG00406/eboot.bin'),
+    f('PS Vita/PCSG00406/chd.bin'),
+    f('PS Vita/PCSG00406/chr.bin'),
+    f('PS Vita/PCSG00406/vtsnd.bin'),
+    f('PS Vita/PCSG00406/sce_sys/param.sfo'),
+    f('PS Vita/PCSG00406/sce_sys/icon0.png'),
+    f('PS Vita/PCSG00406/sce_module/libc.suprx'),
+    f('PS Vita/PCSG00406/sce_pfs/files.db'),
+  ];
+
+  it('ne garde que l’exécutable d’un jeu Vita sorti de son paquet', () => {
+    // Le descriptif est rangé dans « sce_sys », pas à côté de l'exécutable :
+    // c'est ce qui avait fait rater la règle au premier essai.
+    assert.deepEqual(noms(collapseExtracted(vita)), ['eboot.bin']);
+  });
+
+  it('masque aussi ce qui est dans les sous-dossiers', () => {
+    const reste = collapseExtracted(vita);
+    assert.ok(!reste.some((r) => r.name === 'libc.suprx'));
+    assert.ok(!reste.some((r) => r.name === 'files.db'));
+  });
+
+  it('reconnaît aussi un descriptif posé à côté de l’exécutable', () => {
+    // La disposition d'une carte PSP.
+    const psp = [f('PSP/JEU/eboot.bin'), f('PSP/JEU/param.sfo'), f('PSP/JEU/data.bin')];
+    assert.deepEqual(noms(collapseExtracted(psp)), ['eboot.bin']);
+  });
+
+  it('ne touche à rien sans le descriptif', () => {
+    // Un « eboot.bin » seul ne prouve pas qu'on est dans un jeu déballé.
+    const roms = [f('PSP/eboot.bin'), f('PSP/Jeu.iso')];
+    assert.equal(collapseExtracted(roms).length, 2);
+  });
+
+  it('ne touche à rien sans l’exécutable', () => {
+    const roms = [f('PS Vita/JEU/sce_sys/param.sfo'), f('PS Vita/JEU/chd.bin')];
+    assert.equal(collapseExtracted(roms).length, 2);
+  });
+
+  it('laisse les autres dossiers intacts', () => {
+    const roms = [...vita, f('Nes/Zelda.nes'), f('Nes/Mario.nes')];
+    assert.deepEqual(noms(collapseExtracted(roms)), ['Mario.nes', 'Zelda.nes', 'eboot.bin']);
+  });
+
+  it('traite chaque jeu déballé séparément', () => {
+    const roms = [
+      f('Vita/JeuA/eboot.bin'), f('Vita/JeuA/sce_sys/param.sfo'), f('Vita/JeuA/dat.bin'),
+      f('Vita/JeuB/eboot.bin'), f('Vita/JeuB/sce_sys/param.sfo'), f('Vita/JeuB/dat.bin'),
+    ];
+    assert.equal(collapseExtracted(roms).length, 2);
+  });
+
+  it('ne bronche pas sur une bibliothèque sans le moindre déballage', () => {
+    assert.equal(collapseExtracted([f('Nes/Zelda.nes')]).length, 1);
+    assert.equal(collapseExtracted([]).length, 0);
   });
 });

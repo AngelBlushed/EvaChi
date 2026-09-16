@@ -66,6 +66,7 @@ import type { Shot, StateSlot } from '../libretro/client.ts';
 import {
   FAVORIS,
   collapseDiscs,
+  collapseExtracted,
   coresFor,
   effectiveCore,
   gameLabel,
@@ -2874,7 +2875,7 @@ function renderGames(): void {
   // Compté sur ce qui est réellement montré : replier les disques change le
   // nombre de jeux, et un compteur qui ne bouge pas donne l'impression que le
   // réglage n'a rien fait.
-  const montres = disquesReplies() ? collapseDiscs(games) : games;
+  const montres = disquesReplies() ? collapseExtracted(collapseDiscs(games)) : games;
   const known = montres.filter((rom) => coresFor(rom, catalog).length > 0).length;
   countsOut.textContent = `${plural(known, 'jeu', 'jeux')} · ${plural(catalog.length, 'cœur')}`;
 
