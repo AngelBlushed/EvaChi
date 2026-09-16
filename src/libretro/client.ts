@@ -237,6 +237,42 @@ export interface CoverIndex {
   readonly names: string[];
 }
 
+/** Un emplacement de sauvegarde d'état. */
+export interface StateSlot {
+  readonly slot: number;
+  readonly filled: boolean;
+  /** Secondes depuis 1970. */
+  readonly taken: number;
+  readonly size: number;
+  /** L'image de l'écran au moment de la sauvegarde. */
+  readonly shot: string;
+}
+
+/** Range un état, avec l'image de l'écran. */
+export async function saveStateSlot(
+  romPath: string,
+  slot: number,
+  state: string,
+  shot: string,
+): Promise<void> {
+  return invoke<void>('save_state_slot', { romPath, slot, state, shot });
+}
+
+/** Relit un état rangé, en base64. */
+export async function loadStateSlot(romPath: string, slot: number): Promise<string> {
+  return invoke<string>('load_state_slot', { romPath, slot });
+}
+
+/** L'état des quatre emplacements d'un jeu. */
+export async function listStates(romPath: string): Promise<StateSlot[]> {
+  return invoke<StateSlot[]>('list_states', { romPath });
+}
+
+/** Vide un emplacement. */
+export async function deleteStateSlot(romPath: string, slot: number): Promise<void> {
+  return invoke<void>('delete_state_slot', { romPath, slot });
+}
+
 /** Une capture d'écran conservée. */
 export interface Shot {
   readonly file: string;

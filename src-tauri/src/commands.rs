@@ -765,6 +765,74 @@ pub struct CoverIndex {
     pub names: Vec<String>,
 }
 
+/// La base des données de l'application, où vivent captures et sauvegardes.
+fn racine(paths: &Paths) -> std::path::PathBuf {
+    paths
+        .covers
+        .parent()
+        .map_or_else(|| paths.covers.clone(), std::path::Path::to_path_buf)
+}
+
+/// Range un état de jeu dans un emplacement, avec l'image de l'écran.
+#[tauri::command]
+pub async fn save_state_slot(
+    rom_path: String,
+    slot: u8,
+    state: String,
+    shot: String,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    let base = racine(&paths);
+    let instant = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or_default();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::states::poser(&base, &rom_path, slot, &state, &shot, instant)
+    })
+    .await
+    .map_err(|error| format!("sauvegarde interrompue : {error}"))?
+}
+
+/// Relit un état rangé.
+#[tauri::command]
+pub async fn load_state_slot(
+    rom_path: String,
+    slot: u8,
+    paths: State<'_, Paths>,
+) -> Result<String, String> {
+    let base = racine(&paths);
+    tauri::async_runtime::spawn_blocking(move || crate::states::lire(&base, &rom_path, slot))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))?
+}
+
+/// L'état de tous les emplacements d'un jeu.
+#[tauri::command]
+pub async fn list_states(
+    rom_path: String,
+    paths: State<'_, Paths>,
+) -> Result<Vec<crate::states::Emplacement>, String> {
+    let base = racine(&paths);
+    tauri::async_runtime::spawn_blocking(move || crate::states::lister(&base, &rom_path))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
+}
+
+/// Vide un emplacement.
+#[tauri::command]
+pub async fn delete_state_slot(
+    rom_path: String,
+    slot: u8,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    let base = racine(&paths);
+    tauri::async_runtime::spawn_blocking(move || crate::states::effacer(&base, &rom_path, slot))
+        .await
+        .map_err(|error| format!("effacement interrompu : {error}"))?
+}
+
 /// Écrit une capture d'écran et rend son nom de fichier.
 #[tauri::command]
 pub async fn save_shot(
@@ -772,10 +840,7 @@ pub async fn save_shot(
     data: String,
     paths: State<'_, Paths>,
 ) -> Result<String, String> {
-    let base = paths.covers.parent().map_or_else(
-        || paths.covers.clone(),
-        std::path::Path::to_path_buf,
-    );
+    let base = racine(&paths);
     let instant = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -789,10 +854,7 @@ pub async fn save_shot(
 /// Toutes les captures, la plus récente d'abord.
 #[tauri::command]
 pub async fn list_shots(paths: State<'_, Paths>) -> Result<Vec<crate::shots::Shot>, String> {
-    let base = paths.covers.parent().map_or_else(
-        || paths.covers.clone(),
-        std::path::Path::to_path_buf,
-    );
+    let base = racine(&paths);
     tauri::async_runtime::spawn_blocking(move || crate::shots::toutes(&base))
         .await
         .map_err(|error| format!("lecture interrompue : {error}"))
@@ -801,10 +863,7 @@ pub async fn list_shots(paths: State<'_, Paths>) -> Result<Vec<crate::shots::Sho
 /// Efface une capture.
 #[tauri::command]
 pub async fn delete_shot(file: String, paths: State<'_, Paths>) -> Result<(), String> {
-    let base = paths.covers.parent().map_or_else(
-        || paths.covers.clone(),
-        std::path::Path::to_path_buf,
-    );
+    let base = racine(&paths);
     tauri::async_runtime::spawn_blocking(move || crate::shots::effacer(&base, &file))
         .await
         .map_err(|error| format!("effacement interrompu : {error}"))?
@@ -813,10 +872,7 @@ pub async fn delete_shot(file: String, paths: State<'_, Paths>) -> Result<(), St
 /// Ouvre le dossier des captures dans l'explorateur.
 #[tauri::command]
 pub fn reveal_shots_dir(paths: State<'_, Paths>) -> Result<String, String> {
-    let base = paths.covers.parent().map_or_else(
-        || paths.covers.clone(),
-        std::path::Path::to_path_buf,
-    );
+    let base = racine(&paths);
     let dossier = crate::shots::dossier(&base);
     std::fs::create_dir_all(&dossier).map_err(|error| format!("dossier : {error}"))?;
 

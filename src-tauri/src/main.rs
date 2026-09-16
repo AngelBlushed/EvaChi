@@ -14,6 +14,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod adopt;
+mod b64;
 mod bios;
 mod commands;
 mod covers;
@@ -23,6 +24,7 @@ mod manual;
 mod pads;
 mod shots;
 mod skeleton;
+mod states;
 
 use evachi::libretro::Session;
 use tauri::Manager;
@@ -153,6 +155,10 @@ fn main() {
             commands::installable_emulators,
             commands::install_emulator,
             commands::cover_index,
+            commands::save_state_slot,
+            commands::load_state_slot,
+            commands::list_states,
+            commands::delete_state_slot,
             commands::save_shot,
             commands::list_shots,
             commands::delete_shot,

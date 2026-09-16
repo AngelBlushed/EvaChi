@@ -83,6 +83,23 @@ fn empreinte(texte: &str) -> u64 {
     valeur
 }
 
+/// Un nom de dossier sûr et stable, tiré du chemin du jeu.
+///
+/// Partagé avec les sauvegardes d'état : les deux ont besoin de désigner un
+/// jeu par un nom de fichier, et deux règles différentes finiraient par ne
+/// plus désigner le même.
+pub fn nom_de_dossier(rom_path: &str) -> String {
+    let queue: String = rom_path
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(40)
+        .collect();
+    format!("{queue}-{:016x}", empreinte(rom_path))
+}
+
 /// Le type de contenu d'une image, d'après son extension.
 fn type_mime(extension: &str) -> &'static str {
     match extension {
@@ -91,34 +108,6 @@ fn type_mime(extension: &str) -> &'static str {
         "gif" => "image/gif",
         _ => "image/png",
     }
-}
-
-/// Encode des octets en base64, sans dépendance.
-pub fn encode_base64(octets: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] =
-        b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut sortie = String::with_capacity(octets.len().div_ceil(3) * 4);
-
-    for morceau in octets.chunks(3) {
-        let a = morceau[0] as u32;
-        let b = *morceau.get(1).unwrap_or(&0) as u32;
-        let c = *morceau.get(2).unwrap_or(&0) as u32;
-        let trois = (a << 16) | (b << 8) | c;
-
-        sortie.push(ALPHABET[(trois >> 18) as usize & 63] as char);
-        sortie.push(ALPHABET[(trois >> 12) as usize & 63] as char);
-        sortie.push(if morceau.len() > 1 {
-            ALPHABET[(trois >> 6) as usize & 63] as char
-        } else {
-            '='
-        });
-        sortie.push(if morceau.len() > 2 {
-            ALPHABET[trois as usize & 63] as char
-        } else {
-            '='
-        });
-    }
-    sortie
 }
 
 /// Lit une image du dossier et la rend sous forme d'adresse `data:`.
@@ -140,7 +129,7 @@ fn en_adresse(chemin: &Path) -> Option<String> {
     Some(format!(
         "data:{};base64,{}",
         type_mime(&extension),
-        encode_base64(&octets)
+        crate::b64::encode(&octets)
     ))
 }
 
@@ -219,16 +208,6 @@ mod tests {
         0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49,
         0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
     ];
-
-    #[test]
-    fn encode_comme_la_norme() {
-        // Les exemples de la RFC 4648, y compris le remplissage.
-        assert_eq!(encode_base64(b"f"), "Zg==");
-        assert_eq!(encode_base64(b"fo"), "Zm8=");
-        assert_eq!(encode_base64(b"foo"), "Zm9v");
-        assert_eq!(encode_base64(b"foobar"), "Zm9vYmFy");
-        assert_eq!(encode_base64(b""), "");
-    }
 
     #[test]
     fn deux_jeux_de_meme_nom_ne_se_marchent_pas_dessus() {

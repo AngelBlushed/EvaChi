@@ -78,55 +78,9 @@ pub fn dossier(base: &Path) -> PathBuf {
 /// La fenêtre nous envoie l'image sous cette forme : c'est ce que rend le
 /// canevas, et la convertir en tableau d'octets avant l'envoi coûterait un
 /// aller-retour de plus pour rien.
-pub fn depuis_data(adresse: &str) -> Result<Vec<u8>, String> {
-    let (entete, charge) = adresse
-        .split_once(',')
-        .ok_or_else(|| "image sans en-tête".to_string())?;
-    if !entete.contains("base64") {
-        return Err("image non encodée en base64".into());
-    }
-    decode_base64(charge)
-}
-
-/// Décode du base64, sans dépendance.
-fn decode_base64(texte: &str) -> Result<Vec<u8>, String> {
-    let valeur = |c: u8| -> Option<u32> {
-        Some(match c {
-            b'A'..=b'Z' => u32::from(c - b'A'),
-            b'a'..=b'z' => u32::from(c - b'a') + 26,
-            b'0'..=b'9' => u32::from(c - b'0') + 52,
-            b'+' => 62,
-            b'/' => 63,
-            _ => return None,
-        })
-    };
-
-    let utiles: Vec<u8> = texte
-        .bytes()
-        .filter(|c| !c.is_ascii_whitespace() && *c != b'=')
-        .collect();
-
-    let mut sortie = Vec::with_capacity(utiles.len() / 4 * 3);
-    for morceau in utiles.chunks(4) {
-        let mut assemble = 0u32;
-        for (rang, c) in morceau.iter().enumerate() {
-            let v = valeur(*c).ok_or_else(|| format!("caractère inattendu : {}", *c as char))?;
-            assemble |= v << (18 - 6 * rang);
-        }
-        // Un morceau de n caractères porte n-1 octets utiles.
-        for rang in 0..morceau.len().saturating_sub(1) {
-            sortie.push(((assemble >> (16 - 8 * rang)) & 0xFF) as u8);
-        }
-        if sortie.len() > MAX_SHOT {
-            return Err("capture trop lourde".into());
-        }
-    }
-    Ok(sortie)
-}
-
 /// Écrit une capture et rend son nom de fichier.
 pub fn poser(base: &Path, jeu: &str, adresse: &str, instant: u64) -> Result<String, String> {
-    let octets = depuis_data(adresse)?;
+    let octets = crate::b64::depuis_data(adresse, MAX_SHOT)?;
     if octets.is_empty() {
         return Err("capture vide".into());
     }
@@ -178,7 +132,7 @@ pub fn toutes(base: &Path) -> Vec<Shot> {
                 file: fichier,
                 game: jeu,
                 taken: instant,
-                data: format!("data:image/png;base64,{}", crate::manual::encode_base64(&octets)),
+                data: format!("data:image/png;base64,{}", crate::b64::encode(&octets)),
             })
         })
         .collect()
@@ -218,20 +172,6 @@ mod tests {
         let (jeu, instant) = depuis_nom(&nom);
         assert_eq!(jeu, "Sonic USA");
         assert_eq!(instant, 1_700_000_000);
-    }
-
-    #[test]
-    fn decode_ce_que_le_canevas_envoie() {
-        // Les exemples de la RFC 4648, dans l'autre sens.
-        assert_eq!(decode_base64("Zm9vYmFy").unwrap(), b"foobar");
-        assert_eq!(decode_base64("Zg==").unwrap(), b"f");
-        assert_eq!(decode_base64("Zm8=").unwrap(), b"fo");
-    }
-
-    #[test]
-    fn refuse_une_adresse_qui_n_en_est_pas_une() {
-        assert!(depuis_data("pas une adresse").is_err());
-        assert!(depuis_data("data:image/png,brut").is_err());
     }
 
     #[test]

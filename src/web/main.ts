@@ -26,10 +26,13 @@ import {
   clearManualCover,
   coverIndex,
   deleteShot,
+  deleteStateSlot,
   directories,
   libraryFolders,
   listRoms,
   listShots,
+  listStates,
+  loadStateSlot,
   manualCovers,
   pickContent,
   pickFolder,
@@ -37,6 +40,7 @@ import {
   removeLibraryFolder,
   revealShotsDir,
   saveShot,
+  saveStateSlot,
   setManualCover,
   note,
   takeMessages,
@@ -58,7 +62,7 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import type { Shot } from '../libretro/client.ts';
+import type { Shot, StateSlot } from '../libretro/client.ts';
 import {
   FAVORIS,
   collapseDiscs,
@@ -157,6 +161,7 @@ const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
 const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
+const emplacementsBoite = $<HTMLDivElement>('emplacements');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const disquesCase = $<HTMLInputElement>('disques');
 const musiqueCase = $<HTMLInputElement>('musique');
@@ -188,6 +193,7 @@ const dialogs = {
   themes: $<HTMLDialogElement>('theme-dialog'),
   graphics: $<HTMLDialogElement>('graphics-dialog'),
   gallery: $<HTMLDialogElement>('gallery-dialog'),
+  states: $<HTMLDialogElement>('states-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -211,6 +217,7 @@ const RETENU = {
   echelle: 'evachi.echelle',
   lissage: 'evachi.lissage',
   etats: 'evachi.etats',
+  emplacement: 'evachi.emplacement',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -615,6 +622,146 @@ async function effacerCapture(fichier: string): Promise<void> {
   }
 }
 
+// --- Emplacements de sauvegarde ---------------------------------------------
+
+/**
+ * L'emplacement que visent les raccourcis.
+ *
+ * Retenu d'un lancement à l'autre : on se fait une habitude d'un emplacement,
+ * et repartir du premier à chaque ouverture obligerait à y penser.
+ */
+let emplacementVise = Number(retenu(RETENU.emplacement) ?? '0') || 0;
+
+/** Le jeu en cours, par son chemin — c'est lui qui nomme le dossier d'états. */
+let cheminEnCours = '';
+
+/**
+ * Range l'état du cœur dans un emplacement.
+ *
+ * L'image de l'écran est prise au même instant : devant quatre emplacements
+ * datés, c'est la vignette qui dit lequel est le bon, pas l'heure.
+ */
+async function sauverEmplacement(slot: number): Promise<void> {
+  if (!core || !cheminEnCours) return;
+  try {
+    const etat = await core.saveState();
+    const vignette = canvas.width > 0 ? canvas.toDataURL('image/png') : '';
+    await saveStateSlot(cheminEnCours, slot, encodeBase64(etat), vignette);
+    savedState = etat;
+    refreshMenus();
+    log(`emplacement ${slot + 1} — ${humanSize(etat.length)}`, 'ok');
+  } catch (error) {
+    log(`sauvegarde impossible — ${reason(error)}`, 'err');
+  }
+}
+
+/** Reprend l'état rangé dans un emplacement. */
+async function chargerEmplacement(slot: number): Promise<void> {
+  if (!core || !cheminEnCours) return;
+  try {
+    const texte = await loadStateSlot(cheminEnCours, slot);
+    await core.loadState(decodeBase64(texte));
+    log(`emplacement ${slot + 1} — repris`, 'ok');
+  } catch (error) {
+    log(`reprise impossible — ${reason(error)}`, 'err');
+  }
+}
+
+/**
+ * Encode et décode les octets d'un état.
+ *
+ * Le pont vers la coque native ne transporte que du texte ; un tableau de
+ * plusieurs mégaoctets converti en JSON coûterait dix fois plus cher que ces
+ * deux fonctions réunies.
+ */
+function encodeBase64(octets: Uint8Array): string {
+  let texte = '';
+  // Par tranches : passer un million d'octets d'un coup à `fromCharCode`
+  // dépasse la taille d'appel que le moteur accepte.
+  for (let debut = 0; debut < octets.length; debut += 0x8000) {
+    texte += String.fromCharCode(...octets.subarray(debut, debut + 0x8000));
+  }
+  return btoa(texte);
+}
+
+function decodeBase64(texte: string): Uint8Array {
+  const brut = atob(texte);
+  const octets = new Uint8Array(brut.length);
+  for (let rang = 0; rang < brut.length; rang += 1) octets[rang] = brut.charCodeAt(rang);
+  return octets;
+}
+
+/** Dessine les quatre emplacements du jeu en cours. */
+async function renderEmplacements(): Promise<void> {
+  emplacementsBoite.replaceChildren();
+  if (!cheminEnCours) return;
+
+  let liste: StateSlot[] = [];
+  try {
+    liste = await listStates(cheminEnCours);
+  } catch (error) {
+    log(`emplacements — ${reason(error)}`, 'err');
+    return;
+  }
+
+  for (const place of liste) {
+    const carte = document.createElement('button');
+    carte.type = 'button';
+    carte.className = 'emplacement';
+    carte.setAttribute('aria-current', String(place.slot === emplacementVise));
+    carte.title = place.filled
+      ? 'Reprendre cette sauvegarde — clic droit pour la vider'
+      : 'Sauvegarder ici';
+
+    const apercu = document.createElement('span');
+    apercu.className = 'apercu';
+    if (place.shot) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.src = place.shot;
+      apercu.append(image);
+    } else {
+      const rien = document.createElement('span');
+      rien.className = 'rien';
+      rien.textContent = place.filled ? 'sans image' : 'vide';
+      apercu.append(rien);
+    }
+
+    const titre = document.createElement('span');
+    titre.className = 'titre';
+    titre.textContent = `Emplacement ${place.slot + 1}`;
+
+    const quand = document.createElement('span');
+    quand.className = 'quand';
+    quand.textContent = place.filled
+      ? `${new Date(place.taken * 1000).toLocaleString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        })} · ${humanSize(place.size)}`
+      : '—';
+
+    carte.append(apercu, titre, quand);
+    // Un emplacement occupé se reprend, un emplacement vide se remplit : c'est
+    // ce qu'on veut faire neuf fois sur dix, et l'autre geste reste à portée.
+    carte.addEventListener('click', async () => {
+      emplacementVise = place.slot;
+      retenir(RETENU.emplacement, String(place.slot));
+      if (place.filled) await chargerEmplacement(place.slot);
+      else await sauverEmplacement(place.slot);
+      await renderEmplacements();
+    });
+    carte.addEventListener('contextmenu', async (event) => {
+      event.preventDefault();
+      if (!place.filled) return;
+      await deleteStateSlot(cheminEnCours, place.slot);
+      await renderEmplacements();
+    });
+    emplacementsBoite.append(carte);
+  }
+}
+
 // --- Sauvegarde rapide ------------------------------------------------------
 
 /**
@@ -953,7 +1100,8 @@ function refreshMenus(): void {
     toggle: playing,
     reset: playing,
     save: playing,
-    restore: playing && savedState !== null,
+    restore: playing,
+    states: playing,
     shot: playing,
     stop: playing,
   };
@@ -1209,6 +1357,11 @@ async function selectCore(next: CatalogEntry): Promise<boolean> {
 /** Charge un contenu dans le cœur actif et passe en lecture. */
 async function loadContent(name: string, bytes: Uint8Array, path?: string): Promise<void> {
   if (!core) return;
+
+  // C'est le chemin du jeu qui nomme son dossier de sauvegardes : retenu ici,
+  // là où on le connaît, plutôt que cherché plus tard dans la bibliothèque —
+  // qui peut avoir changé entre-temps.
+  cheminEnCours = path ?? '';
 
   loopToken += 1;
   running = false;
@@ -3334,24 +3487,11 @@ const actions: Record<string, () => void | Promise<void>> = {
       log(`réinitialisation impossible — ${reason(error)}`, 'err');
     }
   },
-  save: async () => {
-    if (!core) return;
-    try {
-      savedState = await core.saveState();
-      refreshMenus();
-      log(`état sauvegardé — ${savedState.length} octets`, 'ok');
-    } catch (error) {
-      log(`sauvegarde impossible — ${reason(error)}`, 'err');
-    }
-  },
-  restore: async () => {
-    if (!core || !savedState) return;
-    try {
-      await core.loadState(savedState);
-      log('état restauré', 'ok');
-    } catch (error) {
-      log(`restauration impossible — ${reason(error)}`, 'err');
-    }
+  save: () => sauverEmplacement(emplacementVise),
+  restore: () => chargerEmplacement(emplacementVise),
+  states: async () => {
+    await renderEmplacements();
+    openDialog(dialogs.states);
   },
   stop: stopPlaying,
 
