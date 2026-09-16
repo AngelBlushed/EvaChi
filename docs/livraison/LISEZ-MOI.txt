@@ -23,6 +23,22 @@ Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
 sert pas peuvent être supprimés.
 
 
+La langue
+---------
+
+EvaChi parle cinquante langues. Au premier lancement, elle prend celle de
+Windows si elle la connaît, et le français sinon. Pour en changer :
+
+  Menu « Affichage » → « Thèmes… » → section « Langue »
+
+Chaque langue y est écrite dans son propre alphabet : on reconnaît la sienne
+sans savoir lire les autres. Le choix est retenu d'un lancement à l'autre.
+
+  To change the language: third menu from the left -> the entry with three
+  dots -> the second list in the window. Every language is written in its own
+  script, so look for yours.
+
+
 Les BIOS, les clés, les micrologiciels
 --------------------------------------
 

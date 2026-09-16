@@ -10,7 +10,6 @@ import { describe, it } from 'node:test';
 
 import {
   parseOverrides,
-  padButtonName,
   padButtonShort,
   resolveBindings,
   withBinding,
@@ -89,14 +88,16 @@ describe('relecture de ce qui a été enregistré', () => {
 });
 
 describe('noms des boutons', () => {
-  it('nomme ceux de la disposition standard', () => {
-    assert.equal(padButtonName(0), 'bouton du bas');
-    assert.equal(padButtonName(9), 'départ');
-    assert.equal(padButtonName(14), 'croix gauche');
+  it('nomme ceux de la disposition standard comme la sérigraphie', () => {
+    // Ce sont les noms gravés sur la manette, les mêmes dans toutes les
+    // langues : c'est ce que le joueur a sous les doigts.
+    assert.equal(padButtonShort(0), 'A');
+    assert.equal(padButtonShort(9), 'Start');
+    assert.equal(padButtonShort(14), '←');
   });
 
   it('se rabat sur le numéro pour un bouton inconnu', () => {
-    assert.equal(padButtonName(23), 'bouton 23');
+    assert.equal(padButtonShort(23), 'b23');
   });
 
   it('donne des étiquettes courtes qui tiennent dans une case', () => {

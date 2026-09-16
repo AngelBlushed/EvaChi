@@ -13,6 +13,16 @@ import { COMBIEN, forget, formatPlaytime, formatWhen, parse, remember } from './
 
 const jeu = (nom: string) => ({ path: `D:/roms/${nom}.md`, name: `${nom}.md`, folder: 'Md' });
 
+/**
+ * Les espaces insécables ramenées à des espaces ordinaires.
+ *
+ * `Intl` écrit « 30 min » avec une insécable entre le nombre et l'unité —
+ * c'est la bonne typographie, et c'est invisible dans un fichier d'épreuves,
+ * où la comparaison échouait sur deux textes rigoureusement identiques à
+ * l'œil.
+ */
+const lisible = (texte: string) => texte.replace(/[\u00a0\u202f]/g, ' ');
+
 describe('mémoire des parties', () => {
   it('met le dernier joué en tête', () => {
     let liste = remember([], jeu('Sonic'), 100);
@@ -94,15 +104,20 @@ describe('temps de jeu écrit', () => {
   });
 
   it('passe aux minutes puis aux heures', () => {
-    assert.equal(formatPlaytime(60), '1 min');
-    assert.equal(formatPlaytime(1800), '30 min');
-    assert.equal(formatPlaytime(3600), '1 h');
-    assert.equal(formatPlaytime(3600 * 3 + 720), '3 h 12');
+    assert.equal(lisible(formatPlaytime(60)), '1 min');
+    assert.equal(lisible(formatPlaytime(1800)), '30 min');
+    assert.equal(lisible(formatPlaytime(3600)), '1 h');
+    assert.equal(lisible(formatPlaytime(3600 * 3 + 720)), '3 h 12');
   });
 
   it('survit à une valeur impossible', () => {
     assert.equal(formatPlaytime(Number.NaN), 'moins d’une minute');
     assert.equal(formatPlaytime(-1), 'moins d’une minute');
+  });
+
+  it('écrit ses unités dans la langue demandée', () => {
+    assert.equal(lisible(formatPlaytime(1800, 'de')), '30 Min.');
+    assert.equal(formatPlaytime(0, 'en', 'less than a minute'), 'less than a minute');
   });
 });
 
@@ -110,15 +125,23 @@ describe('date écrite', () => {
   const MAINTENANT = 1_700_000_000;
 
   it('dit l’écart, pas le jour du calendrier', () => {
-    assert.equal(formatWhen(MAINTENANT, MAINTENANT), 'à l’instant');
-    assert.equal(formatWhen(MAINTENANT - 600, MAINTENANT), 'il y a 10 min');
-    assert.equal(formatWhen(MAINTENANT - 7200, MAINTENANT), 'il y a 2 h');
-    assert.equal(formatWhen(MAINTENANT - 86_400, MAINTENANT), 'hier');
-    assert.equal(formatWhen(MAINTENANT - 86_400 * 3, MAINTENANT), 'il y a 3 jours');
+    assert.equal(lisible(formatWhen(MAINTENANT, MAINTENANT)), 'maintenant');
+    assert.equal(lisible(formatWhen(MAINTENANT - 600, MAINTENANT)), 'il y a 10 min');
+    assert.equal(lisible(formatWhen(MAINTENANT - 7200, MAINTENANT)), 'il y a 2 h');
+    assert.equal(lisible(formatWhen(MAINTENANT - 86_400, MAINTENANT)), 'hier');
+    assert.equal(lisible(formatWhen(MAINTENANT - 86_400 * 3, MAINTENANT)), 'il y a 3 jours');
   });
 
   it('ne parle jamais du futur', () => {
     // Une horloge qui recule ne doit pas donner « il y a -2 h ».
-    assert.equal(formatWhen(MAINTENANT + 5000, MAINTENANT), 'à l’instant');
+    assert.equal(lisible(formatWhen(MAINTENANT + 5000, MAINTENANT)), 'maintenant');
+  });
+
+  it('suit la langue demandée, tournure comprise', () => {
+    // Le nombre passe devant en français, derrière en japonais : c'est
+    // exactement ce qu'une phrase assemblée à la main ne sait pas faire.
+    assert.equal(lisible(formatWhen(MAINTENANT - 86_400 * 3, MAINTENANT, 'en')), '3 days ago');
+    assert.equal(lisible(formatWhen(MAINTENANT - 86_400, MAINTENANT, 'de')), 'gestern');
+    assert.equal(lisible(formatWhen(MAINTENANT - 86_400 * 3, MAINTENANT, 'ja')), '3 日前');
   });
 });

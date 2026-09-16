@@ -317,6 +317,49 @@ Un test vérifie le contraste de chaque palette — texte sur fond, texte discre
 accent — parce qu'une palette qu'on trouve jolie et qu'on ne peut pas lire est
 une palette ratée.
 
+### Langues
+
+`Affichage → Thèmes…` propose aussi la langue : cinquante, écrites chacune dans
+son propre alphabet. Au premier lancement, celle du système est retenue si elle
+figure dans la liste ; sinon le français, qui est la langue d'origine des
+textes.
+
+Le français sert de clé, à la manière de gettext : le code dit
+`t('Ajouter un dossier…')` et non `t('toolbar.addFolder')`. La page n'a donc pas
+une seule étiquette technique à porter, et une phrase sans traduction s'affiche
+en français plutôt que de montrer un nom de variable.
+
+Les clés sont **relevées** dans le source par `node outils/cles.mjs` — dans la
+page, dans les appels `t()`, `dit()` et `aTraduire()`, et dans les notes de
+micrologiciel tenues par `bios.rs`. Elles ne sont jamais recopiées à la main :
+une apostrophe droite prise pour une courbe suffit à ce qu'une traduction ne se
+trouve plus, et c'est arrivé au premier essai.
+
+Chaque langue est un tableau de phrases dans l'ordre de `CLES` — le rang fait le
+lien, pas le texte. Une épreuve vérifie pour chacune le compte exact, les trous
+`{0}` à remplir, les balises des paragraphes mis en forme, et qu'une forme de
+pluriel existe pour chaque catégorie que la langue emploie réellement : le russe
+en a trois, l'arabe six, le japonais une seule.
+
+Ce qui ne se traduit pas à la main ne passe pas par la table : les dates, les
+heures, les écarts de temps, les tailles de fichier et les unités viennent
+d'`Intl`, qui les connaît déjà dans les cinquante langues — « 5,7 Go », « 5.7 GB »,
+« ГБ », « غ.ب ».
+
+Ajouter une langue tient en deux gestes : une ligne dans `outils/langues.mjs`,
+un fichier de traductions à côté des autres, puis `node outils/langues.mjs`.
+
+Ajouter une **phrase** demande de relancer `node outils/cles.mjs` : la nouvelle
+clé se range à sa place alphabétique, et chaque tableau de langue doit recevoir
+sa ligne au même rang. L'épreuve refuse tout fichier qui n'a plus le bon compte,
+ce qui rend l'oubli impossible à laisser passer.
+
+Un libellé rangé dans une table — un thème, un mode d'affichage — s'affiche
+ailleurs, où `t()` le prend au passage ; l'outil ne verrait alors que
+`t(theme.label)`. C'est à cela que sert `aTraduire()`, qui ne fait rien sinon
+rendre la phrase visible au relevé. C'est le `N_()` de gettext, pour la même
+raison.
+
 ## ROMs
 
 Le dépôt ne contient et ne contiendra **aucune ROM commerciale ni BIOS**. Écrire

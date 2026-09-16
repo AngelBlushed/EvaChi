@@ -8,6 +8,7 @@
 
 import type { RomEntry } from '../libretro/client.ts';
 import type { CatalogEntry } from './catalog.ts';
+import { aTraduire } from './i18n.ts';
 
 /** Un jeu et les cœurs capables de l'ouvrir. */
 export interface Playable {
@@ -401,7 +402,7 @@ export function withFavourites(
   const candidates = [...new Map(games.flatMap((item) => item.cores).map((c) => [c.id, c])).values()];
 
   return [
-    { key: FAVORIS, label: 'Favoris', games, candidates, preferred: undefined },
+    { key: FAVORIS, label: aTraduire('Favoris'), games, candidates, preferred: undefined },
     ...shelves,
   ];
 }

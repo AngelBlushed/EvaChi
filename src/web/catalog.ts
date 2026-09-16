@@ -9,6 +9,7 @@
 
 import type { AsyncEmulatorCore } from '../core/types.ts';
 import { toAsync } from '../core/types.ts';
+import { aTraduire, dit, t } from './i18n.ts';
 import { Chip8 } from '../chip8/chip8.ts';
 import { LibretroCore, externalSystems } from '../libretro/client.ts';
 import type { ButtonLayout } from './input.ts';
@@ -90,7 +91,7 @@ export async function libretroCores(): Promise<CatalogEntry[]> {
   if (!inShell) return [];
 
   const found = await LibretroCore.list();
-  discoveryReport.push(`list_cores → ${found.length} entrée(s)`);
+  discoveryReport.push(dit('list_cores → {0} cœurs annoncés', found.length));
   rejectedCores = found.filter((entry) => !entry.usable).map((entry) => entry.id);
 
   const usable = found
@@ -111,7 +112,10 @@ export async function libretroCores(): Promise<CatalogEntry[]> {
   // passager, pas une désinstallation. On garde ce qu'on savait, et on le dit.
   if (usable.length === 0 && lastLibretro.length > 0) {
     throw new Error(
-      `aucun cœur renvoyé alors que ${lastLibretro.length} étaient connus — liste précédente conservée`,
+      dit(
+        'aucun cœur renvoyé alors que {0} étaient connus — liste précédente conservée',
+        lastLibretro.length,
+      ),
     );
   }
 
@@ -129,7 +133,7 @@ export async function externalEntries(): Promise<CatalogEntry[]> {
   if (!inShell) return [];
 
   const systems = await externalSystems();
-  discoveryReport.push(`external_systems → ${systems.length} déclaré(s)`);
+  discoveryReport.push(dit('external_systems → {0} émulateurs déclarés', systems.length));
   return systems.map((system) => ({
     kind: 'externe' as const,
     id: `externe:${system.name}`,
@@ -138,7 +142,9 @@ export async function externalEntries(): Promise<CatalogEntry[]> {
     layout: JOYPAD,
     needsPath: true,
     async open() {
-      throw new Error(`${system.name} est un émulateur externe : il se lance, il ne s'héberge pas`);
+      throw new Error(
+        dit("{0} est un émulateur externe : il se lance, il ne s'héberge pas", system.name),
+      );
     },
   }));
 }
@@ -167,11 +173,11 @@ export async function discover(makeChip8: () => Chip8): Promise<CatalogEntry[]> 
   const internal = internalCores(makeChip8);
   const rest: CatalogEntry[] = [];
   discoveryErrors = [];
-  discoveryReport = [`coque native : ${inShell ? 'oui' : 'NON'}`];
+  discoveryReport = [dit('coque native : {0}', inShell ? t('oui') : t('NON'))];
 
   const sources: [string, () => Promise<CatalogEntry[]>][] = [
-    ['cœurs libretro', libretroCores],
-    ['émulateurs externes', externalEntries],
+    [aTraduire('cœurs libretro'), libretroCores],
+    [aTraduire('émulateurs externes'), externalEntries],
   ];
 
   for (const [what, source] of sources) {
@@ -181,7 +187,7 @@ export async function discover(makeChip8: () => Chip8): Promise<CatalogEntry[]> 
       // La source a échoué : on dit pourquoi, et on reprend ce qu'on savait
       // d'elle plutôt que de laisser le catalogue se vider.
       discoveryErrors.push(
-        `${what} : ${error instanceof Error ? error.message : String(error)}`,
+        `${t(what)} : ${error instanceof Error ? error.message : String(error)}`,
       );
       if (source === libretroCores) rest.push(...lastLibretro);
     }

@@ -10,6 +10,8 @@
  * qu'on ne peut pas lire est une palette ratée.
  */
 
+import { aTraduire } from './i18n.ts';
+
 /** Les couleurs que toute palette doit donner. */
 export interface Palette {
   /** Fond général de la fenêtre. */
@@ -46,7 +48,7 @@ export interface Theme {
 export const THEMES: readonly Theme[] = [
   {
     id: 'nuit-rose',
-    label: 'Nuit rose',
+    label: aTraduire('Nuit rose'),
     scheme: 'dark',
     palette: {
       bg: '#191317',
@@ -63,7 +65,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'rose-blanc',
-    label: 'Rose et blanc',
+    label: aTraduire('Rose et blanc'),
     scheme: 'light',
     palette: {
       bg: '#fff5f9',
@@ -80,7 +82,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'ardoise',
-    label: 'Ardoise',
+    label: aTraduire('Ardoise'),
     scheme: 'dark',
     palette: {
       bg: '#14171a',
@@ -97,7 +99,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'papier',
-    label: 'Papier',
+    label: aTraduire('Papier'),
     scheme: 'light',
     palette: {
       bg: '#f7f3ea',
@@ -114,7 +116,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'menthe',
-    label: 'Menthe',
+    label: aTraduire('Menthe'),
     scheme: 'dark',
     palette: {
       bg: '#0e1a17',
@@ -131,7 +133,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'ambre',
-    label: 'Ambre',
+    label: aTraduire('Ambre'),
     scheme: 'dark',
     palette: {
       bg: '#1a1410',
@@ -148,7 +150,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'ocean',
-    label: 'Océan',
+    label: aTraduire('Océan'),
     scheme: 'dark',
     palette: {
       bg: '#0c1524',
@@ -165,7 +167,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'lavande',
-    label: 'Lavande',
+    label: aTraduire('Lavande'),
     scheme: 'light',
     palette: {
       bg: '#f6f3fd',
@@ -182,7 +184,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'contraste',
-    label: 'Contraste élevé',
+    label: aTraduire('Contraste élevé'),
     scheme: 'dark',
     palette: {
       bg: '#000000',
@@ -199,7 +201,7 @@ export const THEMES: readonly Theme[] = [
   },
   {
     id: 'game-boy',
-    label: 'Game Boy',
+    label: aTraduire('Game Boy'),
     scheme: 'dark',
     palette: {
       bg: '#0d1f0b',

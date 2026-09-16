@@ -131,26 +131,12 @@ export function padButtonShort(index: number): string {
   return COURTS[index] ?? `b${index}`;
 }
 
-/** Le nom lisible d'un bouton de manette, en disposition standard du W3C. */
-export function padButtonName(index: number): string {
-  const NOMS: Record<number, string> = {
-    0: 'bouton du bas',
-    1: 'bouton de droite',
-    2: 'bouton de gauche',
-    3: 'bouton du haut',
-    4: 'tranche gauche',
-    5: 'tranche droite',
-    6: 'gâchette gauche',
-    7: 'gâchette droite',
-    8: 'sélection',
-    9: 'départ',
-    10: 'manche gauche',
-    11: 'manche droit',
-    12: 'croix haut',
-    13: 'croix bas',
-    14: 'croix gauche',
-    15: 'croix droite',
-    16: 'bouton central',
-  };
-  return NOMS[index] ?? `bouton ${index}`;
-}
+/*
+ * Il existait ici un second jeu de noms, en toutes lettres : « bouton du bas »,
+ * « sélection », « croix gauche ». Il a été retiré en même temps qu'arrivaient
+ * les cinquante langues. Deux raisons, dans cet ordre : sur la manette, c'est
+ * « Start » qui est gravé, pas « départ » — la sérigraphie est le nom que le
+ * joueur a sous les doigts, dans toutes les langues ; et ces dix-sept noms
+ * auraient été dix-sept phrases de plus à traduire pour nommer ce qui est déjà
+ * écrit sur le matériel.
+ */

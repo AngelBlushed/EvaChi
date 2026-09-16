@@ -98,37 +98,64 @@ export function parse(brut: string | null): Recent[] {
 }
 
 /**
+ * Une durée écrite dans la langue demandée.
+ *
+ * `Intl` sait déjà écrire « 30 min », « 30 Min. » et « 30 分 » ; le faire à la
+ * main reviendrait à recopier dans une table ce que le navigateur porte déjà.
+ */
+function duree(valeur: number, unite: 'minute' | 'hour', langue: string): string {
+  return new Intl.NumberFormat(langue, {
+    style: 'unit',
+    unit: unite,
+    unitDisplay: 'short',
+    maximumFractionDigits: 0,
+  }).format(valeur);
+}
+
+/**
  * Le temps de jeu, écrit comme on le dirait.
  *
  * Arrondi franchement : à personne il n'importe d'avoir joué 3 h 12 min 47 s.
  * Les premières secondes sont nommées à part — « moins d'une minute » se lit,
- * « 0 min » ressemble à une panne.
+ * « 0 min » ressemble à une panne. Cette phrase-là est la seule qui passe par
+ * la table de traduction ; les unités viennent d'`Intl`.
  */
-export function formatPlaytime(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 60) return 'moins d’une minute';
+export function formatPlaytime(
+  seconds: number,
+  langue = 'fr',
+  moinsDUneMinute = 'moins d’une minute',
+): string {
+  if (!Number.isFinite(seconds) || seconds < 60) return moinsDUneMinute;
 
   const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 60) return duree(minutes, 'minute', langue);
 
   const heures = Math.floor(minutes / 60);
   const reste = minutes % 60;
-  return reste === 0 ? `${heures} h` : `${heures} h ${String(reste).padStart(2, '0')}`;
+  return reste === 0
+    ? duree(heures, 'hour', langue)
+    : `${duree(heures, 'hour', langue)} ${String(reste).padStart(2, '0')}`;
 }
 
 /**
  * Depuis quand, écrit comme on le dirait.
  *
  * « il y a 3 jours » plutôt qu'une date : sur une liste de jeux récents, c'est
- * l'écart qui renseigne, pas le jour du calendrier.
+ * l'écart qui renseigne, pas le jour du calendrier. `Intl` connaît la tournure
+ * de chaque langue, « hier » et « вчера » compris — et l'ordre des mots, qui
+ * place le nombre avant en français et après en japonais.
+ *
+ * Les minutes et les heures sont dites court, les jours en toutes lettres :
+ * « il y a 3 j » se lit mal, « il y a 10 minutes » prend trop de place.
  */
-export function formatWhen(played: number, now: number): string {
+export function formatWhen(played: number, now: number, langue = 'fr'): string {
   const ecart = Math.max(0, now - played);
-  if (ecart < 90) return 'à l’instant';
-  if (ecart < 3600) return `il y a ${Math.round(ecart / 60)} min`;
-  if (ecart < 86_400) {
-    const heures = Math.round(ecart / 3600);
-    return `il y a ${heures} h`;
-  }
-  const jours = Math.round(ecart / 86_400);
-  return jours === 1 ? 'hier' : `il y a ${jours} jours`;
+  const bref = new Intl.RelativeTimeFormat(langue, { numeric: 'auto', style: 'short' });
+
+  if (ecart < 90) return bref.format(0, 'second');
+  if (ecart < 3600) return bref.format(-Math.round(ecart / 60), 'minute');
+  if (ecart < 86_400) return bref.format(-Math.round(ecart / 3600), 'hour');
+
+  const long = new Intl.RelativeTimeFormat(langue, { numeric: 'auto' });
+  return long.format(-Math.round(ecart / 86_400), 'day');
 }

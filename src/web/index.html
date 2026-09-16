@@ -1038,6 +1038,37 @@
       .menu-choix[aria-pressed="true"] { border-color: var(--accent); }
       .menu-choix span { color: var(--muted); font-size: 11px; line-height: 1.4; }
 
+      /* Cinquante langues ne tiennent pas en pavés : des pastilles serrées
+         dans une boîte qui défile, sinon la fenêtre fait deux écrans de haut.
+         Chaque nom est écrit dans sa propre langue, d'où les alphabets mêlés. */
+      #langue-list {
+        grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+        gap: 6px;
+        max-height: 172px;
+        overflow-y: auto;
+        padding: 2px;
+      }
+      #langue-list .menu-choix {
+        padding: 6px 9px;
+        border-width: 1px;
+        font-size: 12px;
+        line-height: 1.3;
+      }
+      #langue-list .menu-choix strong { font-weight: 500; }
+
+      /* Le menu animé est une géométrie, pas un texte : ses rangées, ses rails
+         et ses translations sont calculés en pixels depuis la gauche. Le
+         retourner avec l'écriture arabe ou hébraïque décalerait tout sans rien
+         gagner. Les libellés, eux, gardent leur sens de lecture propre —
+         `plaintext` le décide d'après la première lettre, ce qui range bien un
+         titre arabe à côté d'un nom de jeu japonais. */
+      #xmb { direction: ltr; }
+      #xmb-console,
+      #xmb-pied,
+      #xmb-colonnes,
+      #xmb-entrees,
+      .xmb-touches { unicode-bidi: plaintext; }
+
       /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
       #bios-adopted:empty { display: none; }
       /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
@@ -1324,7 +1355,7 @@
             <div class="lettre" id="xmb-lettre" hidden></div>
             <div class="xmb-pied">
               <span id="xmb-pied"></span>
-              <span class="xmb-touches">A lancer · X favori · B retour · Start menu</span>
+              <span class="xmb-touches">A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start</span>
             </div>
           </div>
 
@@ -1363,7 +1394,7 @@
     <dialog id="install-dialog">
       <h2>Émulateurs</h2>
       <div class="dialog-body">
-        <p class="hint-text">
+        <p class="hint-text" data-i18n-html>
           Chaque console a besoin de son émulateur. EvaChi va les chercher sur la
           forge officielle du projet libretro,
           <code>buildbot.libretro.com</code>, et les installe dans son propre
@@ -1459,7 +1490,7 @@
             Arguments
             <input type="text" id="ext-args" placeholder="(vide) ou --fullscreen {rom}" />
           </label>
-          <p class="hint-text">
+          <p class="hint-text" data-i18n-html>
             <code>{rom}</code> sera remplacé par le chemin du jeu. Sans lui, le
             chemin est ajouté à la fin — ce qu'attendent la plupart des émulateurs.
           </p>
@@ -1484,6 +1515,9 @@
           lisible : le texte garde partout un contraste suffisant sur son fond.
         </p>
         <div class="themes" id="theme-list"></div>
+
+        <h3 class="section">Langue</h3>
+        <div class="menus" id="langue-list"></div>
 
         <h3 class="section">Présentation</h3>
         <div class="menus" id="menu-list"></div>
@@ -1527,7 +1561,7 @@
         <h3 class="section">Bibliothèque</h3>
         <label class="field bascule">
           <input type="checkbox" id="disques" checked />
-          <span>
+          <span data-i18n-html>
             Un seul fichier par jeu sur disque
             <small>
               Un jeu sur CD arrive en un feuillet <code>.cue</code> et en autant
@@ -1547,7 +1581,7 @@
       <h2>La fois précédente s'est mal terminée</h2>
       <div class="dialog-body">
         <p class="hint-text" id="crash-quoi"></p>
-        <p class="hint-text">
+        <p class="hint-text" data-i18n-html>
           Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe,
           il l'emporte avec lui, sans message. Écarter cet émulateur le laisse
           installé mais cesse de le proposer. Vous pourrez le rétablir à tout
@@ -1564,7 +1598,7 @@
     <dialog id="states-dialog">
       <h2>Emplacements de sauvegarde</h2>
       <div class="dialog-body">
-        <p class="hint-text">
+        <p class="hint-text" data-i18n-html>
           Quatre emplacements par jeu, gardés sur le disque. L'emplacement en
           gras est celui qu'utilisent <strong>F2</strong> et <strong>F4</strong>
           — et <strong>Select + L1</strong> / <strong>Select + R1</strong> à la
@@ -1580,7 +1614,7 @@
     <dialog id="gallery-dialog" class="large">
       <h2>Galerie</h2>
       <div class="dialog-body">
-        <p class="hint-text" id="gallery-vide">
+        <p class="hint-text" id="gallery-vide" data-i18n-html>
           Aucune capture. Pressez <strong>F12</strong> en cours de partie, ou
           <strong>Select + Y</strong> à la manette.
         </p>
@@ -1626,13 +1660,18 @@
           s'allume. Pour en changer une, passez en réassignation, cliquez la
           touche à modifier, puis pressez le bouton voulu.
         </p>
-        <p class="hint-text">
+        <p class="hint-text" data-i18n-html>
           <strong>Hors jeu, tout se fait à la manette :</strong> les directions
           parcourent la bibliothèque, les fenêtres et la barre de menus ;
           <strong>A</strong> valide, <strong>B</strong> revient en arrière,
           <strong>Start</strong> ouvre la barre de menus. En cours de partie,
           <strong>Select et Start ensemble</strong> ramènent à la bibliothèque —
           deux boutons à la fois, car chacun d'eux sert au jeu.
+        </p>
+        <!-- Hors du paragraphe traduit : celui-ci est réécrit d'un bloc au
+             changement de langue, ce qui recréerait ces deux boutons et
+             perdrait les gestes qui leur sont attachés. -->
+        <p class="hint-text">
           <button type="button" id="controls-remap" class="lien">Réassigner…</button>
           <button type="button" id="controls-reset" class="lien">Liaisons d'origine</button>
         </p>

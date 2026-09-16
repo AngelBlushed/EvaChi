@@ -92,7 +92,18 @@ import {
 import type { ButtonLayout } from './input.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
 import {
-  padButtonName,
+  aTraduire,
+  compte,
+  dit,
+  langueDuSysteme,
+  localeCourante,
+  poserLangue,
+  t,
+  traduireDocument,
+} from './i18n.ts';
+import type { Langue } from './i18n.ts';
+import { FRANCAIS, LANGUES } from './langues/index.ts';
+import {
   padButtonShort,
   parseOverrides,
   resolveBindings,
@@ -166,6 +177,7 @@ const biosSummary = $<HTMLElement>('bios-summary');
 const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
+const langueList = $<HTMLDivElement>('langue-list');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
@@ -235,6 +247,7 @@ const RETENU = {
   etats: 'evachi.etats',
   emplacement: 'evachi.emplacement',
   recents: 'evachi.recents',
+  langue: 'evachi.langue',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -274,7 +287,7 @@ function renderThemes(): void {
     vignette.type = 'button';
     vignette.className = 'theme';
     vignette.setAttribute('aria-pressed', String(theme.id === themeActuel.id));
-    vignette.title = theme.scheme === 'light' ? 'thème clair' : 'thème sombre';
+    vignette.title = theme.scheme === 'light' ? t('thème clair') : t('thème sombre');
 
     const apercu = document.createElement('span');
     apercu.className = 'apercu';
@@ -285,7 +298,7 @@ function renderThemes(): void {
 
     const nom = document.createElement('span');
     nom.className = 'nom';
-    nom.textContent = theme.label;
+    nom.textContent = t(theme.label);
 
     const barres = document.createElement('span');
     barres.className = 'barres';
@@ -298,7 +311,7 @@ function renderThemes(): void {
     const coche = document.createElement('span');
     coche.className = 'coche';
     coche.style.color = theme.palette.accent;
-    coche.textContent = theme.id === themeActuel.id ? '● en cours' : '';
+    coche.textContent = theme.id === themeActuel.id ? `● ${t('en cours')}` : '';
 
     apercu.append(nom, barres, coche);
     vignette.append(apercu);
@@ -307,22 +320,110 @@ function renderThemes(): void {
   }
 }
 
+// --- Langue -----------------------------------------------------------------
+
+/**
+ * La langue de l'interface.
+ *
+ * Retenue par son étiquette plutôt que par son rang : ajouter une langue au
+ * milieu de la liste ferait autrement basculer tout le monde dans une autre.
+ */
+function langueRetenue(): Langue {
+  const garde = retenu(RETENU.langue);
+  if (garde) {
+    const connue = LANGUES.find((langue) => langue.code === garde);
+    if (connue) return connue;
+  }
+  // Rien de choisi : on suit ce que le système demande, et on retombe sur le
+  // français, qui est la langue d'origine des textes.
+  return langueDuSysteme(LANGUES, navigator.languages ?? [navigator.language]) ?? FRANCAIS;
+}
+
+/**
+ * Pose une langue et repeint tout ce qui porte du texte.
+ *
+ * Les fenêtres et les menus sont traduits sur place ; le reste est redessiné,
+ * car ses libellés sont écrits par le code et non par la page.
+ */
+function choisirLangue(code: string): void {
+  const langue = LANGUES.find((autre) => autre.code === code) ?? FRANCAIS;
+  poserLangue(langue.code === 'fr' ? null : langue);
+  retenir(RETENU.langue, langue.code);
+
+  document.documentElement.lang = langue.code;
+  // Les écritures de droite à gauche retournent toute la mise en page : sans
+  // cela l'arabe s'afficherait aligné à gauche, avec la ponctuation du mauvais
+  // côté.
+  document.documentElement.dir = langue.rtl ? 'rtl' : 'ltr';
+
+  traduireDocument(document);
+  renderLangues();
+  renderMenus();
+  renderThemes();
+  renderGraphisme();
+  renderGames();
+  // La grille de commandes et les raccourcis de sauvegarde ne sont pas
+  // redessinés à l'ouverture de leur fenêtre : sans ces deux appels, leurs
+  // libellés resteraient dans la langue précédente jusqu'au prochain jeu
+  // chargé. Les autres listes se refont en s'ouvrant, et n'ont rien à faire
+  // ici.
+  buildKeypad();
+  renderRaccourcisEtat();
+  refreshMenus();
+}
+
+/** Dessine le choix de langue, à côté des thèmes. */
+function renderLangues(): void {
+  langueList.replaceChildren();
+  const courante = retenu(RETENU.langue) ?? langueRetenue().code;
+
+  for (const langue of LANGUES) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    choix.className = 'menu-choix';
+    choix.setAttribute('aria-pressed', String(langue.code === courante));
+    // Le nom est écrit dans sa propre langue : c'est ainsi qu'on reconnaît la
+    // sienne dans une liste qu'on ne sait pas lire.
+    choix.lang = langue.code;
+    if (langue.rtl) choix.dir = 'rtl';
+
+    const nom = document.createElement('strong');
+    nom.textContent = langue.nom;
+    choix.append(nom);
+    choix.addEventListener('click', () => choisirLangue(langue.code));
+    langueList.append(choix);
+  }
+
+  // Cinquante entrées dans une boîte qui défile : sans cela, ouvrir la fenêtre
+  // en tamoul montrait le haut de la liste, et la langue en cours restait
+  // invisible douze rangées plus bas.
+  const choisie = langueList.querySelector<HTMLElement>('[aria-pressed="true"]');
+  if (choisie) {
+    langueList.scrollTop = Math.max(
+      0,
+      choisie.offsetTop - langueList.clientHeight / 2 + choisie.offsetHeight / 2,
+    );
+  }
+}
+
 /** Les deux façons de présenter la bibliothèque. */
 const MENUS = [
   {
     id: 'liste',
-    label: 'Liste',
-    detail: 'Un volet par console, en tableau. Le plus dense à la souris.',
+    label: aTraduire('Liste'),
+    detail: aTraduire('Un volet par console, en tableau. Le plus dense à la souris.'),
   },
   {
     id: 'grille',
-    label: 'Grille',
-    detail: 'Les jaquettes en grand, parcourues à la manette. Pensé pour le canapé.',
+    label: aTraduire('Grille'),
+    detail: aTraduire('Les jaquettes en grand, parcourues à la manette. Pensé pour le canapé.'),
   },
   {
     id: 'xmb',
-    label: 'Menu animé',
-    detail: 'Les consoles en rangée, les jeux en colonne, un fond qui ondule. Façon console de salon.',
+    label: aTraduire('Menu animé'),
+    detail: aTraduire(
+      'Les consoles en rangée, les jeux en colonne, un fond qui ondule. Façon console de salon.',
+    ),
   },
 ] as const;
 
@@ -445,13 +546,17 @@ function ouvrirContextuel(event: MouseEvent, item: Playable): void {
   const entrees: [string, string, () => void][] = [
     [
       favori ? '★' : '☆',
-      favori ? 'Retirer des favoris' : 'Mettre en favoris',
+      favori ? t('Retirer des favoris') : t('Mettre en favoris'),
       () => basculerFavori(item.rom.path),
     ],
-    ['▶', 'Lancer', () => void jouerItem(item)],
-    ['🖼', posee ? 'Changer la jaquette…' : 'Choisir une jaquette…', () => void poserJaquette(item)],
+    ['▶', t('Lancer'), () => void jouerItem(item)],
+    [
+      '🖼',
+      posee ? t('Changer la jaquette…') : t('Choisir une jaquette…'),
+      () => void poserJaquette(item),
+    ],
   ];
-  if (posee) entrees.push(['✕', 'Retirer la jaquette', () => void enleverJaquette(item)]);
+  if (posee) entrees.push(['✕', t('Retirer la jaquette'), () => void enleverJaquette(item)]);
 
   for (const [signe, texte, faire] of entrees) {
     const bouton = document.createElement('button');
@@ -621,7 +726,13 @@ function voletReprendre(shelves: readonly Shelf[]): Shelf | null {
   const candidates = [
     ...new Map(games.flatMap((item) => item.cores).map((c) => [c.id, c])).values(),
   ];
-  return { key: REPRENDRE, label: 'Reprendre', games, candidates, preferred: undefined };
+  return {
+    key: REPRENDRE,
+    label: aTraduire('Reprendre'),
+    games,
+    candidates,
+    preferred: undefined,
+  };
 }
 
 /** Ce qu'on sait d'un jeu récemment joué, s'il en fait partie. */
@@ -644,7 +755,7 @@ function voletGalerie(): Shelf | null {
   if (captures.length === 0) return null;
   return {
     key: GALERIE,
-    label: 'Galerie',
+    label: aTraduire('Galerie'),
     games: captures.map((capture) => ({
       rom: {
         name: capture.game,
@@ -669,7 +780,7 @@ function renderGalerie(): void {
     const vignette = document.createElement('button');
     vignette.type = 'button';
     vignette.className = 'capture';
-    vignette.title = `${capture.game} — clic droit pour effacer`;
+    vignette.title = dit('{0} — clic droit pour effacer', capture.game);
 
     const image = document.createElement('img');
     image.alt = capture.game;
@@ -682,7 +793,7 @@ function renderGalerie(): void {
     const quand = document.createElement('span');
     quand.className = 'quand';
     quand.textContent = capture.taken
-      ? new Date(capture.taken * 1000).toLocaleString('fr-FR', {
+      ? new Date(capture.taken * 1000).toLocaleString(localeCourante(), {
           day: 'numeric',
           month: 'short',
           hour: '2-digit',
@@ -757,18 +868,18 @@ function renderEcartes(): void {
     const bouton = document.createElement('button');
     bouton.type = 'button';
     bouton.className = 'lien';
-    bouton.textContent = 'Rétablir';
+    bouton.textContent = t('Rétablir');
     bouton.addEventListener('click', async () => {
       try {
         await setCoreUsable(id, true);
-        log(`${id} rétabli`, 'ok');
+        log(dit('{0} rétabli', id), 'ok');
         // Le catalogue, pas seulement la liste des jeux : c'est lui qui écarte
         // les cœurs inutilisables, et il n'est relu qu'ici.
         await reloadCatalog();
         await refreshLibrary();
         renderEcartes();
       } catch (error) {
-        log(`rétablissement impossible — ${reason(error)}`, 'err');
+        log(dit('rétablissement impossible — {0}', reason(error)), 'err');
       }
     });
 
@@ -786,9 +897,11 @@ async function signalerIncident(): Promise<void> {
   }
   if (!rapport) return;
 
-  const quoi = rapport.game ? ` en lançant « ${rapport.game} »` : '';
-  crashQuoi.textContent = `EvaChi s'est arrêtée${quoi}, avec l'émulateur ${rapport.label || rapport.core}.`;
-  log(`arrêt brutal la fois précédente — ${rapport.label || rapport.core}`, 'err');
+  const nom = rapport.label || rapport.core;
+  crashQuoi.textContent = rapport.game
+    ? dit("EvaChi s'est arrêtée en lançant « {0} », avec l'émulateur {1}.", rapport.game, nom)
+    : dit("EvaChi s'est arrêtée, avec l'émulateur {0}.", nom);
+  log(dit('arrêt brutal la fois précédente — {0}', nom), 'err');
 
   crashEcarter.onclick = async () => {
     try {
@@ -836,7 +949,7 @@ async function sauverEmplacement(slot: number): Promise<void> {
     await saveStateSlot(cheminEnCours, slot, encodeBase64(etat), vignette);
     savedState = etat;
     refreshMenus();
-    log(`emplacement ${slot + 1} — ${humanSize(etat.length)}`, 'ok');
+    log(dit('emplacement {0} — {1}', slot + 1, humanSize(etat.length)), 'ok');
   } catch (error) {
     log(`sauvegarde impossible — ${reason(error)}`, 'err');
   }
@@ -897,8 +1010,8 @@ async function renderEmplacements(): Promise<void> {
     carte.className = 'emplacement';
     carte.setAttribute('aria-current', String(place.slot === emplacementVise));
     carte.title = place.filled
-      ? 'Reprendre cette sauvegarde — clic droit pour la vider'
-      : 'Sauvegarder ici';
+      ? t('Reprendre cette sauvegarde — clic droit pour la vider')
+      : t('Sauvegarder ici');
 
     const apercu = document.createElement('span');
     apercu.className = 'apercu';
@@ -910,18 +1023,18 @@ async function renderEmplacements(): Promise<void> {
     } else {
       const rien = document.createElement('span');
       rien.className = 'rien';
-      rien.textContent = place.filled ? 'sans image' : 'vide';
+      rien.textContent = place.filled ? t('sans image') : t('vide');
       apercu.append(rien);
     }
 
     const titre = document.createElement('span');
     titre.className = 'titre';
-    titre.textContent = `Emplacement ${place.slot + 1}`;
+    titre.textContent = dit('Emplacement {0}', place.slot + 1);
 
     const quand = document.createElement('span');
     quand.className = 'quand';
     quand.textContent = place.filled
-      ? `${new Date(place.taken * 1000).toLocaleString('fr-FR', {
+      ? `${new Date(place.taken * 1000).toLocaleString(localeCourante(), {
           day: 'numeric',
           month: 'short',
           hour: '2-digit',
@@ -999,7 +1112,7 @@ function direRaccourci(raccourci: Raccourci): string {
   if (raccourci.pad.length > 0) {
     morceaux.push(raccourci.pad.map((index) => padButtonShort(index)).join(' + '));
   }
-  return morceaux.join('   ou   ') || 'aucun';
+  return morceaux.join(`   ${t('ou')}   `) || t('aucun');
 }
 
 /** Le raccourci qu'on est en train de redéfinir, s'il y en a un. */
@@ -1010,14 +1123,14 @@ function renderRaccourcisEtat(): void {
 
   for (const quoi of ['sauver', 'charger'] as const) {
     const dt = document.createElement('dt');
-    dt.textContent = quoi === 'sauver' ? 'Sauvegarder' : 'Charger';
+    dt.textContent = quoi === 'sauver' ? t('Sauvegarder') : t('Charger');
 
     const dd = document.createElement('dd');
     const bouton = document.createElement('button');
     bouton.type = 'button';
     bouton.className = 'lien';
     bouton.textContent =
-      raccourciEnAttente === quoi ? 'pressez une touche…' : direRaccourci(raccourcisEtat[quoi]);
+      raccourciEnAttente === quoi ? t('pressez une touche…') : direRaccourci(raccourcisEtat[quoi]);
     bouton.addEventListener('click', () => {
       raccourciEnAttente = raccourciEnAttente === quoi ? null : quoi;
       renderRaccourcisEtat();
@@ -1074,16 +1187,20 @@ function surveillerEtats(pad: Gamepad, maintenant: number): void {
  * autres.
  */
 const ECHELLES = [
-  ['ajuster', 'Ajuster', 'Remplit la fenêtre en gardant les proportions'],
-  ['1', '×1', 'Taille d’origine de la console, au pixel près'],
-  ['2', '×2', 'Chaque pixel sur quatre : net, sans déformation'],
-  ['3', '×3', 'Chaque pixel sur neuf'],
-  ['4', '×4', 'Chaque pixel sur seize — pour les grands écrans'],
+  ['ajuster', aTraduire('Ajuster'), aTraduire('Remplit la fenêtre en gardant les proportions')],
+  ['1', '×1', aTraduire('Taille d’origine de la console, au pixel près')],
+  ['2', '×2', aTraduire('Chaque pixel sur quatre : net, sans déformation')],
+  ['3', '×3', aTraduire('Chaque pixel sur neuf')],
+  ['4', '×4', aTraduire('Chaque pixel sur seize — pour les grands écrans')],
 ] as const;
 
 const LISSAGES = [
-  ['net', 'Net', 'Les pixels restent carrés, comme sur la machine d’origine'],
-  ['doux', 'Adouci', 'Les contours sont fondus — plus proche d’un vieux téléviseur'],
+  ['net', aTraduire('Net'), aTraduire('Les pixels restent carrés, comme sur la machine d’origine')],
+  [
+    'doux',
+    aTraduire('Adouci'),
+    aTraduire('Les contours sont fondus — plus proche d’un vieux téléviseur'),
+  ],
 ] as const;
 
 function echelleImage(): string {
@@ -1109,10 +1226,10 @@ function renderChoix(
     choix.className = 'menu-choix';
     choix.setAttribute('aria-pressed', String(id === courant));
     const nom = document.createElement('strong');
-    nom.textContent = label;
-    const dit = document.createElement('span');
-    dit.textContent = detail;
-    choix.append(nom, dit);
+    nom.textContent = t(label);
+    const explication = document.createElement('span');
+    explication.textContent = t(detail);
+    choix.append(nom, explication);
     choix.addEventListener('click', () => poser(id));
     boite.append(choix);
   }
@@ -1186,9 +1303,9 @@ function renderMenus(): void {
     choix.setAttribute('aria-pressed', String(menu.id === courant));
 
     const nom = document.createElement('strong');
-    nom.textContent = menu.label;
+    nom.textContent = t(menu.label);
     const detail = document.createElement('span');
-    detail.textContent = menu.detail;
+    detail.textContent = t(menu.detail);
 
     choix.append(nom, detail);
     choix.addEventListener('click', () => choisirMenu(menu.id));
@@ -1251,16 +1368,21 @@ let shownSize = '';
 const reason = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** Accorde un nom en nombre. En français, zéro reste au singulier. */
-const plural = (count: number, singular: string, plural = `${singular}s`): string =>
-  `${count} ${count > 1 ? plural : singular}`;
+/**
+ * Accorde un nom en nombre.
+ *
+ * Passe par les règles de la langue en cours : le français a deux formes, le
+ * russe trois, le japonais une seule. En français, zéro reste au singulier.
+ */
+const plural = (count: number, singular: string, pluriel = `${singular}s`): string =>
+  compte(count, singular, pluriel);
 
 // --- Journal et barre d'état ------------------------------------------------
 
 function log(message: string, kind: 'info' | 'ok' | 'err' = 'info'): void {
   const line = document.createElement('div');
   if (kind !== 'info') line.className = kind;
-  line.textContent = `${new Date().toLocaleTimeString('fr-FR')}  ${message}`;
+  line.textContent = `${new Date().toLocaleTimeString(localeCourante())}  ${message}`;
   logBox.append(line);
   logBox.scrollTop = logBox.scrollHeight;
 
@@ -1298,8 +1420,12 @@ function refreshMenus(): void {
     if (button) button.disabled = !on;
   }
 
+  // Ce libellé-ci est le seul de la barre que le code réécrit. Au changement de
+  // langue, `traduireDocument` le ramène d'abord à ce que la page portait —
+  // « Pause » — parce que c'est ce texte-là qu'il a retenu comme origine. D'où
+  // l'appel à `refreshMenus` juste après, qui remet le bon des deux.
   const toggle = menubar.querySelector<HTMLButtonElement>('[data-action="toggle"]');
-  if (toggle) toggle.textContent = running ? 'Pause' : 'Reprendre';
+  if (toggle) toggle.textContent = running ? t('Pause') : t('Reprendre');
 }
 
 for (const menu of menubar.querySelectorAll<HTMLElement>('[data-menu]')) {
@@ -1463,7 +1589,7 @@ async function runLoop(): Promise<void> {
     } catch (error) {
       if (token === loopToken) {
         setRunning(false);
-        log(`arrêt — ${reason(error)}`, 'err');
+        log(dit('arrêt — {0}', reason(error)), 'err');
       }
       return;
     }
@@ -1477,7 +1603,7 @@ async function runLoop(): Promise<void> {
 
     const now = performance.now();
     if (now - lastReport >= 1000) {
-      fpsOut.textContent = `${framesThisSecond} im/s`;
+      fpsOut.textContent = dit('{0} im/s', framesThisSecond);
       framesThisSecond = 0;
       lastReport = now;
       void drainMessages();
@@ -1496,7 +1622,7 @@ async function runLoop(): Promise<void> {
 async function drainMessages(): Promise<void> {
   if (!inShell || entry?.kind !== 'libretro') return;
   try {
-    for (const message of await takeMessages()) log(`cœur : ${message}`);
+    for (const message of await takeMessages()) log(dit('cœur : {0}', message));
   } catch {
     // Un échec de relève ne doit pas interrompre la partie.
   }
@@ -1583,7 +1709,7 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
 
   await audio.unlock();
   setRunning(true);
-  log(`${name} — chargé`, 'ok');
+  log(dit('{0} — chargé', name), 'ok');
   await drainMessages();
 }
 
@@ -1621,7 +1747,7 @@ async function stopPlaying(): Promise<void> {
   try {
     await partant?.close?.();
   } catch (error) {
-    log(`déchargement incomplet — ${reason(error)}`, 'err');
+    log(dit('déchargement incomplet — {0}', reason(error)), 'err');
   }
 }
 
@@ -1672,13 +1798,46 @@ async function play(target: CatalogEntry, rom: RomEntry): Promise<void> {
 
 // --- Bibliothèque -----------------------------------------------------------
 
+/**
+ * Les formats de taille déjà construits, par langue et par unité.
+ *
+ * Une bibliothèque affiche la taille de chaque jeu : en construire un par
+ * ligne coûterait plus cher que tout le reste du dessin.
+ */
+const formatsTaille = new Map<string, Intl.NumberFormat>();
+
+function formatTaille(unite: string, decimales: number): Intl.NumberFormat {
+  const langue = localeCourante();
+  const cle = `${langue} ${unite}`;
+  let format = formatsTaille.get(cle);
+  if (!format) {
+    format = new Intl.NumberFormat(langue, {
+      style: 'unit',
+      unit: unite,
+      unitDisplay: 'short',
+      minimumFractionDigits: decimales,
+      maximumFractionDigits: decimales,
+    });
+    formatsTaille.set(cle, format);
+  }
+  return format;
+}
+
+/**
+ * Une taille de fichier, écrite dans la langue en cours.
+ *
+ * Les unités ne se traduisent pas à la main : « Go » s'écrit « GB » en
+ * anglais, « ГБ » en russe et « غ.ب » en arabe, et le navigateur connaît déjà
+ * les trois. Une image de Wii U pèse six mille méga-octets ; annoncée ainsi,
+ * le nombre ne se lit plus, d'où l'échelon en giga-octets.
+ */
 function humanSize(bytes: number): string {
-  // Une image de Wii U pèse six mille méga-octets ; annoncée ainsi, le nombre
-  // ne se lit plus.
-  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} Go`;
-  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
-  if (bytes >= 1024) return `${Math.round(bytes / 1024)} Ko`;
-  return `${bytes} o`;
+  if (bytes >= 1024 * 1024 * 1024) {
+    return formatTaille('gigabyte', 1).format(bytes / (1024 * 1024 * 1024));
+  }
+  if (bytes >= 1024 * 1024) return formatTaille('megabyte', 1).format(bytes / (1024 * 1024));
+  if (bytes >= 1024) return formatTaille('kilobyte', 0).format(Math.round(bytes / 1024));
+  return formatTaille('byte', 0).format(bytes);
 }
 
 /** Les cœurs installés capables d'ouvrir ce fichier. */
@@ -1792,7 +1951,10 @@ function renderGrille(shelves: Shelf[]): void {
     // pourquoi certains jeux apparaissaient deux fois.
     const titre = document.createElement('h3');
     titre.className = 'section-grille';
-    titre.textContent = shelf.label;
+    // Les volets d'une console portent le nom du dossier, qui ne se traduit
+    // pas ; « Favoris », « Reprendre » et « Galerie », si. Une clé inconnue
+    // ressort telle quelle, ce qui règle les deux cas d'un seul geste.
+    titre.textContent = t(shelf.label);
     const combien = document.createElement('span');
     combien.textContent = plural(shelf.games.length, 'jeu', 'jeux');
     titre.append(combien);
@@ -2130,7 +2292,12 @@ function naviguerMenu(): void {
     if (item) {
       tic();
       const mis = basculerFavori(item.rom.path);
-      log(`${item.rom.name} — ${mis ? 'mis en favori' : 'retiré des favoris'}`, 'ok');
+      log(
+        mis
+          ? dit('{0} — mis en favori', item.rom.name)
+          : dit('{0} — retiré des favoris', item.rom.name),
+        'ok',
+      );
     }
   }
 }
@@ -2588,7 +2755,7 @@ function renderColonnesXmb(): void {
     const pastille = document.createElement('button');
     pastille.type = 'button';
     pastille.className = 'xmb-console';
-    pastille.title = `${shelf.label} — ${plural(shelf.games.length, 'jeu', 'jeux')}`;
+    pastille.title = `${t(shelf.label)} — ${plural(shelf.games.length, 'jeu', 'jeux')}`;
 
     const rond = document.createElement('span');
     rond.className = 'rond';
@@ -2668,22 +2835,26 @@ function renderEntreesXmb(): void {
     if (shelf.key === GALERIE) {
       const capture = captures[rang];
       detail.textContent = capture?.taken
-        ? new Date(capture.taken * 1000).toLocaleString('fr-FR', {
+        ? new Date(capture.taken * 1000).toLocaleString(localeCourante(), {
             day: 'numeric',
             month: 'long',
             hour: '2-digit',
             minute: '2-digit',
           })
-        : 'capture';
+        : t('capture');
     } else if (shelf.key === REPRENDRE) {
       // Ici on veut savoir quand et combien, pas avec quel émulateur.
       const vu = detailRecent(item.rom.path);
       detail.textContent = vu
-        ? `${formatWhen(vu.played, Math.floor(Date.now() / 1000))} · ${formatPlaytime(vu.seconds)}`
+        ? `${formatWhen(vu.played, Math.floor(Date.now() / 1000), localeCourante())} · ${formatPlaytime(
+            vu.seconds,
+            localeCourante(),
+            t('moins d’une minute'),
+          )}`
         : '';
     } else {
       const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
-      detail.textContent = `${cœur?.label ?? 'aucun émulateur'} · ${humanSize(item.rom.size)}`;
+      detail.textContent = `${cœur?.label ?? t('aucun émulateur')} · ${humanSize(item.rom.size)}`;
     }
 
     texte.append(titre, detail);
@@ -2692,7 +2863,7 @@ function renderEntreesXmb(): void {
       const etoile = document.createElement('span');
       etoile.className = 'etoile';
       etoile.textContent = '★';
-      etoile.title = 'Favori';
+      etoile.title = t('Favori');
       entree.append(etoile);
     }
     entree.addEventListener('click', () => {
@@ -2732,12 +2903,12 @@ function placerXmb(): void {
   // qu'on voie d'où l'on vient, assez haut pour qu'on voie où l'on va.
   xmbEntrees.style.transform = `translateY(${(XMB.ancre - entreeXmb) * XMB.entree * echelleXmb}px)`;
 
-  xmbConsole.textContent = shelf?.label ?? '—';
+  xmbConsole.textContent = shelf ? t(shelf.label) : '—';
   const item = shelf?.games[entreeXmb];
   const galerie = shelf?.key === GALERIE;
   const quoi = galerie ? (['capture', 'captures'] as const) : (['jeu', 'jeux'] as const);
   xmbPied.textContent = shelf
-    ? `${plural(shelf.games.length, quoi[0], quoi[1])} · ${entreeXmb + 1} sur ${shelf.games.length}${
+    ? `${plural(shelf.games.length, quoi[0], quoi[1])} · ${dit('{0} sur {1}', entreeXmb + 1, shelf.games.length)}${
         item && !galerie ? ` · ${item.rom.extension}` : ''
       }`
     : '';
@@ -2895,7 +3066,7 @@ function renderXmb(shelves: Shelf[]): void {
 function poserHeure(): void {
   if (xmbView.hidden) return;
   const maintenant = new Date();
-  xmbHeure.textContent = maintenant.toLocaleString('fr-FR', {
+  xmbHeure.textContent = maintenant.toLocaleString(localeCourante(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
@@ -3222,22 +3393,28 @@ function renderGames(): void {
     if (bare) {
       // Sans émulateur, indiquer un dossier de jeux ne donnerait rien : c'est
       // l'installation qu'il faut proposer, et le dire franchement.
-      if (heading) heading.textContent = 'Aucun émulateur installé';
+      if (heading) heading.textContent = t('Aucun émulateur installé');
       if (detail) {
-        detail.textContent =
-          "EvaChi peut les télécharger depuis la forge officielle libretro. Choisissez les consoles qui vous intéressent.";
+        detail.textContent = t(
+          'EvaChi peut les télécharger depuis la forge officielle libretro. Choisissez les consoles qui vous intéressent.',
+        );
       }
     } else if (games.length === 0) {
-      if (heading) heading.textContent = 'Aucun jeu';
-      if (detail) detail.textContent = 'Indiquez le dossier où se trouvent vos jeux.';
+      if (heading) heading.textContent = t('Aucun jeu');
+      if (detail) detail.textContent = t('Indiquez le dossier où se trouvent vos jeux.');
     } else if (needle) {
-      if (heading) heading.textContent = 'Aucun résultat';
-      if (detail) detail.textContent = `Rien ne correspond à « ${searchInput.value.trim()} ».`;
+      if (heading) heading.textContent = t('Aucun résultat');
+      if (detail) {
+        detail.textContent = dit('Rien ne correspond à « {0} ».', searchInput.value.trim());
+      }
     } else {
-      if (heading) heading.textContent = 'Aucun jeu reconnu';
+      if (heading) heading.textContent = t('Aucun jeu reconnu');
       if (detail) {
         const found = plural(games.length, 'fichier');
-        detail.textContent = `${found} sur le disque, mais aucun cœur installé ne l'ouvre.`;
+        detail.textContent = dit(
+          "{0} sur le disque, mais aucun cœur installé ne l'ouvre.",
+          found,
+        );
       }
     }
     return;
@@ -3280,13 +3457,13 @@ function renderGames(): void {
     const heading = document.createElement('summary');
     const label = document.createElement('span');
     label.className = 'console';
-    label.textContent = shelf.label;
+    label.textContent = t(shelf.label);
     heading.append(label);
 
     if (shelf.candidates.length > 1) {
       const picker = document.createElement('select');
       picker.className = 'shelf-core';
-      picker.title = 'Émulateur utilisé pour ce dossier';
+      picker.title = t('Émulateur utilisé pour ce dossier');
       for (const candidate of shelf.candidates) {
         const option = document.createElement('option');
         option.value = candidate.id;
@@ -3337,7 +3514,7 @@ async function refreshLibrary(): Promise<void> {
   try {
     games = await listRoms();
   } catch (error) {
-    log(`bibliothèque illisible — ${reason(error)}`, 'err');
+    log(dit('bibliothèque illisible — {0}', reason(error)), 'err');
     games = [];
   }
   renderGames();
@@ -3367,19 +3544,19 @@ function renderFolders(): void {
       const note = document.createElement('span');
       note.className = 'fixed';
       note.style.marginLeft = 'auto';
-      note.textContent = 'par défaut';
+      note.textContent = t('par défaut');
       item.append(note);
     } else {
       const remove = document.createElement('button');
       remove.type = 'button';
-      remove.textContent = 'Retirer';
+      remove.textContent = t('Retirer');
       remove.addEventListener('click', async () => {
         try {
           folders = await removeLibraryFolder(path);
           renderFolders();
           await refreshLibrary();
         } catch (error) {
-          log(`retrait impossible — ${reason(error)}`, 'err');
+          log(dit('retrait impossible — {0}', reason(error)), 'err');
         }
       });
       item.append(remove);
@@ -3402,9 +3579,9 @@ async function addFolder(): Promise<void> {
     folders = await addLibraryFolder(chosen);
     renderFolders();
     await refreshLibrary();
-    log(`dossier ajouté : ${chosen}`, 'ok');
+    log(dit('dossier ajouté : {0}', chosen), 'ok');
   } catch (error) {
-    log(`ajout impossible — ${reason(error)}`, 'err');
+    log(dit('ajout impossible — {0}', reason(error)), 'err');
   }
 }
 
@@ -3444,9 +3621,9 @@ function renderInstall(): void {
     state.className = 'state';
     if (offer.installed) {
       state.classList.add('ready');
-      state.textContent = 'installé';
+      state.textContent = t('installé');
     } else {
-      state.textContent = 'à télécharger';
+      state.textContent = t('à télécharger');
     }
 
     item.append(name, state);
@@ -3455,7 +3632,7 @@ function renderInstall(): void {
 
   const waiting = offers.filter((offer) => !offer.installed).length;
   installButton.disabled = waiting === 0;
-  installProgress.textContent = waiting === 0 ? 'tout est installé' : '';
+  installProgress.textContent = waiting === 0 ? t('tout est installé') : '';
 }
 
 let standalones: EmulatorOffer[] = [];
@@ -3486,7 +3663,7 @@ function renderEmulators(): void {
     if (offer.downloadable) {
       const button = document.createElement('button');
       button.type = 'button';
-      button.textContent = offer.owned ? 'Mettre à jour' : 'Installer';
+      button.textContent = offer.owned ? t('Mettre à jour') : t('Installer');
       button.addEventListener('click', () => void fetchEmulator(offer, button));
       actions.append(button);
     }
@@ -3497,8 +3674,8 @@ function renderEmulators(): void {
     // permettait ensuite de dire où on l'avait mis.
     const browse = document.createElement('button');
     browse.type = 'button';
-    browse.textContent = offer.owned || offer.declared ? 'Changer…' : 'Parcourir…';
-    browse.title = `Désigner soi-même le programme de ${offer.label}`;
+    browse.textContent = offer.owned || offer.declared ? t('Changer…') : t('Parcourir…');
+    browse.title = dit('Désigner soi-même le programme de {0}', offer.label);
     browse.addEventListener('click', async () => {
       try {
         const chosen = await pickExecutable();
@@ -3506,24 +3683,27 @@ function renderEmulators(): void {
         await adopt(offer.system, chosen);
         await refreshInstall();
       } catch (error) {
-        log(`sélection impossible — ${reason(error)}`, 'err');
+        log(dit('sélection impossible — {0}', reason(error)), 'err');
       }
     });
     actions.append(browse);
 
     if (offer.owned) {
       state.classList.add('ready');
-      state.textContent = `installé par EvaChi · ${offer.license}`;
+      state.textContent = `${t('installé par EvaChi')} · ${offer.license}`;
     } else if (offer.declared) {
       state.classList.add('ready');
       state.textContent = offer.declared;
       state.title = offer.declared;
     } else if (offer.downloadable) {
-      state.textContent = `à télécharger · ${offer.license}`;
+      state.textContent = `${t('à télécharger')} · ${offer.license}`;
     } else {
       // Sa forge refuse les robots : dire où aller le chercher, et rappeler
       // qu'on peut le désigner soi-même une fois installé.
-      state.textContent = `à prendre sur ${offer.site.replace(/^https?:\/\//, '')}, puis « Parcourir… »`;
+      state.textContent = dit(
+        'à prendre sur {0}, puis « Parcourir… »',
+        offer.site.replace(/^https?:\/\//, ''),
+      );
     }
 
     item.append(name, actions, state);
@@ -3535,20 +3715,20 @@ function renderEmulators(): void {
 async function fetchEmulator(offer: EmulatorOffer, button: HTMLButtonElement): Promise<void> {
   const before = button.textContent;
   button.disabled = true;
-  button.textContent = 'Installation…';
-  installProgress.textContent = `${offer.label} — téléchargement…`;
+  button.textContent = t('Installation…');
+  installProgress.textContent = dit('{0} — téléchargement…', offer.label);
 
   try {
     externals = await installEmulator(offer.system);
-    log(`${offer.label} installé et prêt`, 'ok');
-    installProgress.textContent = `${offer.label} installé`;
+    log(dit('{0} installé et prêt', offer.label), 'ok');
+    installProgress.textContent = dit('{0} installé', offer.label);
     presets = await knownExternals();
     renderExternals();
     await reloadCatalog();
     await refreshLibrary();
   } catch (error) {
     log(`${offer.label} — ${reason(error)}`, 'err');
-    installProgress.textContent = `${offer.label} : échec, voir le journal`;
+    installProgress.textContent = dit('{0} : échec, voir le journal', offer.label);
   } finally {
     button.disabled = false;
     button.textContent = before;
@@ -3590,16 +3770,20 @@ function renderBios(): void {
     état.className = 'state';
     état.title = fichier.path;
 
+    // La note vient du code natif, où la liste des micrologiciels est tenue.
+    // Elle passe par la même table que le reste : ses phrases sont relevées
+    // dans `bios.rs` au moment d'écrire les clés.
+    const note = t(fichier.note);
     if (fichier.present) {
       état.classList.add('ready');
-      état.textContent = `en place · ${fichier.note}`;
+      état.textContent = `${t('en place')} · ${note}`;
     } else if (!fichier.coreInstalled) {
-      état.textContent = `cœur non installé · ${fichier.note}`;
+      état.textContent = `${t('cœur non installé')} · ${note}`;
     } else if (fichier.need === 'required') {
       état.classList.add('manque');
-      état.textContent = `MANQUANT · ${fichier.note}`;
+      état.textContent = `${t('MANQUANT')} · ${note}`;
     } else {
-      état.textContent = `absent, facultatif · ${fichier.note}`;
+      état.textContent = `${t('absent, facultatif')} · ${note}`;
     }
 
     item.append(nom, état);
@@ -3610,8 +3794,8 @@ function renderBios(): void {
     (f) => !f.present && f.coreInstalled && f.need === 'required',
   ).length;
   biosSummary.textContent = bloquants
-    ? `${plural(bloquants, 'fichier')} manque${bloquants > 1 ? 'nt' : ''} à des consoles installées`
-    : 'rien ne bloque';
+    ? dit('il manque {0} à des consoles installées', plural(bloquants, 'fichier'))
+    : t('rien ne bloque');
 }
 
 /** Recharge l'état des cœurs et des émulateurs proposés. */
@@ -3621,27 +3805,27 @@ async function refreshInstall(): Promise<void> {
     offers = await installableCores();
     renderInstall();
   } catch (error) {
-    log(`liste des cœurs indisponible — ${reason(error)}`, 'err');
+    log(dit('liste des cœurs indisponible — {0}', reason(error)), 'err');
   }
   try {
     standalones = await installableEmulators();
     renderEmulators();
   } catch (error) {
-    log(`liste des émulateurs indisponible — ${reason(error)}`, 'err');
+    log(dit('liste des émulateurs indisponible — {0}', reason(error)), 'err');
   }
   try {
     systemeFichiers = await systemFiles();
     renderBios();
   } catch (error) {
-    log(`fichiers système illisibles — ${reason(error)}`, 'err');
+    log(dit('fichiers système illisibles — {0}', reason(error)), 'err');
   }
 }
 
 biosFolder.addEventListener('click', async () => {
   try {
-    log(`dossier ouvert : ${await revealSystemDir()}`);
+    log(dit('dossier ouvert : {0}', await revealSystemDir()));
   } catch (error) {
-    log(`ouverture impossible — ${reason(error)}`, 'err');
+    log(dit('ouverture impossible — {0}', reason(error)), 'err');
   }
 });
 
@@ -3680,13 +3864,13 @@ async function ranger(
     const rangés = faits.filter((fait) => fait.placed);
     const consoles = [...new Set(rangés.map((fait) => fait.system))].join(', ');
     biosAdopted.textContent = rangés.length
-      ? `${plural(rangés.length, 'fichier')} rangé${rangés.length > 1 ? 's' : ''} · ${consoles}`
-      : (faits[0]?.note ?? 'rien à ranger');
+      ? dit('rangement : {0} · {1}', plural(rangés.length, 'fichier'), consoles)
+      : (faits[0]?.note ?? t('rien à ranger'));
 
     systemeFichiers = await systemFiles();
     renderBios();
   } catch (error) {
-    log(`rangement impossible — ${reason(error)}`, 'err');
+    log(dit('rangement impossible — {0}', reason(error)), 'err');
   } finally {
     bouton.disabled = false;
   }
@@ -3722,7 +3906,7 @@ async function installSelected(): Promise<void> {
     try {
       const size = await installCore(name);
       done += 1;
-      log(`${offer?.label ?? name} installé — ${Math.round(size / 1024)} Ko`, 'ok');
+      log(dit('{0} installé — {1}', offer?.label ?? name, humanSize(size)), 'ok');
     } catch (error) {
       failed += 1;
       log(`${offer?.label ?? name} — ${reason(error)}`, 'err');
@@ -3731,8 +3915,8 @@ async function installSelected(): Promise<void> {
 
   installProgress.textContent =
     failed === 0
-      ? `${plural(done, 'émulateur')} installé${done > 1 ? 's' : ''}`
-      : `${done} installé(s), ${failed} en échec — voir le journal`;
+      ? dit('installation terminée : {0}', plural(done, 'émulateur'))
+      : dit('{0} installés, {1} en échec — voir le journal', done, failed);
 
   await refreshInstall();
   await reloadCatalog();
@@ -3778,10 +3962,10 @@ function renderExternals(): void {
       state.textContent = declared.executable;
       state.title = declared.executable;
     } else if (preset.detected) {
-      state.textContent = `trouvé : ${preset.detected}`;
+      state.textContent = dit('trouvé : {0}', preset.detected);
       state.title = preset.detected;
     } else {
-      state.textContent = 'non installé sur cette machine';
+      state.textContent = t('non installé sur cette machine');
     }
 
     const actions = document.createElement('div');
@@ -3790,26 +3974,26 @@ function renderExternals(): void {
     if (declared) {
       const remove = document.createElement('button');
       remove.type = 'button';
-      remove.textContent = 'Retirer';
+      remove.textContent = t('Retirer');
       remove.addEventListener('click', () => void detach(preset.system));
       actions.append(remove);
     } else if (preset.detected) {
       const use = document.createElement('button');
       use.type = 'button';
-      use.textContent = 'Activer';
+      use.textContent = t('Activer');
       use.addEventListener('click', () => void adopt(preset.system, preset.detected));
       actions.append(use);
     }
 
     const browse = document.createElement('button');
     browse.type = 'button';
-    browse.textContent = declared ? 'Changer…' : 'Parcourir…';
+    browse.textContent = declared ? t('Changer…') : t('Parcourir…');
     browse.addEventListener('click', async () => {
       try {
         const chosen = await pickExecutable();
         if (chosen) await adopt(preset.system, chosen);
       } catch (error) {
-        log(`sélection impossible — ${reason(error)}`, 'err');
+        log(dit('sélection impossible — {0}', reason(error)), 'err');
       }
     });
     actions.append(browse);
@@ -3838,9 +4022,9 @@ async function detach(system: string): Promise<void> {
     presets = await knownExternals();
     renderExternals();
     await reloadCatalog();
-    log(`${system} retiré`);
+    log(dit('{0} retiré', system));
   } catch (error) {
-    log(`retrait impossible — ${reason(error)}`, 'err');
+    log(dit('retrait impossible — {0}', reason(error)), 'err');
   }
 }
 
@@ -3855,7 +4039,7 @@ $('ext-browse').addEventListener('click', async () => {
       }
     }
   } catch (error) {
-    log(`sélection impossible — ${reason(error)}`, 'err');
+    log(dit('sélection impossible — {0}', reason(error)), 'err');
   }
 });
 
@@ -3868,7 +4052,7 @@ $('ext-save').addEventListener('click', async () => {
     .filter(Boolean);
 
   if (!name || !executable || extensions.length === 0) {
-    log('nom, programme et extensions sont tous nécessaires', 'err');
+    log(t('nom, programme et extensions sont tous nécessaires'), 'err');
     return;
   }
 
@@ -3883,11 +4067,11 @@ $('ext-save').addEventListener('click', async () => {
     });
     renderExternals();
     await reloadCatalog();
-    log(`${name} enregistré`, 'ok');
+    log(dit('{0} enregistré', name), 'ok');
 
     for (const field of [extName, extExe, extExtensions, extArgs]) field.value = '';
   } catch (error) {
-    log(`enregistrement impossible — ${reason(error)}`, 'err');
+    log(dit('enregistrement impossible — {0}', reason(error)), 'err');
   }
 });
 
@@ -3900,9 +4084,9 @@ $('ext-save').addEventListener('click', async () => {
  */
 async function reloadCatalog(): Promise<void> {
   catalog = await discover(makeChip8);
-  for (const line of discoveryReport) log(`découverte : ${line}`);
+  for (const line of discoveryReport) log(dit('découverte : {0}', line));
   for (const failure of discoveryErrors) {
-    log(`découverte interrompue — ${failure}`, 'err');
+    log(dit('découverte interrompue — {0}', failure), 'err');
   }
   renderGames();
 }
@@ -3912,7 +4096,7 @@ async function reloadCatalog(): Promise<void> {
 /** Ouvre un jeu par le sélecteur de fichiers, avec le cœur actif. */
 async function openContent(): Promise<void> {
   if (!entry || !core) {
-    log("choisissez d'abord un jeu dans la bibliothèque", 'err');
+    log(t("choisissez d'abord un jeu dans la bibliothèque"), 'err');
     return;
   }
 
@@ -3922,7 +4106,7 @@ async function openContent(): Promise<void> {
       if (!path) return;
       await loadContent(path.split(/[\\/]/).pop() ?? path, new Uint8Array(0), path);
     } catch (error) {
-      log(`sélection impossible — ${reason(error)}`, 'err');
+      log(dit('sélection impossible — {0}', reason(error)), 'err');
     }
     return;
   }
@@ -3943,7 +4127,7 @@ async function toggleFullscreen(): Promise<void> {
     if (document.fullscreenElement) await document.exitFullscreen();
     else await playerView.requestFullscreen();
   } catch (error) {
-    log(`plein écran refusé — ${reason(error)}`, 'err');
+    log(dit('plein écran refusé — {0}', reason(error)), 'err');
   }
 }
 
@@ -3954,6 +4138,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   install: openInstall,
   external: () => openDialog(dialogs.external),
   themes: () => {
+    renderLangues();
     renderThemes();
     renderMenus();
     jaquettesCase.checked = jaquettesVoulues();
@@ -3974,10 +4159,10 @@ const actions: Record<string, () => void | Promise<void>> = {
     running = false;
     try {
       await core.reset();
-      log(`${contentName} — réinitialisé`);
+      log(dit('{0} — réinitialisé', contentName));
       setRunning(true);
     } catch (error) {
-      log(`réinitialisation impossible — ${reason(error)}`, 'err');
+      log(dit('réinitialisation impossible — {0}', reason(error)), 'err');
     }
   },
   save: () => sauverEmplacement(emplacementVise),
@@ -4023,35 +4208,40 @@ menubar.addEventListener('click', (event) => {
  * finiront par se contredire.
  */
 const RACCOURCIS_CLAVIER: readonly (readonly [string, string])[] = [
-  ['Flèches', 'Parcourir la grille et le menu animé'],
-  ['Entrée', 'Lancer le jeu choisi'],
-  ['P', 'Plein écran'],
-  ['F5', 'Actualiser la bibliothèque'],
-  ['Échap', 'Refermer une fenêtre'],
+  [aTraduire('Flèches'), aTraduire('Parcourir la grille et le menu animé')],
+  [aTraduire('Entrée'), aTraduire('Lancer le jeu choisi')],
+  ['P', aTraduire('Plein écran')],
+  ['F5', aTraduire('Actualiser la bibliothèque')],
+  [aTraduire('Échap'), aTraduire('Refermer une fenêtre')],
 ];
 
 function renderAbout(): void {
   raccourcisClavier.replaceChildren();
   for (const [touche, quoi] of RACCOURCIS_CLAVIER) {
     const dt = document.createElement('dt');
-    dt.textContent = touche;
+    // Le nom de la touche se traduit aussi : « Entrée » se lit « Enter » sur
+    // un clavier anglais et « Intro » sur un clavier espagnol.
+    dt.textContent = t(touche);
     const dd = document.createElement('dd');
-    dd.textContent = quoi;
+    dd.textContent = t(quoi);
     raccourcisClavier.append(dt, dd);
   }
 
   aboutBody.replaceChildren();
 
   const rows: [string, string][] = [
-    ['Cœurs installés', catalog.map((candidate) => candidate.label).join(', ') || 'aucun'],
-    ['Dossier par défaut', defaultRomsPath || '—'],
-    ['Dossiers ajoutés', folders.length ? folders.join('\n') : 'aucun'],
-    ['Manette', padIndex >= 0 ? 'branchée' : 'aucune'],
+    [
+      aTraduire('Cœurs installés'),
+      catalog.map((candidate) => candidate.label).join(', ') || t('aucun'),
+    ],
+    [aTraduire('Dossier par défaut'), defaultRomsPath || '—'],
+    [aTraduire('Dossiers ajoutés'), folders.length ? folders.join('\n') : t('aucun')],
+    [aTraduire('Manette'), padIndex >= 0 ? t('branchée') : t('aucune')],
   ];
 
   for (const [term, detail] of rows) {
     const dt = document.createElement('dt');
-    dt.textContent = term;
+    dt.textContent = t(term);
     const dd = document.createElement('dd');
     dd.textContent = detail;
     aboutBody.append(dt, dd);
@@ -4072,7 +4262,7 @@ presetSelect.addEventListener('change', async () => {
     : null;
 
   if (!(await selectCore(chip8))) return;
-  log(`interpréteur : ${presetSelect.selectedOptions[0]?.text ?? '?'}`);
+  log(dit('interpréteur : {0}', presetSelect.selectedOptions[0]?.text ?? '?'));
   if (previous) await loadContent(previous.name, previous.bytes, previous.path);
 });
 
@@ -4110,8 +4300,8 @@ function currentPad(): Gamepad | null {
   if (found !== padIndex) {
     padIndex = found;
     const pad = found >= 0 ? pads[found] : null;
-    padStatus.textContent = pad ? `Manette : ${pad.id}` : 'Aucune manette détectée.';
-    log(pad ? `manette : ${pad.id}` : 'manette débranchée', pad ? 'ok' : 'info');
+    padStatus.textContent = pad ? dit('Manette : {0}', pad.id) : t('Aucune manette détectée.');
+    log(pad ? dit('manette : {0}', pad.id) : t('manette débranchée'), pad ? 'ok' : 'info');
   }
   return padIndex >= 0 ? pads[padIndex] : null;
 }
@@ -4275,7 +4465,7 @@ function capturerLiaison(): void {
     ...liaisons,
     [layout.id]: withBinding(liaisons[layout.id], presse, cible),
   });
-  log(`${layout.labels[cible] ?? cible} ← ${padButtonName(presse)}`, 'ok');
+  log(`${layout.labels[cible] ?? cible} ← ${padButtonShort(presse)}`, 'ok');
 }
 
 const remapButton = $<HTMLButtonElement>('controls-remap');
@@ -4284,7 +4474,7 @@ const resetBindings = $<HTMLButtonElement>('controls-reset');
 remapButton.addEventListener('click', () => {
   remappage = !remappage;
   enAttente = null;
-  remapButton.textContent = remappage ? 'Terminer' : 'Réassigner…';
+  remapButton.textContent = remappage ? t('Terminer') : t('Réassigner…');
   keypadBox.classList.toggle('remappage', remappage);
   buildKeypad();
 });
@@ -4293,7 +4483,7 @@ resetBindings.addEventListener('click', () => {
   if (!liaisons[layout.id]) return;
   enAttente = null;
   poserLiaisons(withoutBindings(liaisons, layout.id));
-  log('liaisons de manette remises d’origine');
+  log(t('liaisons de manette remises d’origine'));
 });
 
 let keyLabels: Map<string, string> | null = null;
@@ -4331,10 +4521,10 @@ function buildKeypad(): void {
     const source = [...padBindings()].find(([, cible]) => cible === index)?.[0];
     if (enAttente === index) {
       manette.textContent = '…';
-      cell.title = 'pressez le bouton voulu sur la manette';
+      cell.title = t('pressez le bouton voulu sur la manette');
     } else if (source !== undefined) {
       manette.textContent = padButtonShort(source);
-      cell.title = `manette : ${padButtonName(source)}`;
+      cell.title = dit('manette : {0}', padButtonShort(source));
     } else {
       manette.textContent = '';
     }
@@ -4410,6 +4600,14 @@ async function start(): Promise<void> {
   // non passer de l'une à l'autre sous les yeux.
   applyTheme(themeActuel, document.documentElement);
 
+  // La langue avant tout dessin : traduire après coup ferait apparaître la
+  // fenêtre en français une fraction de seconde, puis basculer sous les yeux.
+  const langue = langueRetenue();
+  poserLangue(langue.code === 'fr' ? null : langue);
+  document.documentElement.lang = langue.code;
+  document.documentElement.dir = langue.rtl ? 'rtl' : 'ltr';
+  traduireDocument(document);
+
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.
   await relireJaquettesPosees();
@@ -4431,7 +4629,7 @@ async function start(): Promise<void> {
   // installé doit être interrogé un par un, et l'attente se compte en dizaines
   // de secondes : sans un mot, une bibliothèque vide passe pour une panne, et
   // on referme la fenêtre — ce qui fait tout recommencer au lancement suivant.
-  if (inShell) log('interrogation des cœurs installés…');
+  if (inShell) log(t('interrogation des cœurs installés…'));
 
   catalog = await discover(makeChip8);
 
@@ -4455,9 +4653,11 @@ async function start(): Promise<void> {
         presets = found;
         renderExternals();
       })
-      .catch((error) => log(`recherche des émulateurs interrompue — ${reason(error)}`, 'err'));
+      .catch((error) =>
+        log(dit('recherche des émulateurs interrompue — {0}', reason(error)), 'err'),
+      );
   } else {
-    log("page web : seuls les cœurs internes sont disponibles, sans bibliothèque");
+    log(t('page web : seuls les cœurs internes sont disponibles, sans bibliothèque'));
   }
 
   placeholderPath.textContent = defaultRomsPath;
@@ -4470,19 +4670,22 @@ async function start(): Promise<void> {
   await refreshLibrary();
   showLibrary(true);
   refreshMenus();
-  log(`${plural(catalog.length, 'cœur')} ${catalog.length > 1 ? 'disponibles' : 'disponible'}`);
+  log(dit('{0} à disposition', plural(catalog.length, 'cœur')));
 
-  for (const line of discoveryReport) log(`découverte : ${line}`);
+  for (const line of discoveryReport) log(dit('découverte : {0}', line));
   for (const failure of discoveryErrors) {
-    log(`découverte interrompue — ${failure}`, 'err');
+    log(dit('découverte interrompue — {0}', failure), 'err');
   }
 
   if (rejectedCores.length > 0) {
     // Ils ont été chargés dans un processus séparé et s'y sont terminés
     // brutalement — le plus souvent faute d'un contexte graphique matériel.
-    const many = rejectedCores.length > 1;
     log(
-      `${plural(rejectedCores.length, 'cœur')} écarté${many ? 's' : ''} : ${rejectedCores.join(', ')}`,
+      dit(
+        "mis à l'écart : {0} · {1}",
+        plural(rejectedCores.length, 'cœur'),
+        rejectedCores.join(', '),
+      ),
       'err',
     );
   }
