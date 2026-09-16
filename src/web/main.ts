@@ -98,7 +98,7 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
-import { Held, echelle, step, voisin } from './navigation.ts';
+import { Held, echelle, initiale, sautInitiale, step, voisin } from './navigation.ts';
 import type { Boite } from './navigation.ts';
 import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } from './recents.ts';
 import type { Recent } from './recents.ts';
@@ -127,6 +127,7 @@ const grilleView = $<HTMLDivElement>('grille');
 const grilleTuiles = $<HTMLDivElement>('grille-tuiles');
 const grilleTitre = $<HTMLElement>('grille-titre');
 const grilleDetail = $<HTMLElement>('grille-detail');
+const grilleLettre = $<HTMLDivElement>('grille-lettre');
 const xmbView = $<HTMLDivElement>('xmb');
 const xmbFond = $<HTMLCanvasElement>('xmb-fond');
 const xmbColonnes = $<HTMLDivElement>('xmb-colonnes');
@@ -134,6 +135,7 @@ const xmbEntrees = $<HTMLDivElement>('xmb-entrees');
 const xmbConsole = $<HTMLElement>('xmb-console');
 const xmbHeure = $<HTMLElement>('xmb-heure');
 const xmbPied = $<HTMLElement>('xmb-pied');
+const xmbLettre = $<HTMLDivElement>('xmb-lettre');
 const xmbAfficheInitiale = $<HTMLElement>('xmb-affiche-initiale');
 const xmbAfficheImage = $<HTMLImageElement>('xmb-affiche-image');
 const placeholder = $<HTMLDivElement>('placeholder');
@@ -1844,6 +1846,9 @@ const boutons = {
   retour: new Held(1000, 1000),
   favori: new Held(1000, 1000),
   capture: new Held(1200, 1200),
+  // Les gâchettes hautes se tiennent pour traverser vite : elles répètent.
+  lettreAvant: new Held(380, 200),
+  lettreArriere: new Held(380, 200),
 };
 
 /**
@@ -1925,6 +1930,20 @@ function naviguerMenu(): void {
   if (a) {
     tic(true);
     void (vue === 'grille' ? jouerChoisie() : jouerXmb());
+  }
+
+  // Les gâchettes hautes sautent d'initiale — sauf quand Select est tenu,
+  // auquel cas la combinaison appartient aux sauvegardes rapides.
+  const select = appuye(BOUTON.select);
+  const avant = boutons.lettreAvant.update(!select && appuye(5), maintenant);
+  const arriere = boutons.lettreArriere.update(!select && appuye(4), maintenant);
+  if (avant.pressed || avant.repeat) {
+    tic();
+    sauterLettre(vue, 1);
+  }
+  if (arriere.pressed || arriere.repeat) {
+    tic();
+    sauterLettre(vue, -1);
   }
 
   if (boutons.favori.update(appuye(BOUTON.x), maintenant).pressed) {
@@ -2105,6 +2124,57 @@ function bruit(lance = false): void {
   else ticDeplacement();
 }
 
+// --- Saut par initiale ------------------------------------------------------
+
+/**
+ * Montre la lettre atteinte, le temps d'un saut.
+ *
+ * Sans ce repère, sauter de lettre en lettre revient à avancer les yeux
+ * fermés : la liste bouge, mais rien ne dit où l'on vient d'arriver.
+ */
+let lettreMinuterie = 0;
+
+function montrerLettre(texte: string): void {
+  const boite = enGrille() ? grilleLettre : xmbLettre;
+  clearTimeout(lettreMinuterie);
+  boite.textContent = texte;
+  boite.hidden = false;
+  // L'animation repart de zéro à chaque saut : sans ce retrait, deux sauts
+  // rapprochés laisseraient la première lettre s'effacer sous la seconde.
+  boite.style.animation = 'none';
+  void boite.offsetWidth;
+  boite.style.animation = '';
+  lettreMinuterie = window.setTimeout(() => {
+    boite.hidden = true;
+  }, 700);
+}
+
+/** Les initiales des jeux de la vue en cours, dans l'ordre affiché. */
+function initialesVue(vue: 'grille' | 'xmb'): string[] {
+  const liste = vue === 'grille' ? tuiles : (voletsXmb[colonneXmb]?.games ?? []);
+  return liste.map((item) => initiale(gameLabel(item.rom.name)));
+}
+
+/**
+ * Saute à la lettre suivante ou précédente.
+ *
+ * C'est la réponse à la recherche sans clavier : le champ de recherche demande
+ * un clavier qu'on n'a pas manette en main, et cinq cents jeux ne se
+ * parcourent pas case par case.
+ */
+function sauterLettre(vue: 'grille' | 'xmb', sens: 1 | -1): void {
+  const initiales = initialesVue(vue);
+  if (initiales.length === 0) return;
+
+  const depuis = vue === 'grille' ? choisie : entreeXmb;
+  const vers = sautInitiale(depuis, initiales, sens);
+  if (vers === depuis) return;
+
+  if (vue === 'grille') choisir(vers);
+  else allerEntree(vers);
+  montrerLettre(initiales[vers]);
+}
+
 /** Déplace la sélection de la vue en cours. */
 function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
   if (vue === 'grille') choisir(voisin(choisie, boitesGrille, sens));
@@ -2180,6 +2250,13 @@ document.addEventListener('keydown', (event) => {
     event.preventDefault();
     pousser(vue, sens);
     bruit();
+    return;
+  }
+
+  if ((event.key === 'PageDown' || event.key === 'PageUp') && !dansLaRecherche) {
+    event.preventDefault();
+    bruit();
+    sauterLettre(vue, event.key === 'PageDown' ? 1 : -1);
     return;
   }
 

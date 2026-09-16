@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { Held, columnsFor, echelle, move, step, voisin } from './navigation.ts';
+import { Held, columnsFor, echelle, initiale, move, sautInitiale, step, voisin } from './navigation.ts';
 import type { Boite } from './navigation.ts';
 
 /*  Grille de référence, 4 colonnes, 10 jeux :
@@ -227,5 +227,72 @@ describe('voisin d’après la disposition réelle', () => {
     // monter la ramène sous la première colonne.
     assert.equal(voisin(99, grille(4), 'haut'), 0);
     assert.equal(voisin(99, grille(4), 'gauche'), 3, 'rien à gauche : on reste');
+  });
+});
+
+describe('initiale d’un titre', () => {
+  it('ramène les accents à leur lettre', () => {
+    // « Astérix » et « Asterix » doivent se ranger ensemble.
+    assert.equal(initiale('Astérix'), 'A');
+    assert.equal(initiale('Ébène'), 'E');
+  });
+
+  it('range tout le reste sous un même signe', () => {
+    assert.equal(initiale('1942'), '#');
+    assert.equal(initiale('[BIOS] Truc'), '#');
+    assert.equal(initiale(''), '#');
+    assert.equal(initiale('   '), '#');
+  });
+});
+
+describe('saut par initiale', () => {
+  //  0:A  1:A  2:A  3:M  4:M  5:Z
+  const lettres = ['A', 'A', 'A', 'M', 'M', 'Z'];
+
+  it('saute au premier de la lettre suivante', () => {
+    assert.equal(sautInitiale(0, lettres, 1), 3);
+    assert.equal(sautInitiale(3, lettres, 1), 5);
+  });
+
+  it('revient d’abord au début de la lettre en cours', () => {
+    // Depuis le milieu des « A », reculer doit remonter au premier « A » et
+    // non sauter par-dessus les deux qui restent.
+    assert.equal(sautInitiale(2, lettres, -1), 0);
+    assert.equal(sautInitiale(4, lettres, -1), 3);
+  });
+
+  it('revient au début du bloc précédent, pas à sa fin', () => {
+    // C'est le premier « A » qu'on veut retrouver en revenant des « M ».
+    assert.equal(sautInitiale(3, lettres, -1), 0);
+    assert.equal(sautInitiale(5, lettres, -1), 3);
+  });
+
+  it('ne sort pas de la liste', () => {
+    assert.equal(sautInitiale(0, lettres, -1), 0);
+    assert.equal(sautInitiale(5, lettres, 1), 5);
+  });
+
+  it('survit à une liste vide ou à un indice impossible', () => {
+    assert.equal(sautInitiale(0, [], 1), 0);
+    assert.equal(sautInitiale(99, lettres, 1), 5);
+    assert.equal(sautInitiale(-4, lettres, 1), 3);
+  });
+
+  it('traverse une bibliothèque entière en peu d’appuis', () => {
+    // Le point de la manœuvre : cinq cents jeux ne se parcourent pas case par
+    // case, mais bien en une vingtaine de sauts.
+    const grande = Array.from({ length: 500 }, (_, i) =>
+      String.fromCharCode(65 + Math.floor(i / 20)),
+    );
+    let rang = 0;
+    let appuis = 0;
+    while (rang < grande.length - 1 && appuis < 100) {
+      const suivant = sautInitiale(rang, grande, 1);
+      if (suivant === rang) break;
+      rang = suivant;
+      appuis += 1;
+    }
+    assert.ok(appuis <= 26, `${appuis} appuis pour traverser`);
+    assert.ok(rang > 400, 'on doit arriver près du bout');
   });
 });

@@ -60,6 +60,64 @@ export function step(index: number, count: number, delta: number): number {
   return Math.min(Math.max(index + delta, 0), count - 1);
 }
 
+/**
+ * L'initiale sous laquelle un titre se range.
+ *
+ * Les accents sont ramenés à leur lettre — « Astérix » et « Asterix » doivent
+ * se ranger ensemble — et tout ce qui n'est pas une lettre part sous le même
+ * signe, qui vient avant l'alphabet comme dans n'importe quel index.
+ */
+export function initiale(titre: string): string {
+  const propre = titre
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .toUpperCase();
+  const premier = propre.charAt(0);
+  return premier >= 'A' && premier <= 'Z' ? premier : '#';
+}
+
+/**
+ * Le saut à la lettre suivante ou précédente.
+ *
+ * Cinq cents jeux ne se parcourent pas case par case, et le champ de recherche
+ * demande un clavier qu'on n'a pas manette en main. Sauter d'initiale en
+ * initiale traverse la bibliothèque en une dizaine d'appuis, ce qui suffit.
+ *
+ * Vers l'arrière on remonte jusqu'au **début** du bloc précédent, et non à sa
+ * fin : c'est le premier « M » qu'on veut retrouver en revenant des « N », pas
+ * le dernier.
+ */
+export function sautInitiale(
+  index: number,
+  initiales: readonly string[],
+  sens: 1 | -1,
+): number {
+  if (initiales.length === 0) return 0;
+  const courant = Math.min(Math.max(index, 0), initiales.length - 1);
+  const ici = initiales[courant];
+
+  if (sens === 1) {
+    for (let rang = courant + 1; rang < initiales.length; rang += 1) {
+      if (initiales[rang] !== ici) return rang;
+    }
+    return courant;
+  }
+
+  // Le début du bloc en cours, d'abord : si l'on n'y est pas déjà, c'est là
+  // qu'on veut aller. Sans cela, revenir en arrière depuis le milieu des « M »
+  // sauterait directement aux « L » en laissant des « M » derrière soi.
+  let debut = courant;
+  while (debut > 0 && initiales[debut - 1] === ici) debut -= 1;
+  if (debut !== courant) return debut;
+
+  if (debut === 0) return 0;
+  const precedente = initiales[debut - 1];
+  let rang = debut - 1;
+  while (rang > 0 && initiales[rang - 1] === precedente) rang -= 1;
+  return rang;
+}
+
 /** Un rectangle, tel que la mise en page l'a posé. */
 export interface Boite {
   readonly x: number;

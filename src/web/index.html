@@ -425,6 +425,37 @@
       }
       .capture .quand { display: block; opacity: 0.7; }
 
+      /*
+       * La lettre atteinte, le temps d'un saut.
+       *
+       * Posée au milieu, par-dessus tout, et retirée d'elle-même : c'est un
+       * repère, pas un élément d'interface. Sans elle, sauter de lettre en
+       * lettre à la manette revient à avancer les yeux fermés.
+       */
+      .lettre {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        pointer-events: none;
+        z-index: 5;
+        font-size: 128px;
+        font-weight: 700;
+        color: var(--ink);
+        text-shadow: 0 4px 24px rgba(0, 0, 0, 0.7);
+        animation: lettre-passe 700ms ease-out forwards;
+      }
+      .lettre[hidden] { display: none; }
+      @keyframes lettre-passe {
+        0% { opacity: 0; transform: scale(0.8); }
+        18% { opacity: 0.92; transform: scale(1); }
+        70% { opacity: 0.92; }
+        100% { opacity: 0; transform: scale(1.05); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .lettre { animation: none; opacity: 0.9; }
+      }
+
       /* --- Menu animé --- */
 
       /*
@@ -1260,6 +1291,7 @@
                deux vues partagent la même bibliothèque, pas le même dessin. -->
           <div class="grille" id="grille" hidden>
             <div class="grille-tuiles" id="grille-tuiles"></div>
+            <div class="lettre" id="grille-lettre" hidden></div>
             <div class="grille-pied">
               <strong id="grille-titre"></strong>
               <span id="grille-detail"></span>
@@ -1289,6 +1321,7 @@
                 <img alt="" id="xmb-affiche-image" />
               </span>
             </div>
+            <div class="lettre" id="xmb-lettre" hidden></div>
             <div class="xmb-pied">
               <span id="xmb-pied"></span>
               <span class="xmb-touches">A lancer · X favori · B retour · Start menu</span>
