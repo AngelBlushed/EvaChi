@@ -22,6 +22,7 @@ mod emulators;
 mod install;
 mod manual;
 mod pads;
+mod sentinel;
 mod shots;
 mod skeleton;
 mod states;
@@ -155,6 +156,10 @@ fn main() {
             commands::installable_emulators,
             commands::install_emulator,
             commands::cover_index,
+            commands::begin_session,
+            commands::crash_report,
+            commands::dismiss_crash,
+            commands::set_core_usable,
             commands::save_state_slot,
             commands::load_state_slot,
             commands::list_states,

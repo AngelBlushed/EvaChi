@@ -1376,6 +1376,16 @@
         </p>
         <ul class="preset-list" id="install-list"></ul>
 
+        <div id="ecartes-bloc" hidden>
+          <h3 class="section">Émulateurs écartés</h3>
+          <p class="hint-text">
+            Ceux-ci ne sont plus proposés : ils n'ont pas répondu à
+            l'interrogation, ou ils ont fait tomber EvaChi. Les rétablir ne les
+            réinstalle pas — cela les remet simplement dans la liste.
+          </p>
+          <ul class="preset-list" id="ecartes-list"></ul>
+        </div>
+
         <h3 class="section">Consoles récentes</h3>
         <p class="hint-text">
           Ces consoles n'ont pas de cœur libretro : leur émulateur est un
@@ -1530,6 +1540,24 @@
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <dialog id="crash-dialog">
+      <h2>La fois précédente s'est mal terminée</h2>
+      <div class="dialog-body">
+        <p class="hint-text" id="crash-quoi"></p>
+        <p class="hint-text">
+          Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe,
+          il l'emporte avec lui, sans message. Écarter cet émulateur le laisse
+          installé mais cesse de le proposer. Vous pourrez le rétablir à tout
+          moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la
+          fenêtre.
+        </p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="crash-ecarter" class="lien">Écarter cet émulateur</button>
+        <button type="button" data-close>Le garder</button>
       </div>
     </dialog>
 

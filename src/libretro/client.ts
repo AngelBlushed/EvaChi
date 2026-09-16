@@ -237,6 +237,33 @@ export interface CoverIndex {
   readonly names: string[];
 }
 
+/** Ce qu'une partie mal terminée a laissé derrière elle. */
+export interface CrashReport {
+  readonly core: string;
+  readonly label: string;
+  readonly game: string;
+}
+
+/** Note qu'une partie commence, pour qu'un arrêt brutal laisse une trace. */
+export async function beginSession(core: string, label: string, game: string): Promise<void> {
+  return invoke<void>('begin_session', { core, label, game });
+}
+
+/** La note laissée par une partie qui ne s'est pas terminée, s'il y en a une. */
+export async function crashReport(): Promise<CrashReport | null> {
+  return invoke<CrashReport | null>('crash_report');
+}
+
+/** Efface la note : on a pris connaissance de l'incident. */
+export async function dismissCrash(): Promise<void> {
+  return invoke<void>('dismiss_crash');
+}
+
+/** Écarte un cœur, ou le rétablit. */
+export async function setCoreUsable(path: string, usable: boolean): Promise<void> {
+  return invoke<void>('set_core_usable', { path, usable });
+}
+
 /** Un emplacement de sauvegarde d'état. */
 export interface StateSlot {
   readonly slot: number;

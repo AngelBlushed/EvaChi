@@ -23,8 +23,11 @@ import {
   adoptSystemFile,
   pickSystemFolder,
   adoptSystemFolder,
+  beginSession,
   clearManualCover,
   coverIndex,
+  crashReport,
+  dismissCrash,
   deleteShot,
   deleteStateSlot,
   directories,
@@ -39,6 +42,7 @@ import {
   readContent,
   removeLibraryFolder,
   revealShotsDir,
+  setCoreUsable,
   saveShot,
   saveStateSlot,
   setManualCover,
@@ -168,6 +172,10 @@ const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
 const emplacementsBoite = $<HTMLDivElement>('emplacements');
+const crashQuoi = $<HTMLElement>('crash-quoi');
+const crashEcarter = $<HTMLButtonElement>('crash-ecarter');
+const ecartesBloc = $<HTMLDivElement>('ecartes-bloc');
+const ecartesList = $<HTMLUListElement>('ecartes-list');
 const jaquettesCase = $<HTMLInputElement>('jaquettes');
 const disquesCase = $<HTMLInputElement>('disques');
 const musiqueCase = $<HTMLInputElement>('musique');
@@ -200,6 +208,7 @@ const dialogs = {
   graphics: $<HTMLDialogElement>('graphics-dialog'),
   gallery: $<HTMLDialogElement>('gallery-dialog'),
   states: $<HTMLDialogElement>('states-dialog'),
+  crash: $<HTMLDialogElement>('crash-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -712,6 +721,91 @@ async function effacerCapture(fichier: string): Promise<void> {
   } catch (error) {
     log(`effacement — ${reason(error)}`, 'err');
   }
+}
+
+// --- Arrêt brutal -----------------------------------------------------------
+
+/**
+ * Signale une partie qui ne s'est pas terminée, et propose d'écarter le cœur.
+ *
+ * Un cœur libretro tourne dans la même fenêtre qu'EvaChi : quand il tombe, il
+ * l'emporte avec lui, sans message ni journal. Flycast l'a fait — il a fallu
+ * fouiller le journal d'événements de Windows pour apprendre lequel des
+ * cinquante-quatre cœurs était en cause. Une note posée au chargement et
+ * effacée au déchargement suffit à répondre à la question suivante : « qu'est-ce
+ * qui vient de se passer ? »
+ */
+/**
+ * Les émulateurs écartés, avec de quoi les rétablir.
+ *
+ * Un cœur écarté reste installé : on cesse seulement de le proposer. Sans
+ * cette liste, la seule façon de revenir en arrière serait de le réinstaller —
+ * un téléchargement pour annuler un réglage.
+ */
+function renderEcartes(): void {
+  ecartesList.replaceChildren();
+  ecartesBloc.hidden = rejectedCores.length === 0;
+
+  for (const id of rejectedCores) {
+    const ligne = document.createElement('li');
+
+    const nom = document.createElement('span');
+    nom.className = 'name';
+    nom.textContent = id;
+
+    const bouton = document.createElement('button');
+    bouton.type = 'button';
+    bouton.className = 'lien';
+    bouton.textContent = 'Rétablir';
+    bouton.addEventListener('click', async () => {
+      try {
+        await setCoreUsable(id, true);
+        log(`${id} rétabli`, 'ok');
+        // Le catalogue, pas seulement la liste des jeux : c'est lui qui écarte
+        // les cœurs inutilisables, et il n'est relu qu'ici.
+        await reloadCatalog();
+        await refreshLibrary();
+        renderEcartes();
+      } catch (error) {
+        log(`rétablissement impossible — ${reason(error)}`, 'err');
+      }
+    });
+
+    ligne.append(nom, bouton);
+    ecartesList.append(ligne);
+  }
+}
+
+async function signalerIncident(): Promise<void> {
+  let rapport = null;
+  try {
+    rapport = await crashReport();
+  } catch {
+    return;
+  }
+  if (!rapport) return;
+
+  const quoi = rapport.game ? ` en lançant « ${rapport.game} »` : '';
+  crashQuoi.textContent = `EvaChi s'est arrêtée${quoi}, avec l'émulateur ${rapport.label || rapport.core}.`;
+  log(`arrêt brutal la fois précédente — ${rapport.label || rapport.core}`, 'err');
+
+  crashEcarter.onclick = async () => {
+    try {
+      await setCoreUsable(rapport.core, false);
+      log(`${rapport.label} écarté`, 'ok');
+      await reloadCatalog();
+      await refreshLibrary();
+    } catch (error) {
+      log(`mise à l'écart impossible — ${reason(error)}`, 'err');
+    }
+    dialogs.crash.close();
+  };
+
+  // La note est effacée dès qu'on l'a montrée : on ne prévient qu'une fois.
+  dialogs.crash.addEventListener('close', () => void dismissCrash().catch(() => {}), {
+    once: true,
+  });
+  openDialog(dialogs.crash);
 }
 
 // --- Emplacements de sauvegarde ---------------------------------------------
@@ -1455,6 +1549,13 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
   // qui peut avoir changé entre-temps.
   cheminEnCours = path ?? '';
   if (path) ouvrirPartie({ path, name, folder: dossierDuJeu(path) });
+
+  // Le témoin est posé avant l'appel au cœur, pas après : c'est justement
+  // pendant le chargement que les cœurs fragiles tombent, et une fenêtre qui
+  // disparaît sans rien dire ne laisserait autrement aucune trace.
+  if (entry && entry.kind !== 'interne') {
+    void beginSession(entry.id, entry.label, name).catch(() => {});
+  }
 
   loopToken += 1;
   running = false;
@@ -3494,6 +3595,7 @@ installButton.addEventListener('click', () => void installSelected());
 /** Ouvre la liste des émulateurs, après l'avoir remise à jour. */
 async function openInstall(): Promise<void> {
   await refreshInstall();
+  renderEcartes();
   openDialog(dialogs.install);
 }
 
@@ -4162,6 +4264,7 @@ async function start(): Promise<void> {
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.
   await relireJaquettesPosees();
+  await signalerIncident();
   await relireCaptures();
 
   try {

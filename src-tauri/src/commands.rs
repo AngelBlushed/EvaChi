@@ -765,6 +765,47 @@ pub struct CoverIndex {
     pub names: Vec<String>,
 }
 
+/// Ce qu'une partie mal terminée a laissé derrière elle.
+///
+/// Relu une fois au démarrage : si une note traîne, c'est que la fenêtre a
+/// disparu pendant qu'un cœur tournait, et la note dit lequel.
+#[tauri::command]
+pub fn crash_report(paths: State<'_, Paths>) -> Option<crate::sentinel::Rapport> {
+    crate::sentinel::relever(&racine(&paths))
+}
+
+/// Efface la note : on a pris connaissance de l'incident.
+#[tauri::command]
+pub fn dismiss_crash(paths: State<'_, Paths>) -> Result<(), String> {
+    crate::sentinel::fermer(&racine(&paths));
+    Ok(())
+}
+
+/// Écarte un cœur, ou le rétablit.
+///
+/// Un cœur écarté reste installé et reste dans la fiche : on ne le propose
+/// simplement plus. Effacer sa bibliothèque serait irréversible pour un cœur
+/// qui ne fait peut-être tomber qu'un seul jeu.
+#[tauri::command]
+pub fn set_core_usable(
+    path: String,
+    usable: bool,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    // Désigné par son identifiant et non par son chemin : c'est ce que la
+    // fenêtre connaît, et le chemin d'un cœur change quand on le réinstalle.
+    let mut config = load_config(&paths)?;
+    let Some(connu) = config
+        .cores
+        .values_mut()
+        .find(|connu| connu.entry.id == path || connu.entry.path == path)
+    else {
+        return Err(format!("cœur inconnu : {path}"));
+    };
+    connu.entry.usable = usable;
+    write_config(&paths, &config)
+}
+
 /// La base des données de l'application, où vivent captures et sauvegardes.
 fn racine(paths: &Paths) -> std::path::PathBuf {
     paths
@@ -2286,6 +2327,22 @@ pub fn load_content(path: String, session: State<'_, Session>) -> Result<AvInfo,
     session.load_content(Path::new(&path), data)
 }
 
+/// Note qu'une partie commence, pour qu'un arrêt brutal laisse une trace.
+///
+/// Posée par la fenêtre plutôt que déduite ici : c'est elle qui sait quel cœur
+/// elle a choisi et sous quel nom il s'affiche, et l'acteur qui tient la
+/// session n'expose pas cette identité.
+#[tauri::command]
+pub fn begin_session(
+    core: String,
+    label: String,
+    game: String,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    crate::sentinel::ouvrir(&racine(&paths), &core, &label, &game)
+        .map_err(|error| format!("témoin non écrit : {error}"))
+}
+
 /// En-tête d'une trame : largeur, hauteur, drapeaux, nombre de trames audio.
 const FRAME_HEADER: usize = 16;
 const FLAG_VIDEO: u32 = 1 << 0;
@@ -2374,7 +2431,9 @@ pub fn load_state(state: Vec<u8>, session: State<'_, Session>) -> Result<(), Str
 }
 
 #[tauri::command]
-pub fn unload(session: State<'_, Session>) -> Result<(), String> {
+pub fn unload(session: State<'_, Session>, paths: State<'_, Paths>) -> Result<(), String> {
+    // Déchargé proprement : il n'y a plus d'incident à signaler.
+    crate::sentinel::fermer(&racine(&paths));
     session.unload()
 }
 
