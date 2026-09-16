@@ -9,7 +9,8 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { Held, columnsFor, echelle, move, step } from './navigation.ts';
+import { Held, columnsFor, echelle, move, step, voisin } from './navigation.ts';
+import type { Boite } from './navigation.ts';
 
 /*  Grille de référence, 4 colonnes, 10 jeux :
  *
@@ -167,5 +168,64 @@ describe('appui tenu', () => {
     bouton.update(true, 0);
     bouton.update(false, 50);
     assert.deepEqual(bouton.update(true, 60), { pressed: true, repeat: false });
+  });
+});
+
+describe('voisin d’après la disposition réelle', () => {
+  /** Une grille régulière de 3 colonnes, cases de 100×120 espacées de 20. */
+  const grille = (combien: number, colonnes = 3): Boite[] =>
+    Array.from({ length: combien }, (_, i) => ({
+      x: (i % colonnes) * 120,
+      y: Math.floor(i / colonnes) * 140,
+      w: 100,
+      h: 120,
+    }));
+
+  it('se déplace comme on s’y attend sur une grille régulière', () => {
+    const boites = grille(9);
+    assert.equal(voisin(4, boites, 'gauche'), 3);
+    assert.equal(voisin(4, boites, 'droite'), 5);
+    assert.equal(voisin(4, boites, 'haut'), 1);
+    assert.equal(voisin(4, boites, 'bas'), 7);
+  });
+
+  it('ne sort pas de la grille', () => {
+    const boites = grille(9);
+    assert.equal(voisin(0, boites, 'gauche'), 0);
+    assert.equal(voisin(0, boites, 'haut'), 0);
+    assert.equal(voisin(8, boites, 'droite'), 8);
+    assert.equal(voisin(8, boites, 'bas'), 8);
+  });
+
+  it('descend vers la case la plus proche quand la ligne est incomplète', () => {
+    // Sept cases sur trois colonnes : sous la case 5 il n'y a personne, mais
+    // la 6 est juste à côté.
+    const boites = grille(7);
+    assert.equal(voisin(5, boites, 'bas'), 6);
+  });
+
+  it('franchit un titre de section sans se tromper de colonne', () => {
+    // C'est le cas qui cassait : un titre coupe la rangée, et le calcul en
+    // colonnes envoyait la sélection n'importe où dans la section suivante.
+    const boites: Boite[] = [
+      // Section 1 : deux favoris.
+      { x: 0, y: 0, w: 100, h: 120 },
+      { x: 120, y: 0, w: 100, h: 120 },
+      // Section 2, après un titre : trois jeux, une rangée plus bas.
+      { x: 0, y: 200, w: 100, h: 120 },
+      { x: 120, y: 200, w: 100, h: 120 },
+      { x: 240, y: 200, w: 100, h: 120 },
+    ];
+    assert.equal(voisin(1, boites, 'bas'), 3, 'doit tomber sous la même colonne');
+    assert.equal(voisin(3, boites, 'haut'), 1);
+    assert.equal(voisin(4, boites, 'haut'), 1, 'la colonne 3 n’existe pas au-dessus');
+  });
+
+  it('survit à une grille vide ou à un indice impossible', () => {
+    assert.equal(voisin(0, [], 'bas'), 0);
+    // L'indice est ramené sur la dernière case, qui est seule sur sa rangée :
+    // monter la ramène sous la première colonne.
+    assert.equal(voisin(99, grille(4), 'haut'), 0);
+    assert.equal(voisin(99, grille(4), 'gauche'), 3, 'rien à gauche : on reste');
   });
 });

@@ -97,7 +97,8 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
-import { Held, columnsFor, echelle, move, step } from './navigation.ts';
+import { Held, echelle, step, voisin } from './navigation.ts';
+import type { Boite } from './navigation.ts';
 import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } from './recents.ts';
 import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
@@ -1629,14 +1630,6 @@ function enGrille(): boolean {
   return menuActuel() === 'grille';
 }
 
-/** Largeur d'une tuile et écart entre deux, tels que la feuille de style les pose. */
-const TUILE = { largeur: 124, ecart: 18 };
-
-/** Le nombre de colonnes réellement affichées. */
-function colonnes(): number {
-  return columnsFor(grilleTuiles.clientWidth - 44, TUILE.largeur, TUILE.ecart);
-}
-
 /**
  * Range la grille : ni cases affichées, ni sélection qui traîne.
  *
@@ -1658,6 +1651,24 @@ function signature(liste: readonly Playable[]): string {
 }
 let signatureAffichee = '';
 
+/**
+ * Les positions des cases, relevées après le dessin.
+ *
+ * C'est sur elles que se fait le déplacement : une grille coupée par des
+ * titres de section n'a plus de rangées régulières, et l'arithmétique en
+ * colonnes envoyait alors la sélection au hasard d'une section à l'autre.
+ */
+let boitesGrille: Boite[] = [];
+
+function releverBoites(): void {
+  boitesGrille = ([...grilleTuiles.querySelectorAll<HTMLElement>('.tuile')]).map((element) => ({
+    x: element.offsetLeft,
+    y: element.offsetTop,
+    w: element.offsetWidth,
+    h: element.offsetHeight,
+  }));
+}
+
 /** Dessine la grille à partir des volets déjà classés. */
 function renderGrille(shelves: Shelf[]): void {
   grilleTuiles.replaceChildren();
@@ -1669,7 +1680,21 @@ function renderGrille(shelves: Shelf[]): void {
   if (empreinte !== signatureAffichee) choisie = 0;
   signatureAffichee = empreinte;
 
-  for (const [rang, item] of tuiles.entries()) {
+  let rang = -1;
+  for (const shelf of shelves) {
+    // Un titre par volet : sans lui, les favoris et les parties récentes se
+    // fondaient dans le tas, et on ne comprenait ni pourquoi ils étaient là ni
+    // pourquoi certains jeux apparaissaient deux fois.
+    const titre = document.createElement('h3');
+    titre.className = 'section-grille';
+    titre.textContent = shelf.label;
+    const combien = document.createElement('span');
+    combien.textContent = plural(shelf.games.length, 'jeu', 'jeux');
+    titre.append(combien);
+    grilleTuiles.append(titre);
+
+    for (const item of shelf.games) {
+    rang += 1;
     const tuile = document.createElement('button');
     tuile.type = 'button';
     tuile.className = 'tuile';
@@ -1723,8 +1748,10 @@ function renderGrille(shelves: Shelf[]): void {
       ouvrirContextuel(event, item);
     });
     grilleTuiles.append(tuile);
+    }
   }
 
+  releverBoites();
   choisir(choisie);
 }
 
@@ -1732,7 +1759,10 @@ function renderGrille(shelves: Shelf[]): void {
 function choisir(rang: number): void {
   choisie = Math.min(Math.max(rang, 0), Math.max(0, tuiles.length - 1));
 
-  const cases = [...grilleTuiles.children] as HTMLElement[];
+  // Les cases seules, sans les titres de section : ceux-ci sont aussi des
+  // enfants de la grille, et les compter décalait la sélection d'un cran par
+  // section traversée — la marque se posait alors sur un titre.
+  const cases = [...grilleTuiles.querySelectorAll<HTMLElement>('.tuile')];
   for (const [index, element] of cases.entries()) {
     element.setAttribute('aria-selected', String(index === choisie));
   }
@@ -2076,7 +2106,7 @@ function bruit(lance = false): void {
 
 /** Déplace la sélection de la vue en cours. */
 function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
-  if (vue === 'grille') choisir(move(choisie, tuiles.length, colonnes(), sens));
+  if (vue === 'grille') choisir(voisin(choisie, boitesGrille, sens));
   else deplacerXmb(sens);
 }
 
@@ -2555,6 +2585,11 @@ setInterval(poserHeure, 30_000);
  * repère, et l'écart grandirait à mesure qu'on descend dans la liste.
  */
 window.addEventListener('resize', () => {
+  // La grille se recompose à toute largeur : ses positions sont à relever.
+  if (!grilleView.hidden) {
+    releverBoites();
+    choisir(choisie);
+  }
   if (xmbView.hidden) return;
   poserEchelle();
   placerXmb();

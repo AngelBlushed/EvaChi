@@ -218,6 +218,28 @@
         align-content: start;
       }
 
+      /* Un titre par volet, sur toute la largeur : c'est lui qui sépare les
+         favoris et les parties récentes du reste de la bibliothèque. */
+      .section-grille {
+        grid-column: 1 / -1;
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        margin: 8px 0 0;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+      .section-grille:first-child { margin-top: 0; }
+      .section-grille span {
+        font-weight: 400;
+        letter-spacing: 0;
+        text-transform: none;
+        color: var(--muted);
+      }
+
       .tuile {
         position: relative;
         border: 0;

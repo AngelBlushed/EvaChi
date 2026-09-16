@@ -60,6 +60,69 @@ export function step(index: number, count: number, delta: number): number {
   return Math.min(Math.max(index + delta, 0), count - 1);
 }
 
+/** Un rectangle, tel que la mise en page l'a posé. */
+export interface Boite {
+  readonly x: number;
+  readonly y: number;
+  readonly w: number;
+  readonly h: number;
+}
+
+/**
+ * Le voisin le plus naturel dans une direction, d'après les positions réelles.
+ *
+ * L'arithmétique en colonnes ne vaut que pour une grille parfaitement
+ * régulière. Dès qu'un titre de section coupe une rangée, les cases ne sont
+ * plus au rang que le calcul leur suppose, et la sélection se met à sauter
+ * d'une section à l'autre sans raison visible.
+ *
+ * On regarde donc où les cases sont vraiment. Ne sont retenues que celles
+ * franchement situées du bon côté ; parmi elles, la plus proche, l'écart de
+ * travers comptant triple — sans quoi, en descendant, on partirait volontiers
+ * vers une case lointaine sur le côté plutôt que vers celle juste en dessous.
+ */
+export function voisin(index: number, boites: readonly Boite[], direction: Direction): number {
+  if (boites.length === 0) return 0;
+  const courant = Math.min(Math.max(index, 0), boites.length - 1);
+  const ici = boites[courant];
+  const cx = ici.x + ici.w / 2;
+  const cy = ici.y + ici.h / 2;
+
+  let meilleur = courant;
+  let meilleurScore = Number.POSITIVE_INFINITY;
+
+  for (const [rang, boite] of boites.entries()) {
+    if (rang === courant) continue;
+    const bx = boite.x + boite.w / 2;
+    const by = boite.y + boite.h / 2;
+
+    // « Franchement du bon côté » : le bord d'en face a dépassé notre milieu.
+    // Sans cette marge, deux cases de hauteurs différentes sur la même rangée
+    // se considèrent l'une au-dessus de l'autre.
+    const passe =
+      direction === 'bas'
+        ? boite.y >= cy
+        : direction === 'haut'
+          ? boite.y + boite.h <= cy
+          : direction === 'droite'
+            ? boite.x >= cx
+            : boite.x + boite.w <= cx;
+    if (!passe) continue;
+
+    const vertical = direction === 'bas' || direction === 'haut';
+    const principal = Math.abs(vertical ? by - cy : bx - cx);
+    const travers = Math.abs(vertical ? bx - cx : by - cy);
+    const score = principal + travers * 3;
+
+    if (score < meilleurScore) {
+      meilleurScore = score;
+      meilleur = rang;
+    }
+  }
+
+  return meilleur;
+}
+
 /**
  * Le nombre de colonnes qui tiennent dans une largeur donnée.
  *
