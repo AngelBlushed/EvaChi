@@ -140,6 +140,7 @@ const xmbConsole = $<HTMLElement>('xmb-console');
 const xmbHeure = $<HTMLElement>('xmb-heure');
 const xmbPied = $<HTMLElement>('xmb-pied');
 const xmbLettre = $<HTMLDivElement>('xmb-lettre');
+const xmbRail = $<HTMLDivElement>('xmb-rail');
 const xmbAfficheInitiale = $<HTMLElement>('xmb-affiche-initiale');
 const xmbAfficheImage = $<HTMLImageElement>('xmb-affiche-image');
 const placeholder = $<HTMLDivElement>('placeholder');
@@ -1930,6 +1931,23 @@ const directions = {
   haut: new Held(260, 55),
   bas: new Held(260, 55),
 };
+
+/**
+ * La croix directionnelle, suivie à part du stick.
+ *
+ * Les deux faisaient le même pas, ce qui gaspillait la moitié des commandes.
+ * La croix enjambe cinq jeux, le stick en avance un : le pouce choisit la
+ * vitesse sans qu'on ait à apprendre quoi que ce soit.
+ */
+const croix = {
+  gauche: new Held(300, 90),
+  droite: new Held(300, 90),
+  haut: new Held(300, 90),
+  bas: new Held(300, 90),
+};
+
+/** Les gâchettes du dessus, qui font sauter de cinq consoles. */
+const rails = { avant: new Held(320, 130), arriere: new Held(320, 130) };
 const valider = new Held(1000, 1000);
 
 /** Vrai quand une vue manette est à l'écran et qu'elle a de quoi montrer. */
@@ -1967,25 +1985,77 @@ function naviguerMenu(): void {
 
   const [x = 0, y = 0] = pad.axes;
   const maintenant = performance.now();
+  const stick: Record<Direction, boolean> = {
+    gauche: x < -STICK_DEADZONE,
+    droite: x > STICK_DEADZONE,
+    haut: y < -STICK_DEADZONE,
+    bas: y > STICK_DEADZONE,
+  };
+  const dpad: Record<Direction, boolean> = {
+    gauche: pad.buttons[14]?.pressed ?? false,
+    droite: pad.buttons[15]?.pressed ?? false,
+    haut: pad.buttons[12]?.pressed ?? false,
+    bas: pad.buttons[13]?.pressed ?? false,
+  };
+  // Hors du menu animé, les deux commandent la même chose : une grille n'a pas
+  // de « cinq crans » qui veuille dire quelque chose.
   const pousse: Record<Direction, boolean> = {
-    gauche: pad.buttons[14]?.pressed || x < -STICK_DEADZONE,
-    droite: pad.buttons[15]?.pressed || x > STICK_DEADZONE,
-    haut: pad.buttons[12]?.pressed || y < -STICK_DEADZONE,
-    bas: pad.buttons[13]?.pressed || y > STICK_DEADZONE,
+    gauche: stick.gauche || dpad.gauche,
+    droite: stick.droite || dpad.droite,
+    haut: stick.haut || dpad.haut,
+    bas: stick.bas || dpad.bas,
   };
 
   const appuye = (index: number) => pad.buttons[index]?.pressed ?? false;
+  const select0 = appuye(BOUTON.select);
+  /** Le petit bruit, partagé par toutes les branches manette. */
+  const tic = (lance = false) => bruit(lance);
   const a = valider.update(appuye(BOUTON.a), maintenant).pressed;
   const b = boutons.b.update(appuye(BOUTON.b), maintenant).pressed;
   const start = boutons.start.update(appuye(BOUTON.start), maintenant).pressed;
 
+  const enMenu = !libraryView.hidden && !document.querySelector('dialog[open]') && enXmb();
+
   const pas: Direction[] = [];
   for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
-    const etat = directions[sens].update(pousse[sens], maintenant);
+    // Dans le menu animé, la croix et le stick sont deux commandes distinctes :
+    // l'une enjambe, l'autre avance d'un cran. Partout ailleurs elles font la
+    // même chose, et les confondre évite deux déplacements pour un seul geste.
+    const source = enMenu ? stick[sens] : pousse[sens];
+    const etat = directions[sens].update(source, maintenant);
     if (etat.pressed || etat.repeat) pas.push(sens);
   }
 
-  const tic = (lance = false) => bruit(lance);
+  if (enMenu) {
+    for (const sens of ['haut', 'bas'] as Direction[]) {
+      const etat = croix[sens].update(dpad[sens], maintenant);
+      if (etat.pressed || etat.repeat) {
+        tic();
+        deplacerXmb(sens, ENJAMBEE);
+      }
+    }
+    // À gauche et à droite la croix reste fine : les gâchettes font déjà le
+    // saut de cinq consoles, et deux commandes pour la même chose se gênent.
+    for (const sens of ['gauche', 'droite'] as Direction[]) {
+      const etat = croix[sens].update(dpad[sens], maintenant);
+      if (etat.pressed || etat.repeat) {
+        tic();
+        deplacerXmb(sens);
+      }
+    }
+
+    const filer = rails.avant.update(!select0 && appuye(5), maintenant);
+    const revenir = rails.arriere.update(!select0 && appuye(4), maintenant);
+    if (filer.pressed || filer.repeat) {
+      tic();
+      deplacerXmb('droite', ENJAMBEE);
+    }
+    if (revenir.pressed || revenir.repeat) {
+      tic();
+      deplacerXmb('gauche', ENJAMBEE);
+    }
+  }
+
 
   // Pendant une partie, Select et Start ensemble ramènent à la bibliothèque.
   // Deux boutons à la fois plutôt qu'un seul : chacun d'eux sert au jeu, et
@@ -2035,9 +2105,10 @@ function naviguerMenu(): void {
 
   // Les gâchettes hautes sautent d'initiale — sauf quand Select est tenu,
   // auquel cas la combinaison appartient aux sauvegardes rapides.
-  const select = appuye(BOUTON.select);
-  const avant = boutons.lettreAvant.update(!select && appuye(5), maintenant);
-  const arriere = boutons.lettreArriere.update(!select && appuye(4), maintenant);
+  // Les gâchettes basses : le saut par initiale. Elles ont pris la place des
+  // gâchettes du dessus, passées au saut de cinq consoles.
+  const avant = boutons.lettreAvant.update(!select0 && appuye(7), maintenant);
+  const arriere = boutons.lettreArriere.update(!select0 && appuye(6), maintenant);
   if (avant.pressed || avant.repeat) {
     tic();
     sauterLettre(vue, 1);
@@ -2224,6 +2295,68 @@ function bruit(lance = false): void {
   if (lance) ticValidation();
   else ticDeplacement();
 }
+
+// --- Molette dans le menu animé ---------------------------------------------
+
+/**
+ * Ce que la molette commande dépend de l'endroit où se trouve le pointeur.
+ *
+ * Au-dessus de la rangée des consoles, elle change de console ; partout
+ * ailleurs, elle parcourt les jeux. C'est ce qu'on attend d'un menu en deux
+ * axes : la molette agit sur ce que l'on survole, comme n'importe quelle liste.
+ */
+let molette = 0;
+let molettePrecedente = 0;
+
+/**
+ * Un cran de molette, quelle que soit la souris.
+ *
+ * Les souris n'envoient pas toutes la même chose : une souris ordinaire donne
+ * cent à cent vingt pixels par cran, un pavé tactile une pluie de petits pas.
+ * On accumule donc jusqu'à un seuil plutôt que d'agir à chaque message, faute
+ * de quoi la même rotation traverserait un jeu sur l'une et trente sur l'autre.
+ *
+ * Cent, et non soixante : un cran de souris vaut cent vingt, et un seuil plus
+ * bas faisait avancer de deux jeux pour un seul cran.
+ */
+const CRAN = 100;
+
+xmbView.addEventListener(
+  'wheel',
+  (event) => {
+    if (xmbView.hidden || libraryView.hidden) return;
+    if (document.querySelector('dialog[open]')) return;
+    event.preventDefault();
+
+    // Deux rotations séparées par un silence ne s'additionnent pas : sans cela
+    // un reliquat oublié ferait sauter un cran au coup d'après.
+    const maintenant = performance.now();
+    if (maintenant - molettePrecedente > 400) molette = 0;
+    molettePrecedente = maintenant;
+
+    molette += event.deltaY;
+    const crans = Math.trunc(molette / CRAN);
+    if (crans === 0) return;
+    molette -= crans * CRAN;
+
+    const rail = xmbRail.getBoundingClientRect();
+    const surLesConsoles = event.clientY >= rail.top && event.clientY <= rail.bottom;
+    const sens: Direction = surLesConsoles
+      ? crans > 0
+        ? 'droite'
+        : 'gauche'
+      : crans > 0
+        ? 'bas'
+        : 'haut';
+
+    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) {
+      deplacerXmb(sens);
+    }
+    // Le même bruit qu'à la manette : c'est le même déplacement.
+    bruit();
+  },
+  { passive: false },
+);
 
 // --- Saut par initiale ------------------------------------------------------
 
@@ -2689,12 +2822,21 @@ function allerEntree(rang: number): void {
 }
 
 /** Un pas de manette dans le menu animé. */
-function deplacerXmb(sens: Direction): void {
+/**
+ * Combien de crans à la fois quand on pousse fort.
+ *
+ * Assez pour traverser une longue liste sans s'endormir, pas assez pour qu'on
+ * doive revenir en arrière à chaque fois. Cinq est le compromis que prennent
+ * les consoles de salon.
+ */
+const ENJAMBEE = 5;
+
+function deplacerXmb(sens: Direction, pas = 1): void {
   const shelf = voletsXmb[colonneXmb];
   if (sens === 'gauche' || sens === 'droite') {
-    allerColonne(step(colonneXmb, voletsXmb.length, sens === 'droite' ? 1 : -1));
+    allerColonne(step(colonneXmb, voletsXmb.length, sens === 'droite' ? pas : -pas));
   } else {
-    allerEntree(step(entreeXmb, shelf?.games.length ?? 0, sens === 'bas' ? 1 : -1));
+    allerEntree(step(entreeXmb, shelf?.games.length ?? 0, sens === 'bas' ? pas : -pas));
   }
 }
 
