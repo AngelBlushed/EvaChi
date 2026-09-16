@@ -98,6 +98,8 @@ import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
 import { Held, columnsFor, echelle, move, step } from './navigation.ts';
+import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } from './recents.ts';
+import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
@@ -218,6 +220,7 @@ const RETENU = {
   lissage: 'evachi.lissage',
   etats: 'evachi.etats',
   emplacement: 'evachi.emplacement',
+  recents: 'evachi.recents',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -525,6 +528,91 @@ async function relireCaptures(): Promise<void> {
   } catch {
     captures = [];
   }
+}
+
+// --- Jeux récemment joués ---------------------------------------------------
+
+/** La clé du volet des parties récentes. */
+const REPRENDRE = 'reprendre';
+
+/**
+ * Les jeux récemment joués, et le temps passé dessus.
+ *
+ * Avec cinq cents jeux, la question posée en ouvrant l'application n'est pas
+ * « lequel choisir » mais « où en étais-je ».
+ */
+let recents: Recent[] = parseRecents(retenu(RETENU.recents));
+
+/** L'instant où la partie en cours a commencé, ou zéro hors partie. */
+let departPartie = 0;
+
+/** Le jeu de la partie en cours, pour le retenir quand elle s'arrête. */
+let jeuEnCours: { path: string; name: string; folder: string } | null = null;
+
+function ecrireRecents(): void {
+  retenir(RETENU.recents, JSON.stringify(recents));
+}
+
+/**
+ * Referme la partie en cours et ajoute son temps au total.
+ *
+ * Appelée au changement de jeu comme à la fermeture : sans cela, quitter par
+ * la croix perdrait toute la session, qui est justement la plus longue.
+ */
+function clorePartie(): void {
+  if (!jeuEnCours || departPartie === 0) return;
+  const secondes = (Date.now() - departPartie) / 1000;
+  recents = remember(recents, jeuEnCours, Math.floor(Date.now() / 1000), secondes);
+  ecrireRecents();
+  departPartie = 0;
+  jeuEnCours = null;
+}
+
+/** Note qu'une partie commence. */
+function ouvrirPartie(jeu: { path: string; name: string; folder: string }): void {
+  clorePartie();
+  jeuEnCours = jeu;
+  departPartie = Date.now();
+  // Noté tout de suite, sans temps : un jeu lancé puis abandonné doit tout de
+  // même apparaître dans « Reprendre », c'est là qu'on ira le rechercher.
+  recents = remember(recents, jeu, Math.floor(Date.now() / 1000));
+  ecrireRecents();
+}
+
+// Fermer la fenêtre est la façon la plus courante de finir une partie.
+window.addEventListener('beforeunload', clorePartie);
+
+/**
+ * Le volet des parties récentes.
+ *
+ * Les jeux y sont repris de la bibliothèque, pour que le cœur et la jaquette
+ * soient ceux qu'on connaît déjà. Un jeu dont le fichier a disparu est
+ * simplement omis : la liste ne doit jamais proposer ce qui ne se lance plus.
+ */
+function voletReprendre(shelves: readonly Shelf[]): Shelf | null {
+  if (recents.length === 0) return null;
+
+  const parChemin = new Map<string, Playable>();
+  for (const shelf of shelves) {
+    if (shelf.key === FAVORIS) continue;
+    for (const item of shelf.games) parChemin.set(item.rom.path, item);
+  }
+
+  const games = recents
+    .map((recent) => parChemin.get(recent.path))
+    .filter((item): item is Playable => item !== undefined);
+
+  if (games.length === 0) return null;
+
+  const candidates = [
+    ...new Map(games.flatMap((item) => item.cores).map((c) => [c.id, c])).values(),
+  ];
+  return { key: REPRENDRE, label: 'Reprendre', games, candidates, preferred: undefined };
+}
+
+/** Ce qu'on sait d'un jeu récemment joué, s'il en fait partie. */
+function detailRecent(chemin: string): Recent | undefined {
+  return recents.find((recent) => recent.path === chemin);
 }
 
 /** La clé du volet réservé aux captures, dans le menu animé. */
@@ -1362,6 +1450,7 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
   // là où on le connaît, plutôt que cherché plus tard dans la bibliothèque —
   // qui peut avoir changé entre-temps.
   cheminEnCours = path ?? '';
+  if (path) ouvrirPartie({ path, name, folder: dossierDuJeu(path) });
 
   loopToken += 1;
   running = false;
@@ -1394,6 +1483,11 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
 
 /** Repose le jeu et revient à la bibliothèque. */
 async function stopPlaying(): Promise<void> {
+  // Le temps de la partie est ajouté avant tout le reste : ce qui suit peut
+  // échouer, et on ne veut pas perdre le compte pour autant.
+  clorePartie();
+  renderGames();
+
   loopToken += 1;
   running = false;
   audio.flush();
@@ -1425,6 +1519,17 @@ async function stopPlaying(): Promise<void> {
   }
 }
 
+/**
+ * Le dossier d'un jeu, tiré de son chemin.
+ *
+ * On ne garde que le dernier segment : c'est lui que la recherche de jaquette
+ * compare aux noms de consoles, et le chemin complet ne lui dirait rien.
+ */
+function dossierDuJeu(chemin: string): string {
+  const morceaux = chemin.replace(/\\/g, '/').split('/');
+  return morceaux.length > 1 ? morceaux[morceaux.length - 2] : '';
+}
+
 /** Lance un jeu de la bibliothèque avec le cœur choisi pour lui. */
 async function play(target: CatalogEntry, rom: RomEntry): Promise<void> {
   // Un émulateur externe est un autre programme : on le démarre avec le jeu en
@@ -1433,6 +1538,11 @@ async function play(target: CatalogEntry, rom: RomEntry): Promise<void> {
     // La bibliothèque reste affichée derrière l'émulateur : la musique du menu
     // ne s'arrêtait donc pas d'elle-même, et jouait par-dessus le jeu.
     arreterMusique();
+    // Un émulateur externe compte comme une partie : on ne saura pas combien
+    // de temps elle dure, mais le jeu doit apparaître dans « Reprendre ».
+    recents = remember(recents, { path: rom.path, name: rom.name, folder: rom.folder }, Math.floor(Date.now() / 1000));
+    ecrireRecents();
+    renderGames();
     try {
       const started = await launchExternal(target.label, rom.path);
       log(`${rom.name} — ${started}`, 'ok');
@@ -2136,7 +2246,13 @@ function renderColonnesXmb(): void {
     // Les favoris portent une étoile plutôt que des initiales : c'est le seul
     // volet qu'on ne reconnaît pas à sa console.
     rond.textContent =
-      shelf.key === FAVORIS ? '★' : shelf.key === GALERIE ? '📷' : initiales(shelf.label);
+      shelf.key === FAVORIS
+        ? '★'
+        : shelf.key === GALERIE
+          ? '📷'
+          : shelf.key === REPRENDRE
+            ? '▶'
+            : initiales(shelf.label);
 
     const etiquette = document.createElement('span');
     etiquette.className = 'etiquette';
@@ -2210,6 +2326,12 @@ function renderEntreesXmb(): void {
             minute: '2-digit',
           })
         : 'capture';
+    } else if (shelf.key === REPRENDRE) {
+      // Ici on veut savoir quand et combien, pas avec quel émulateur.
+      const vu = detailRecent(item.rom.path);
+      detail.textContent = vu
+        ? `${formatWhen(vu.played, Math.floor(Date.now() / 1000))} · ${formatPlaytime(vu.seconds)}`
+        : '';
     } else {
       const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
       detail.textContent = `${cœur?.label ?? 'aucun émulateur'} · ${humanSize(item.rom.size)}`;
@@ -2701,8 +2823,15 @@ function renderGames(): void {
   );
   // La galerie n'existe que dans le menu animé : en liste et en grille, elle a
   // son entrée dans la barre de menus, qui y est toujours sous la main.
+  // « Reprendre » d'abord : c'est ce qu'on vient chercher en ouvrant l'app.
+  // Puis la galerie, puis les favoris, puis les consoles.
+  const reprendre = needle ? null : voletReprendre(classes);
   const galerie = enXmb() && !needle ? voletGalerie() : null;
-  const shelves = galerie ? [galerie, ...classes] : classes;
+  const shelves = [
+    ...(reprendre ? [reprendre] : []),
+    ...(galerie ? [galerie] : []),
+    ...classes,
+  ];
   volets = shelves;
 
   shelvesBox.replaceChildren();
