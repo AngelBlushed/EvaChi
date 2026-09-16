@@ -170,6 +170,14 @@ export function voisin(index: number, boites: readonly Boite[], direction: Direc
     const vertical = direction === 'bas' || direction === 'haut';
     const principal = Math.abs(vertical ? by - cy : bx - cx);
     const travers = Math.abs(vertical ? bx - cx : by - cy);
+
+    // À gauche et à droite on ne quitte pas sa rangée. Sans cette règle, la
+    // dernière case d'une rangée partait en diagonale vers la rangée suivante
+    // — en sautant sa première case au passage, puisque celle-ci n'est pas « à
+    // droite ». Monter et descendre, au contraire, doivent pouvoir franchir un
+    // titre de section.
+    if (!vertical && travers > ici.h / 2) continue;
+
     const score = principal + travers * 3;
 
     if (score < meilleurScore) {

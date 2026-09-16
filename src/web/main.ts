@@ -1800,6 +1800,13 @@ function renderGrille(shelves: Shelf[]): void {
 
     for (const item of shelf.games) {
     rang += 1;
+    // Le rang figé pour cette case-là.
+    //
+    // `rang` est un compteur qui court sur toute la grille : les gestionnaires
+    // d'événements le capturaient lui, et non sa valeur du moment. Tous
+    // désignaient donc la dernière case au moment d'être appelés — un clic
+    // droit n'importe où sautait au dernier jeu de la bibliothèque.
+    const ici = rang;
     const tuile = document.createElement('button');
     tuile.type = 'button';
     tuile.className = 'tuile';
@@ -1845,11 +1852,11 @@ function renderGrille(shelves: Shelf[]): void {
 
     tuile.append(boite, nom);
     tuile.addEventListener('click', () => {
-      choisir(rang);
+      choisir(ici);
       void jouerChoisie();
     });
     tuile.addEventListener('contextmenu', (event) => {
-      choisir(rang);
+      choisir(ici);
       ouvrirContextuel(event, item);
     });
     grilleTuiles.append(tuile);

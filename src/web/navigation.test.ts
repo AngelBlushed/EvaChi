@@ -296,3 +296,34 @@ describe('saut par initiale', () => {
     assert.ok(rang > 400, 'on doit arriver près du bout');
   });
 });
+
+describe('bords d’une rangée', () => {
+  it('ne part pas en diagonale au bout d’une rangée', () => {
+    // Une section d'une seule case, puis une section de trois. Aller à droite
+    // depuis la case seule doit ne rien faire : la rangée est finie. Sans
+    // cette règle, la sélection filait vers la deuxième case de la section
+    // suivante — en sautant la première, qui n'est pas « à droite ».
+    const boites: Boite[] = [
+      { x: 0, y: 0, w: 100, h: 120 },
+      { x: 0, y: 200, w: 100, h: 120 },
+      { x: 120, y: 200, w: 100, h: 120 },
+      { x: 240, y: 200, w: 100, h: 120 },
+    ];
+    assert.equal(voisin(0, boites, 'droite'), 0, 'rien à droite sur cette rangée');
+    assert.equal(voisin(0, boites, 'bas'), 1, 'mais on descend bien');
+    assert.equal(voisin(3, boites, 'droite'), 3, 'bout de rangée');
+    assert.equal(voisin(1, boites, 'gauche'), 1, 'debut de rangee');
+  });
+
+  it('avance toujours d’une seule case sur une rangée', () => {
+    const boites: Boite[] = Array.from({ length: 5 }, (_, i) => ({
+      x: i * 120,
+      y: 0,
+      w: 100,
+      h: 120,
+    }));
+    assert.equal(voisin(0, boites, 'droite'), 1);
+    assert.equal(voisin(1, boites, 'droite'), 2);
+    assert.equal(voisin(4, boites, 'gauche'), 3);
+  });
+});
