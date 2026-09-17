@@ -1,4 +1,4 @@
-EvaChi 0.3.0
+EvaChi 0.4.0
 ============
 
 Un hôte d'émulation multi-systèmes : une bibliothèque, un lanceur, et les
@@ -23,7 +23,25 @@ Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
 sert pas peuvent être supprimés.
 
 
-Ce qui est nouveau depuis la 0.2.0
+Ce qui est nouveau depuis la 0.3.0
+----------------------------------
+
+- Chaque émulateur tourne maintenant dans son propre processus. Celui qui
+  plante ne fait plus disparaître EvaChi : elle le voit tomber, le dit, et
+  revient à la bibliothèque. Celui qui se fige ne la fige plus. Et deux
+  émulateurs 3D lancés l'un après l'autre ne se gênent plus.
+- Une conséquence visible : pendant une partie, le gestionnaire des tâches
+  montre deux « evachi.exe ». C'est normal — le second tient l'émulateur, et
+  il s'en va avec la partie.
+- L'avance rapide : les deux manches de la manette enfoncés ensemble font
+  filer le jeu à 300 %, tant qu'on les tient. La vitesse s'affiche à côté du
+  compte d'images.
+- Fermer la fenêtre en pleine partie ne coûte plus la sauvegarde du jeu :
+  l'émulateur a le temps de l'écrire avant qu'on le range.
+- Quitter EvaChi normalement n'annonce plus un plantage au lancement suivant.
+
+
+Ce qui était nouveau dans la 0.3.0
 ----------------------------------
 
 - Cinquante langues, chacune écrite dans son alphabet. Les accords de pluriel,

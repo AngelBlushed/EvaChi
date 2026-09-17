@@ -2,14 +2,18 @@
 
 Hôte d'émulation multi-systèmes. Une seule interface, des cœurs interchangeables.
 
-EvaChi n'est pas un lanceur : il héberge les cœurs dans son propre processus,
-sous sa propre interface. Deux familles de cœurs cohabitent derrière le même
-contrat :
+EvaChi n'est pas un lanceur : les cœurs tournent sous sa propre interface, et
+c'est elle qui les pilote. Deux familles cohabitent derrière le même contrat :
 
 - les **cœurs internes**, écrits pour ce projet en TypeScript — aujourd'hui
   CHIP-8, complet, avec ses six écarts de comportement ;
 - les **cœurs libretro**, chargés dynamiquement par la coque native, qui
   ouvrent NES, Game Boy, SNES, GBA, PS1, DS, GameCube, PS2, PSP et au-delà.
+
+Un cœur libretro vit dans **un processus voisin, un par partie** : c'est du code
+étranger à qui l'on donne tous les droits sur la mémoire de qui le charge, et
+celui qui plante ne doit pas faire disparaître la fenêtre. Voir
+[docs/isolement.md](docs/isolement.md).
 
 Distribué sous **GPL-3.0-or-later** : voir [LICENSE](LICENSE) et
 [docs/coeurs.md](docs/coeurs.md) pour ce que cela implique.
@@ -201,9 +205,15 @@ puissent affirmer exactement ce qu'ils doivent recevoir.
 | un pixel par bouton enfoncé, sur la deuxième ligne | des entrées qui n'arrivent pas jusqu'au cœur — l'image dit ce qu'il a *lu* |
 | deux rampes audio distinctes par canal | l'entrelacement perdu ou les canaux intervertis |
 | un compteur de trames comme état sérialisable | une sauvegarde qui ne rembobine pas vraiment |
+| une faute de mémoire, un abandon ou une boucle sans fin, sur commande | un cœur qui tombe et emporte la fenêtre avec lui |
+
+La dernière ligne n'a pu être écrite qu'une fois les cœurs isolés dans leur
+propre processus : tant que le cœur vivait ici, un cœur qui plante tuait le
+programme d'épreuve lui-même, et libtest n'a aucun équivalent de
+`#[should_panic]` pour une violation d'accès.
 
 ```bash
-npm run test:rust                           # 27 tests : 15 unitaires, 12 d'intégration
+npm run test:rust                           # 214 tests : 188 unitaires, 26 d'intégration
 npm run test:all                            # TypeScript + types + Rust
 ```
 
