@@ -124,9 +124,10 @@ relâcher.
 Les échéances ne sont pas les mêmes selon la demande, et **aucune n'est
 infinie** : une commande sans échéance, c'est le figement qui revient par la
 seule porte restée ouverte. Cinq secondes pour une trame, cinq minutes pour un
-contenu de PlayStation 2 sur disque externe, quarante-cinq secondes pour un
+contenu de PlayStation 2 sur disque externe, vingt secondes pour un
 déchargement — c'est là que le cœur écrit sa sauvegarde de pile, et la couper
-serait perdre la partie.
+serait perdre la partie ; vingt et non davantage, parce qu'on décharge aussi à
+l'extinction, et qu'un cœur sain rend la main en quelques millisecondes.
 
 Une fois qu'un échange a mal tourné, on ne redemande plus rien : le flux est
 désynchronisé, et redemander poliment à un cœur figé de se décharger ferait

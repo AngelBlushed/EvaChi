@@ -24,8 +24,28 @@ pub const SAMPLE_RATE: f64 = 44100.0;
 pub const AUDIO_FRAMES: usize = 735;
 
 const ENV_SET_PIXEL_FORMAT: c_uint = 10;
+const ENV_GET_LOG_INTERFACE: c_uint = 27;
 const PIXEL_FORMAT_XRGB8888: c_uint = 1;
 const RETRO_DEVICE_JOYPAD: c_uint = 1;
+
+/// Le contenu que ce cœur refuse, pour éprouver le chemin du refus.
+///
+/// Un refus n'a jamais produit de trame : ce que le cœur a écrit avant de
+/// refuser ne peut donc voyager que sur la réponse elle-même. C'est le seul
+/// endroit où l'on apprend *pourquoi*, et c'est le plus facile à perdre.
+pub const CONTENU_REFUSE: &[u8] = b"refuse";
+
+/// Ce qu'il écrit avant de refuser. Choisi pour ressembler à une vraie plainte.
+pub const PLAINTE: &str = "error: missing bios file lynxboot.img";
+
+/// L'interface de journal que libretro tend au cœur.
+///
+/// Le premier champ est une fonction variadique ; on ne s'en sert qu'avec une
+/// chaîne déjà formée, ce qui est licite et suffit ici.
+#[repr(C)]
+struct LogCallback {
+    log: Option<unsafe extern "C" fn(c_uint, *const c_char, ...)>,
+}
 
 // --- Mal tourner sur commande -----------------------------------------------
 
@@ -127,6 +147,8 @@ type InputStateFn = unsafe extern "C" fn(c_uint, c_uint, c_uint, c_uint) -> i16;
 // range donc son état en global, comme le font les vrais.
 
 static mut ENVIRONMENT: Option<EnvironmentFn> = None;
+/// Le journal, tel que l'hôte le tend. Absent tant qu'on ne l'a pas demandé.
+static mut JOURNAL: Option<unsafe extern "C" fn(c_uint, *const c_char, ...)> = None;
 static mut VIDEO_REFRESH: Option<VideoRefreshFn> = None;
 static mut AUDIO_BATCH: Option<AudioSampleBatchFn> = None;
 static mut AUDIO_SAMPLE: Option<AudioSampleFn> = None;
@@ -291,6 +313,18 @@ pub unsafe extern "C" fn retro_set_input_state(cb: InputStateFn) {
 /// Appelé par l'hôte après `retro_set_environment`.
 #[no_mangle]
 pub unsafe extern "C" fn retro_init() {
+    // On réclame le journal comme le font les vrais cœurs : c'est le seul moyen
+    // de dire quoi que ce soit à l'hôte.
+    if let Some(environment) = ENVIRONMENT {
+        let mut interface = LogCallback { log: None };
+        if environment(
+            ENV_GET_LOG_INTERFACE,
+            std::ptr::addr_of_mut!(interface).cast::<c_void>(),
+        ) {
+            JOURNAL = interface.log;
+        }
+    }
+
     FRAME.store(0, Ordering::SeqCst);
     FRAMEBUFFER = vec![0; (STRIDE * HEIGHT) as usize];
     AUDIO = vec![0; AUDIO_FRAMES * 2];
@@ -327,9 +361,32 @@ pub unsafe extern "C" fn retro_load_game(game: *const GameInfo) -> bool {
     if game.is_null() {
         return false;
     }
+
+    // Un contenu convenu fait refuser le cœur, après qu'il s'est plaint. C'est
+    // le chemin le plus facile à perdre : aucune trame n'a eu lieu, donc rien
+    // ne porte la plainte sinon la réponse au refus elle-même.
+    let octets = std::slice::from_raw_parts((*game).data.cast::<u8>(), (*game).size);
+    if !(*game).data.is_null() && octets.starts_with(CONTENU_REFUSE) {
+        dire(PLAINTE);
+        return false;
+    }
+
     CONTENT_SIZE.store((*game).size as u64, Ordering::SeqCst);
     FRAME.store(0, Ordering::SeqCst);
     true
+}
+
+/// Écrit une ligne dans le journal de l'hôte, s'il nous en a tendu un.
+///
+/// # Safety
+/// Appelée depuis les points d'entrée, rappels posés.
+unsafe fn dire(texte: &str) {
+    let Some(journal) = JOURNAL else { return };
+    let mut octets = texte.as_bytes().to_vec();
+    octets.push(0);
+    // Niveau 3 : une erreur. Le niveau zéro serait jeté par l'hôte, et c'est
+    // précisément ce qu'on veut voir arriver de l'autre côté.
+    journal(3, octets.as_ptr().cast::<c_char>());
 }
 
 /// # Safety

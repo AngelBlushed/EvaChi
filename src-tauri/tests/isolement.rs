@@ -283,10 +283,7 @@ fn un_coeur_qui_se_fige_est_abrege() {
 }
 
 #[test]
-fn un_contenu_refuse_dit_pourquoi() {
-    // Ce que le cœur a écrit avant de refuser est le seul endroit où l'on
-    // apprend ce qui lui manque — un BIOS, le plus souvent. Aucune trame n'a
-    // eu lieu : ces lignes doivent voyager sur la réponse elle-même.
+fn un_fichier_absent_est_dit_comme_tel() {
     let bac = tempdir::TempDir::new();
     let session = Session::isolee(evachi());
     session
@@ -296,6 +293,35 @@ fn un_contenu_refuse_dit_pourquoi() {
     let absent = bac.path().join("ce-fichier-n-existe-pas.test");
     let erreur = session.load_content(&absent).expect_err("refus attendu");
     assert!(erreur.contains("chemin illisible") || erreur.contains("os error"), "{erreur}");
+}
+
+#[test]
+fn ce_que_le_coeur_a_dit_avant_de_refuser_arrive_quand_meme() {
+    // L'épreuve qui compte pour les micrologiciels manquants. Ce que le cœur a
+    // écrit avant de refuser est le seul endroit où l'on apprend ce qui lui
+    // manque — et c'est le plus facile à perdre : aucune trame n'a eu lieu,
+    // donc rien ne porte ces lignes sinon la réponse au refus elle-même.
+    //
+    // Elles l'étaient, justement : le parent les décodait puis les jetait avec
+    // l'erreur. Tout marchait, sauf au seul moment où cela servait.
+    let bac = tempdir::TempDir::new();
+    let session = Session::isolee(evachi());
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path())
+        .expect("chargement du cœur d'essai");
+
+    // Le cœur d'essai refuse ce contenu-là, après s'en être plaint.
+    let refuse = bac.path().join("refuse.test");
+    std::fs::write(&refuse, b"refuse").expect("écriture du contenu");
+
+    let erreur = session.load_content(&refuse).expect_err("refus attendu");
+    assert!(erreur.contains("refusé"), "{erreur}");
+
+    let dits = session.take_messages();
+    assert!(
+        dits.iter().any(|ligne| ligne.contains("lynxboot.img")),
+        "la plainte du cœur n'est pas arrivée : {dits:?}"
+    );
 }
 
 #[test]

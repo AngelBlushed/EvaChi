@@ -380,10 +380,12 @@ impl Session {
                 let issue = self.ouvrir_a_cote(chantier, path, system_dir, save_dir);
                 match issue {
                     Ok(info) => Ok(info),
-                    // Aucun cœur n'a encore vécu à côté : le repli est encore
-                    // honnête, et il vaut mieux qu'une application qui refuse
-                    // de jouer.
-                    Err(raison) if !chantier.engage && raison.starts_with("le processus du cœur") => {
+                    // Aucun cœur n'a encore vécu à côté, et c'est le démarrage
+                    // qui a échoué : le repli est encore honnête, et il vaut
+                    // mieux qu'une application qui refuse de jouer.
+                    Err(raison)
+                        if !chantier.engage && raison.contains(super::distant::DEMARRAGE) =>
+                    {
                         eprintln!("[session] {raison} — le cœur restera dans la fenêtre");
                         let locale = Locale::spawn();
                         let repli = locale.load_core(path, system_dir, save_dir);
@@ -426,23 +428,27 @@ impl Session {
                 Distante::demarrer(&chantier.exe, save_dir)?
             }
         };
+
+        // Le processus a vécu dès l'instant où il s'est branché — pas seulement
+        // quand un cœur y sera chargé. Si le chargement échoue parce que le cœur
+        // a fauté, on ne doit surtout pas le réessayer dans la fenêtre : il la
+        // tuerait à son tour.
+        chantier.engage = true;
         let charge = parent::ouverture(path, system_dir, save_dir)?;
 
-        let (dits, brut) = match voisin.demander(Demande::ChargerCoeur, &charge) {
+        let issue = voisin.demander(Demande::ChargerCoeur, &charge);
+        // Relevé avant de regarder l'issue : ce que le cœur a écrit avant de
+        // refuser est tout ce qu'on a pour comprendre pourquoi.
+        self.retenir(voisin.prendre_dits());
+        let brut = match issue {
             Ok(reponse) => reponse,
-            Err(raison) => {
-                // Ce que le cœur a écrit avant de refuser est tout ce qu'on a
-                // pour comprendre pourquoi : on le garde même en échouant.
-                return Err(self.enrichir(&mut voisin, raison));
-            }
+            Err(raison) => return Err(self.enrichir(&mut voisin, raison)),
         };
-        self.retenir(dits);
 
         let info: CoreInfo = serde_json::from_slice(&brut)
             .map_err(|erreur| format!("identité du cœur illisible : {erreur}"))?;
 
         chantier.voisin = Some(voisin);
-        chantier.engage = true;
         Ok(info)
     }
 
@@ -478,16 +484,12 @@ impl Session {
         charge: &[u8],
     ) -> Result<Vec<u8>, String> {
         let voisin = self.voisin(tenant)?;
-        match voisin.demander(demande, charge) {
-            Ok((dits, utile)) => {
-                self.retenir(dits);
-                Ok(utile)
-            }
-            Err(raison) => {
-                let raison = self.enrichir(voisin, raison);
-                Err(raison)
-            }
-        }
+        let issue = voisin.demander(demande, charge);
+        // Quoi qu'il ait répondu : un refus porte souvent l'explication du refus.
+        let dits = voisin.prendre_dits();
+        let issue = issue.map_err(|raison| self.enrichir(voisin, raison));
+        self.retenir(dits);
+        issue
     }
 
     pub fn load_content(&self, path: &Path) -> Result<AvInfo, String> {
@@ -544,21 +546,27 @@ impl Session {
                     image,
                 };
                 let voisin = self.voisin(&mut tenant)?;
-                match voisin.trame(requete) {
-                    Ok((dits, trame)) => {
+                let issue = voisin.trame(requete);
+                let dits = voisin.prendre_dits();
+                let trame = match issue {
+                    Ok(trame) => trame,
+                    Err(raison) => {
+                        let raison = self.enrichir(voisin, raison);
                         self.retenir(dits);
-                        FramePayload {
-                            video: trame.image.map(|image| VideoFrame {
-                                rgba: image.rgba,
-                                width: image.largeur,
-                                height: image.hauteur,
-                            }),
-                            audio: trame.audio,
-                            messages: Vec::new(),
-                            shutdown: trame.arret,
-                        }
+                        return Err(raison);
                     }
-                    Err(raison) => return Err(self.enrichir(voisin, raison)),
+                };
+                self.retenir(dits);
+
+                FramePayload {
+                    video: trame.image.map(|image| VideoFrame {
+                        rgba: image.rgba,
+                        width: image.largeur,
+                        height: image.hauteur,
+                    }),
+                    audio: trame.audio,
+                    messages: Vec::new(),
+                    shutdown: trame.arret,
                 }
             }
         };

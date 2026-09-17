@@ -2025,7 +2025,14 @@ async function runLoop(): Promise<void> {
 
     // On dit d'avance si on peindra : l'image d'une trame qu'on ne regardera
     // pas n'a aucune raison de traverser.
-    const peindra = tempo <= 1 || performance.now() - dernierDessin >= 1000 / 60;
+    //
+    // Un lot se peint toujours. La cadence est déjà réglée par le lot lui-même —
+    // un tour de boucle vaut une image d'écran —, et remesurer le temps écoulé
+    // par-dessus tombait tantôt à 16,6 ms tantôt à 16,7 pour un seuil fixé à
+    // 16,67 : une trame sur deux était sautée, et l'avance rapide s'affichait à
+    // trente images par seconde au lieu de soixante.
+    const peindra =
+      lot > 1 || tempo <= 1 || performance.now() - dernierDessin >= 1000 / 60;
 
     let frame: Frame;
     try {

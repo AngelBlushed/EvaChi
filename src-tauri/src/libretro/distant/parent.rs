@@ -31,6 +31,14 @@ use super::protocole::{self, Demande, Ouverture, Rendu, Requete, BON, ENTETE};
 use super::tuyau::{Canal, Ecoute, TOMBE};
 use super::{enfant::CODE_PLANTAGE, DRAPEAU};
 
+/// Marque des erreurs qui veulent dire « le processus n'a jamais commencé ».
+///
+/// C'est la seule circonstance où l'on s'autorise à retomber dans la fenêtre, et
+/// il y a quatre façons d'y arriver — le tuyau, la mémoire partagée, le
+/// lancement, le branchement. Les reconnaître au début de leur phrase les aurait
+/// manquées trois fois sur quatre.
+pub const DEMARRAGE: &str = "demarrage-impossible";
+
 /// Sans fenêtre console, même quand la version de débogage en est une.
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
@@ -53,6 +61,13 @@ pub struct Distante {
     /// l'attendre une seconde fois coûterait une minute à qui veut simplement
     /// revenir à la bibliothèque.
     perdu: bool,
+    /// Ce que le cœur a dit, mis de côté au fur et à mesure.
+    ///
+    /// Rangé ici plutôt que rendu avec la réponse, parce qu'une réponse peut
+    /// être un refus — et c'est justement alors que ces lignes valent quelque
+    /// chose. Les rendre seulement en cas de succès, c'était les jeter au seul
+    /// moment où on les cherche.
+    dits: Vec<String>,
 }
 
 // SAFETY : tout ce qui est ici — poignées Windows, tuyau, projection — est
@@ -67,6 +82,10 @@ impl Distante {
     /// n'existe pas encore rend « fichier introuvable » à qui l'ouvre, et
     /// l'attente de tuyau ne sait attendre qu'un tuyau existant mais occupé.
     pub fn demarrer(exe: &Path, dossier: &Path) -> Result<Self, String> {
+        Self::ouvrir(exe, dossier).map_err(|raison| format!("{DEMARRAGE} : {raison}"))
+    }
+
+    fn ouvrir(exe: &Path, dossier: &Path) -> Result<Self, String> {
         let ecoute = Ecoute::creer()?;
         let segment = Segment::creer()?;
 
@@ -121,6 +140,7 @@ impl Distante {
             segment,
             jeton: 0,
             perdu: false,
+            dits: Vec::new(),
         })
     }
 
@@ -128,11 +148,7 @@ impl Distante {
     ///
     /// Rend les lignes que le cœur a écrites depuis la dernière fois — elles
     /// voyagent sur *toutes* les réponses — et la charge utile.
-    pub fn demander(
-        &mut self,
-        demande: Demande,
-        charge: &[u8],
-    ) -> Result<(Vec<String>, Vec<u8>), String> {
+    pub fn demander(&mut self, demande: Demande, charge: &[u8]) -> Result<Vec<u8>, String> {
         if self.perdu {
             return Err(format!("{TOMBE} : le processus du cœur ne répond plus"));
         }
@@ -147,11 +163,7 @@ impl Distante {
         issue
     }
 
-    fn echanger(
-        &mut self,
-        demande: Demande,
-        charge: &[u8],
-    ) -> Result<(Vec<String>, Vec<u8>), String> {
+    fn echanger(&mut self, demande: Demande, charge: &[u8]) -> Result<Vec<u8>, String> {
         let echeance = demande.echeance();
         self.jeton = self.jeton.wrapping_add(1);
         let attendu = self.jeton;
@@ -163,7 +175,11 @@ impl Distante {
 
         let mut entete = [0u8; ENTETE];
         self.canal.lire(&mut entete, self.poignee, echeance)?;
-        let (longueur, marque, jeton) = protocole::decoder_entete(&entete)?;
+        // Marqué comme une chute : un en-tête qu'on refuse laisse derrière lui un
+        // flux dont on ne sait plus où il en est. Sans la marque, le canal serait
+        // déclaré sain et la demande suivante lirait la réponse de celle-ci.
+        let (longueur, marque, jeton) =
+            protocole::decoder_entete(&entete).map_err(|raison| format!("{TOMBE} : {raison}"))?;
 
         let mut reponse = vec![0u8; longueur as usize];
         if longueur > 0 {
@@ -179,8 +195,12 @@ impl Distante {
         }
 
         let (messages, utile) = protocole::decomposer(&reponse)?;
+        // Mises de côté avant de regarder si c'est un oui ou un non : le non les
+        // emporterait sinon avec lui.
+        self.dits.extend(messages);
+
         match marque {
-            BON => Ok((messages, utile)),
+            BON => Ok(utile),
             _ => {
                 let raison = String::from_utf8_lossy(&utile).into_owned();
                 // Le refus formulé par le cœur lui-même est rendu tel quel : il
@@ -194,9 +214,16 @@ impl Distante {
         }
     }
 
+    /// Relève ce que le cœur a dit depuis la dernière fois.
+    ///
+    /// À appeler après chaque demande, qu'elle ait réussi ou non.
+    pub fn prendre_dits(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.dits)
+    }
+
     /// Fait tourner le cœur et rend la trame.
-    pub fn trame(&mut self, requete: Requete) -> Result<(Vec<String>, Trame), String> {
-        let (messages, brut) = self.demander(Demande::Trame, &requete.ecrire())?;
+    pub fn trame(&mut self, requete: Requete) -> Result<Trame, String> {
+        let brut = self.demander(Demande::Trame, &requete.ecrire())?;
         let rendu = Rendu::lire(&brut)?;
 
         let image = match rendu.geometrie {
@@ -208,14 +235,11 @@ impl Distante {
             None => None,
         };
 
-        Ok((
-            messages,
-            Trame {
-                image,
-                audio: rendu.audio,
-                arret: rendu.arret,
-            },
-        ))
+        Ok(Trame {
+            image,
+            audio: rendu.audio,
+            arret: rendu.arret,
+        })
     }
 
     /// Demande au cœur de se décharger, puis s'assure que le processus est bien

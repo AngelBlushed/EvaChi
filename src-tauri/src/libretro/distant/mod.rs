@@ -30,7 +30,7 @@ pub mod partage;
 pub mod protocole;
 pub mod tuyau;
 
-pub use parent::Distante;
+pub use parent::{Distante, DEMARRAGE};
 pub use tuyau::TOMBE;
 
 /// Argument interne : tient un cœur pour le compte de la fenêtre, et ne rend la

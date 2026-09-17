@@ -115,30 +115,39 @@ impl Ecoute {
 
         // SAFETY : le tuyau est valide et le recouvrement vit jusqu'au bout.
         let tout_de_suite = unsafe { ConnectNamedPipe(self.tuyau, &mut recouvrement) };
-        if tout_de_suite == 0 {
+        let issue = if tout_de_suite != 0 {
+            Ok(())
+        } else {
             match erreur() {
                 // Le processus du cœur a ouvert le tuyau avant qu'on écoute :
                 // c'est un succès, malgré le zéro rendu.
-                ERROR_PIPE_CONNECTED => {}
+                ERROR_PIPE_CONNECTED => Ok(()),
                 ERROR_IO_PENDING => {
                     attendre(self.tuyau, &mut recouvrement, evenement, processus, echeance)
-                        .map_err(|raison| format!("le cœur ne s'est pas branché : {raison}"))?;
+                        .map(|_| ())
+                        .map_err(|raison| format!("le cœur ne s'est pas branché : {raison}"))
                 }
-                code => {
-                    fermer(evenement);
-                    return Err(format!("branchement refusé : erreur {code}"));
-                }
+                code => Err(format!("branchement refusé : erreur {code}")),
             }
+        };
+
+        // Une seule sortie pour tous les échecs : l'événement se fermait sur le
+        // chemin direct et fuyait sur celui de l'attente, qui est justement le
+        // chemin ordinaire.
+        if let Err(raison) = issue {
+            fermer(evenement);
+            return Err(raison);
         }
 
-        let nom = self.nom.clone();
-        let tuyau = self.tuyau;
-        // La poignée passe au canal : on empêche `Drop` de la fermer ici.
-        std::mem::forget(self);
+        // Le tuyau passe au canal, et le reste part avec l'écoute. `ManuallyDrop`
+        // plutôt que `mem::forget` : celui-ci abandonnait aussi le nom, quelques
+        // dizaines d'octets par partie que rien ne reprenait jamais.
+        let mut sortante = std::mem::ManuallyDrop::new(self);
+        let nom = std::mem::take(&mut sortante.nom);
 
         Ok(Canal {
             _nom: nom,
-            tuyau,
+            tuyau: sortante.tuyau,
             evenement,
         })
     }

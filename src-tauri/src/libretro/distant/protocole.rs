@@ -337,10 +337,20 @@ pub fn decomposer(octets: &[u8]) -> Result<(Vec<String>, Vec<u8>), String> {
 
     let mut position = 0usize;
     let combien = nombre(octets, &mut position)? as usize;
-    // Un message par octet serait déjà absurde : ce plafond n'existe que pour
-    // qu'un compte aberrant ne fasse pas réserver la mémoire d'avance.
-    if combien > octets.len() {
-        return Err("réponse abîmée : trop de messages annoncés".into());
+
+    // Deux plafonds, et les deux comptent.
+    //
+    // Le premier tient à l'arithmétique : chaque message coûte au moins quatre
+    // octets de longueur, donc un compte plus grand que le quart de ce qui
+    // reste est un mensonge. Le second est un chiffre rond, et il est là parce
+    // que le premier ne suffisait pas : sur une réponse de trois cents
+    // mégaoctets — un état de sauvegarde —, un compte annoncé de soixante-quinze
+    // millions passait le contrôle et faisait réserver un tableau de plusieurs
+    // gigaoctets avant qu'on ait lu le premier message. La fenêtre tombait, tuée
+    // par ce qu'elle était censée survivre.
+    const MAX_MESSAGES: usize = 4096;
+    if combien > MAX_MESSAGES || combien > octets.len().saturating_sub(position) / 4 {
+        return Err(format!("réponse abîmée : {combien} messages annoncés"));
     }
 
     let mut messages = Vec::with_capacity(combien);
@@ -485,6 +495,22 @@ mod tests {
         // On ment sur la longueur du premier message.
         compose[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
         assert!(decomposer(&compose).is_err());
+    }
+
+    #[test]
+    fn un_compte_de_messages_aberrant_ne_fait_rien_reserver() {
+        // Le cas qui comptait : une grosse réponse — un état de sauvegarde —
+        // dont l'en-tête annonce des millions de messages. Un tableau réservé
+        // d'avance ferait tomber la fenêtre, tuée par ce qu'elle doit survivre.
+        let mut compose = composer(&[], &vec![0u8; 64 * 1024]);
+        compose[0..4].copy_from_slice(&75_000_000u32.to_le_bytes());
+        assert!(decomposer(&compose).is_err());
+
+        // Et un compte à peine trop grand pour la place disponible, aussi :
+        // quatre octets de longueur par message, c'est le minimum.
+        let mut serre = composer(&[], b"douze octets");
+        serre[0..4].copy_from_slice(&4u32.to_le_bytes());
+        assert!(decomposer(&serre).is_err());
     }
 
     #[test]
