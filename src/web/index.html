@@ -632,7 +632,10 @@
         opacity: 0;
         transition: opacity 260ms ease;
       }
-      .xmb-affiche img.vue { opacity: 1; }
+      /* Le panneau laisse passer les clics — il couvre la liste — mais la
+         jaquette visible, elle, les reçoit : c'est par elle qu'on ouvre le
+         recadrage. */
+      .xmb-affiche img.vue { opacity: 1; pointer-events: auto; }
 
       /* Fenêtre étroite : la jaquette en grand est le premier luxe auquel on
          renonce, et la liste reprend toute la largeur. */
@@ -1092,10 +1095,8 @@
          assombri. Rien d'autre à regarder que le cadre qu'on déplace. */
       .recadre {
         position: relative;
-        display: grid;
-        place-items: center;
         width: 100%;
-        max-height: 56vh;
+        height: 52vh;
         background: var(--bg);
         border: 1px solid var(--edge);
         border-radius: 6px;
@@ -1103,11 +1104,14 @@
         touch-action: none;
         user-select: none;
       }
+      /* Image et cadre sont posés au pixel par le code : le cadre peut sortir
+         de l'image pour ajouter des bandes, et c'est alors l'image qui rapetisse
+         pour que les deux tiennent dans la vue. Une mise en page automatique ne
+         saurait pas faire tenir ensemble deux rectangles dont l'un déborde de
+         l'autre. */
       .recadre img {
+        position: absolute;
         display: block;
-        max-width: 100%;
-        max-height: 56vh;
-        object-fit: contain;
       }
       /* L'ombre portée assombrit tout l'extérieur d'un seul trait, sans
          quatre voiles à placer et à tenir d'accord entre eux. */
@@ -1137,6 +1141,18 @@
       /* La grande jaquette du menu animé s'ouvre au clic sur son recadrage :
          le curseur doit le dire, sinon personne ne l'essaiera. */
       #xmb-affiche-image.vue { cursor: pointer; }
+
+      /* Une jaquette cadrée à la main est montrée telle qu'on l'a cadrée : en
+         entier, sans recoupe. `cover` remplirait la case en rognant ce qu'on
+         vient justement de choisir — et les bandes ajoutées pour dézoomer
+         seraient les premières à sauter. Le fond de la case s'efface avec :
+         c'est ce qui laisse voir le décor à travers les bandes. */
+      img.recadree { object-fit: contain; }
+      /* Le fond ne s'efface que dans le menu animé : c'est là qu'il y a un
+         décor à voir derrière les bandes. Dans la grille, la case garde son
+         fond et son ombre — les bandes y prennent simplement la couleur du
+         panneau, et les vignettes restent d'aplomb les unes à côté des autres. */
+      .xmb-affiche .boite.recadree { background: transparent; box-shadow: none; }
 
       /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
       #bios-adopted:empty { display: none; }
@@ -1831,8 +1847,10 @@
         </div>
         <p class="hint-text" id="recadre-mot">
           Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec
-          Maj on le resserre. À la manette, les directions déplacent et les
-          gâchettes resserrent ou élargissent.
+          Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des
+          bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop
+          serrée. À la manette, les directions déplacent et les gâchettes
+          règlent la taille.
         </p>
       </div>
       <div class="dialog-foot">

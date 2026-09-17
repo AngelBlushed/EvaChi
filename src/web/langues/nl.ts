@@ -7,7 +7,8 @@
  * vérifier à l'œil.
  */
 
-export const nl: readonly string[] = [  /* 1 */ "Met de controller",
+export const nl: readonly string[] = [
+  /* 1 */ "Met de controller",
   /* 2 */ "A starten · X favoriet · Y bijsnijden · L1/R1 consoles · L2/R2 letter · B terug",
   /* 3 */ "Over EvaChi",
   /* 4 */ "Over…",
@@ -343,7 +344,7 @@ export const nl: readonly string[] = [  /* 1 */ "Met de controller",
   /* 334 */ "In het geanimeerde menu, vijf spellen tegelijk",
   /* 335 */ "Spelsnelheid",
   /* 336 */ "Annuleren",
-  /* 337 */ "Sleep het kader, of trek aan een hoek. Met de pijltjes verplaats je het, met Shift maak je het kleiner. Op de controller verplaatsen de richtingsknoppen het en maken de triggers het kleiner of groter.",
+  /* 337 */ "Sleep het kader, of trek aan een hoek. Met de pijltjestoetsen verschuif je het, met Shift maak je het groter of kleiner. Valt het buiten de afbeelding, dan komen er doorzichtige randen bij: zo zoom je uit bij een cover die te strak in beeld zit. Op de controller verplaatsen de richtingsknoppen het kader en regelen de triggers de grootte.",
   /* 338 */ "Bijsnijden",
   /* 339 */ "Hoes bijsnijden",
   /* 340 */ "Hele afbeelding",

@@ -6,7 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const it: readonly string[] = [  /* 1 */ "Col controller",
+export const it: readonly string[] = [
+  /* 1 */ "Col controller",
   /* 2 */ "A avvia · X preferito · Y ritaglia · L1/R1 console · L2/R2 lettera · B indietro",
   /* 3 */ "Informazioni su EvaChi",
   /* 4 */ "Informazioni…",
@@ -342,7 +343,7 @@ export const it: readonly string[] = [  /* 1 */ "Col controller",
   /* 334 */ "Nel menu animato, cinque giochi alla volta",
   /* 335 */ "Velocità del gioco",
   /* 336 */ "Annulla",
-  /* 337 */ "Trascina il riquadro, o tira un angolo. Con le frecce lo sposti, con Maiusc lo stringi. Sul controller le direzioni spostano e i grilletti stringono o allargano.",
+  /* 337 */ "Trascina il riquadro, oppure tira un angolo. Le frecce lo spostano, con Maiusc lo ingrandisci o lo rimpicciolisci. Se esce dall'immagine, intorno alla copertina compaiono bande trasparenti: è così che si allarga una copertina troppo stretta. Con il controller le direzioni lo spostano e i grilletti ne regolano la dimensione.",
   /* 338 */ "Ritaglia",
   /* 339 */ "Ritaglia la copertina",
   /* 340 */ "Tutta l'immagine",

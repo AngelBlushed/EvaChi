@@ -6,7 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const es: readonly string[] = [  /* 1 */ "Con el mando",
+export const es: readonly string[] = [
+  /* 1 */ "Con el mando",
   /* 2 */ "A jugar · X favorito · Y recortar · L1/R1 consolas · L2/R2 letra · B volver",
   /* 3 */ "Acerca de EvaChi",
   /* 4 */ "Acerca de…",
@@ -342,7 +343,7 @@ export const es: readonly string[] = [  /* 1 */ "Con el mando",
   /* 334 */ "En el menú animado, cinco juegos a la vez",
   /* 335 */ "Velocidad del juego",
   /* 336 */ "Cancelar",
-  /* 337 */ "Arrastra el marco o tira de una esquina. Con las flechas lo mueves y con Mayús lo estrechas. En el mando, las direcciones lo mueven y los gatillos lo estrechan o lo ensanchan.",
+  /* 337 */ "Arrastra el marco o tira de una esquina. Con las flechas lo mueves; con Mayús lo agrandas o lo reduces. Si se sale de la imagen, se añaden bandas transparentes: así se aleja una carátula demasiado ajustada. Con el mando, las direcciones lo mueven y los gatillos ajustan el tamaño.",
   /* 338 */ "Recortar",
   /* 339 */ "Recortar la carátula",
   /* 340 */ "Toda la imagen",

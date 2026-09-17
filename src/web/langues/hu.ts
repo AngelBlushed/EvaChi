@@ -9,7 +9,8 @@
  * « 3 játékok » : les six catégories de pluriel portent donc la même forme.
  */
 
-export const hu: readonly string[] = [  /* 1 */ "Kontrolleren",
+export const hu: readonly string[] = [
+  /* 1 */ "Kontrolleren",
   /* 2 */ "A indítás · X kedvenc · Y levágás · L1/R1 konzolok · L2/R2 betű · B vissza",
   /* 3 */ "Az EvaChi névjegye",
   /* 4 */ "Névjegy…",
@@ -345,7 +346,7 @@ export const hu: readonly string[] = [  /* 1 */ "Kontrolleren",
   /* 334 */ "Az animált menüben öt játék egyszerre",
   /* 335 */ "Játék sebessége",
   /* 336 */ "Mégse",
-  /* 337 */ "Húzza a keretet, vagy fogja meg az egyik sarkát. A nyilak mozgatják, Shifttel pedig szűkül. Kontrolleren az irányok mozgatják, a ravaszok szűkítik vagy tágítják.",
+  /* 337 */ "Húzza a keretet, vagy fogja meg az egyik sarkát. A nyilakkal mozgathatja, Shifttel nagyíthatja vagy kicsinyítheti. Ha a keret kilóg a képből, átlátszó sávok kerülnek a borító köré: így tud kicsinyíteni egy túl szűk borítót. Kontrolleren az iránygombok mozgatják, a ravaszok pedig a méretét állítják.",
   /* 338 */ "Levágás",
   /* 339 */ "Borító levágása",
   /* 340 */ "Teljes kép",

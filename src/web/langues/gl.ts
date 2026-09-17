@@ -6,7 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const gl: readonly string[] = [  /* 1 */ "Co mando",
+export const gl: readonly string[] = [
+  /* 1 */ "Co mando",
   /* 2 */ "A iniciar · X favorito · Y recortar · L1/R1 consolas · L2/R2 letra · B volver",
   /* 3 */ "Sobre EvaChi",
   /* 4 */ "Sobre…",
@@ -342,7 +343,7 @@ export const gl: readonly string[] = [  /* 1 */ "Co mando",
   /* 334 */ "No menú animado, cinco xogos de cada vez",
   /* 335 */ "Velocidade do xogo",
   /* 336 */ "Cancelar",
-  /* 337 */ "Arrastra o marco, ou tira dun canto. Coas frechas móvese, e con Maiús estréitase. No mando, as direccións móveno e os gatillos estréitano ou alárgano.",
+  /* 337 */ "Arrastra o marco ou tira dunha esquina. Coas frechas móveo, e con Maiús faino máis grande ou máis pequeno. Se sae da imaxe, engádense bandas transparentes: así se afasta unha portada demasiado axustada. No mando, as direccións móveno e os gatillos axustan o tamaño.",
   /* 338 */ "Recortar",
   /* 339 */ "Recortar a portada",
   /* 340 */ "Imaxe enteira",

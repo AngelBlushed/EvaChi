@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const de: readonly string[] = [  /* 1 */ "Mit dem Controller",
+export const de: readonly string[] = [
+  /* 1 */ "Mit dem Controller",
   /* 2 */ "A starten · X Favorit · Y zuschneiden · L1/R1 Konsolen · L2/R2 Buchstabe · B zurück",
   /* 3 */ "Über EvaChi",
   /* 4 */ "Über…",
@@ -343,7 +344,7 @@ export const de: readonly string[] = [  /* 1 */ "Mit dem Controller",
   /* 334 */ "Im animierten Menü fünf Spiele auf einmal",
   /* 335 */ "Spielgeschwindigkeit",
   /* 336 */ "Abbrechen",
-  /* 337 */ "Ziehen Sie den Rahmen, oder greifen Sie eine Ecke. Mit den Pfeiltasten verschieben Sie ihn, mit Umschalt wird er enger. Am Controller verschieben die Richtungstasten, und die Trigger machen ihn enger oder weiter.",
+  /* 337 */ "Ziehen Sie den Rahmen, oder fassen Sie eine Ecke. Mit den Pfeiltasten verschieben Sie ihn, mit Umschalt wird er größer oder kleiner. Ragt er über das Bild hinaus, kommen ringsum durchsichtige Streifen dazu – so zoomen Sie ein zu eng sitzendes Cover heraus. Am Gamepad verschieben die Richtungstasten, und die Schultertasten stellen die Größe ein.",
   /* 338 */ "Zuschneiden",
   /* 339 */ "Cover zuschneiden",
   /* 340 */ "Ganzes Bild",

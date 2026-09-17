@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const ca: readonly string[] = [  /* 1 */ "Amb el comandament",
+export const ca: readonly string[] = [
+  /* 1 */ "Amb el comandament",
   /* 2 */ "A engegar · X preferit · Y retallar · L1/R1 consoles · L2/R2 lletra · B enrere",
   /* 3 */ "Quant a EvaChi",
   /* 4 */ "Quant a…",
@@ -343,7 +344,7 @@ export const ca: readonly string[] = [  /* 1 */ "Amb el comandament",
   /* 334 */ "Al menú animat, cinc jocs alhora",
   /* 335 */ "Velocitat del joc",
   /* 336 */ "Cancel·la",
-  /* 337 */ "Arrossegueu el marc o estireu-ne un cantó. Amb les fletxes es mou, i amb Maj s'estreny. Al comandament, les direccions el mouen i els gallets l'estrenyen o l'eixamplen.",
+  /* 337 */ "Arrossegueu el marc o estireu-ne un cantó. Amb les fletxes el moveu, i amb Maj el feu més gran o més petit. Si surt de la imatge, hi apareixen bandes transparents al voltant: així s'allunya una caràtula massa ajustada. Amb el comandament, les direccions el mouen i els gallets en regulen la mida.",
   /* 338 */ "Retalla",
   /* 339 */ "Retalla la caràtula",
   /* 340 */ "Tota la imatge",

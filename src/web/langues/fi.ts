@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const fi: readonly string[] = [  /* 1 */ "Ohjaimella",
+export const fi: readonly string[] = [
+  /* 1 */ "Ohjaimella",
   /* 2 */ "A käynnistä · X suosikki · Y rajaa · L1/R1 konsolit · L2/R2 kirjain · B takaisin",
   /* 3 */ "Tietoja EvaChista",
   /* 4 */ "Tietoja…",
@@ -342,7 +343,7 @@ export const fi: readonly string[] = [  /* 1 */ "Ohjaimella",
   /* 334 */ "Animoidussa valikossa viisi peliä kerrallaan",
   /* 335 */ "Pelin nopeus",
   /* 336 */ "Peruuta",
-  /* 337 */ "Vedä kehystä tai tartu sen kulmaan. Nuolinäppäimet siirtävät sitä, ja Vaihto-näppäimen kanssa ne kaventavat sitä. Ohjaimessa suunnat siirtävät ja liipaisimet kaventavat tai laajentavat.",
+  /* 337 */ "Vedä kehystä tai tartu sen kulmaan. Nuolinäppäimet siirtävät kehystä, ja Vaihto-näppäimen kanssa se kasvaa tai kutistuu. Jos kehys ulottuu kuvan ulkopuolelle, reunoille tulee läpinäkyvät kaistaleet: näin saat liian tiukan kansikuvan näkymään väljempänä. Ohjaimessa suuntanapit siirtävät ja liipaisimet säätävät kokoa.",
   /* 338 */ "Rajaa",
   /* 339 */ "Rajaa kansikuva",
   /* 340 */ "Koko kuva",

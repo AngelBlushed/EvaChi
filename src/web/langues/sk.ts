@@ -7,7 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const sk: readonly string[] = [  /* 1 */ "Na ovládači",
+export const sk: readonly string[] = [
+  /* 1 */ "Na ovládači",
   /* 2 */ "A spustiť · X obľúbené · Y orezať · L1/R1 konzoly · L2/R2 písmeno · B späť",
   /* 3 */ "O programe EvaChi",
   /* 4 */ "O programe…",
@@ -343,7 +344,7 @@ export const sk: readonly string[] = [  /* 1 */ "Na ovládači",
   /* 334 */ "V animovanom menu päť hier naraz",
   /* 335 */ "Rýchlosť hry",
   /* 336 */ "Zrušiť",
-  /* 337 */ "Potiahnite rámček alebo jeho roh. Šípky ním pohybujú, so Shiftom ho zmenšujú. Na ovládači ho smery posúvajú a spúšte zmenšujú alebo zväčšujú.",
+  /* 337 */ "Potiahnite rámček alebo jeho roh. Šípky ním pohybujú, so Shiftom ho zväčšujú alebo zmenšujú. Keď presiahne obrázok, pribudnú priehľadné pruhy: takto oddialite priveľmi tesný obal hry. Na ovládači pohybujú rámčekom smerové tlačidlá a veľkosť nastavujú spúšte.",
   /* 338 */ "Orezať",
   /* 339 */ "Orezať obal",
   /* 340 */ "Celý obrázok",

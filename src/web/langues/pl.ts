@@ -7,7 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const pl: readonly string[] = [  /* 1 */ "Na padzie",
+export const pl: readonly string[] = [
+  /* 1 */ "Na padzie",
   /* 2 */ "A uruchom · X ulubione · Y przytnij · L1/R1 konsole · L2/R2 litera · B powrót",
   /* 3 */ "O programie EvaChi",
   /* 4 */ "O programie…",
@@ -343,7 +344,7 @@ export const pl: readonly string[] = [  /* 1 */ "Na padzie",
   /* 334 */ "W animowanym menu pięć gier naraz",
   /* 335 */ "Prędkość gry",
   /* 336 */ "Anuluj",
-  /* 337 */ "Przeciągnij ramkę albo pociągnij za róg. Strzałki ją przesuwają, a z Shiftem ją zwężają. Na padzie kierunki przesuwają, a spusty zwężają lub poszerzają.",
+  /* 337 */ "Przeciągnij ramkę albo pociągnij za róg. Strzałki ją przesuwają, a ze Shiftem powiększają lub zmniejszają. Gdy ramka wyjdzie poza obraz, dokładają się przezroczyste pasy: tak właśnie oddalisz zbyt ciasną okładkę. Na padzie kierunki przesuwają ramkę, a spusty ustawiają jej rozmiar.",
   /* 338 */ "Przytnij",
   /* 339 */ "Przytnij okładkę",
   /* 340 */ "Cały obraz",

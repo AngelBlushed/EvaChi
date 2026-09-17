@@ -7,7 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const sl: readonly string[] = [  /* 1 */ "Na krmilniku",
+export const sl: readonly string[] = [
+  /* 1 */ "Na krmilniku",
   /* 2 */ "A zaženi · X priljubljeno · Y obreži · L1/R1 konzole · L2/R2 črka · B nazaj",
   /* 3 */ "O EvaChi",
   /* 4 */ "O programu…",
@@ -343,7 +344,7 @@ export const sl: readonly string[] = [  /* 1 */ "Na krmilniku",
   /* 334 */ "V animiranem meniju pet iger hkrati",
   /* 335 */ "Hitrost igre",
   /* 336 */ "Prekliči",
-  /* 337 */ "Povlecite okvir ali njegov vogal. S puščicami ga premikate, s Shiftom ga stisnete. Na igralnem ploščku ga smerne tipke premikajo, sprožilca pa stisneta ali razširita.",
+  /* 337 */ "Povlecite okvir ali njegov vogal. S puščicami ga premikate, s tipko Shift pa povečate ali pomanjšate. Če seže čez sliko, se dodajo prosojni pasovi: tako odmaknete pretesen ovitek igre. Na igralnem ploščku okvir premikajo smeri, sprožilci pa nastavljajo velikost.",
   /* 338 */ "Obreži",
   /* 339 */ "Obreži ovitek",
   /* 340 */ "Cela slika",

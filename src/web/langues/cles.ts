@@ -357,7 +357,7 @@ export const CLES: readonly string[] = [
   "Dans le menu animé, cinq jeux à la fois",
   "Vitesse du jeu",
   "Annuler",
-  "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on le resserre. À la manette, les directions déplacent et les gâchettes resserrent ou élargissent.",
+  "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop serrée. À la manette, les directions déplacent et les gâchettes règlent la taille.",
   "Recadrer",
   "Recadrer la jaquette",
   "Tout prendre",

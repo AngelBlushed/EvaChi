@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const eu: readonly string[] = [  /* 1 */ "Kontrolagailuarekin",
+export const eu: readonly string[] = [
+  /* 1 */ "Kontrolagailuarekin",
   /* 2 */ "A abiarazi · X gogokoa · Y moztu · L1/R1 kontsolak · L2/R2 letra · B atzera",
   /* 3 */ "EvaChi-ri buruz",
   /* 4 */ "Honi buruz…",
@@ -343,7 +344,7 @@ export const eu: readonly string[] = [  /* 1 */ "Kontrolagailuarekin",
   /* 334 */ "Menu animatuan, bost joko aldi berean",
   /* 335 */ "Jokoaren abiadura",
   /* 336 */ "Utzi",
-  /* 337 */ "Arrastatu markoa, edo tira ertz batetik. Gezi-teklek mugitu egiten dute, eta Maius teklarekin estutu. Kontrolagailuan, norabideek mugitzen dute eta gatiluek estutu edo zabaldu.",
+  /* 337 */ "Arrastatu markoa, edo tira izkina batetik. Gezi-teklek mugitu egiten dute; Maius sakatuta, handitu edo txikitu. Markoa iruditik kanpo ateratzen bada, zerrenda gardenak gehitzen zaizkio: horrela urruntzen da azal estuegi bat. Agintean, norabideek mugitzen dute eta gatiluek tamaina doitzen dute.",
   /* 338 */ "Moztu",
   /* 339 */ "Moztu azala",
   /* 340 */ "Irudi osoa",

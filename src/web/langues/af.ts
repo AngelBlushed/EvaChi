@@ -6,7 +6,8 @@
  * de rang, en commentaire, sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const af: readonly string[] = [  /* 1 */ "Met die beheerder",
+export const af: readonly string[] = [
+  /* 1 */ "Met die beheerder",
   /* 2 */ "A speel · X gunsteling · Y bysny · L1/R1 konsoles · L2/R2 letter · B terug",
   /* 3 */ "Oor EvaChi",
   /* 4 */ "Oor…",
@@ -342,7 +343,7 @@ export const af: readonly string[] = [  /* 1 */ "Met die beheerder",
   /* 334 */ "In die geanimeerde kieslys, vyf speletjies op 'n slag",
   /* 335 */ "Spelsnelheid",
   /* 336 */ "Kanselleer",
-  /* 337 */ "Sleep die raam, of trek aan 'n hoek. Met die pyltjies skuif jy dit, met Shift trek jy dit nouer. Met die beheerder skuif die rigtings dit, en die snellers maak dit nouer of wyer.",
+  /* 337 */ "Sleep die raam, of trek aan 'n hoek. Met die pyltjies skuif jy dit, en hou Shift in om dit groter of kleiner te maak. Steek dit buite die prent uit, dan kom daar deursigtige rande by — so zoom jy uit op 'n omslag wat te styf sit. Met die kontroleerder skuif die rigtings dit, en die snellers stel die grootte.",
   /* 338 */ "Bysny",
   /* 339 */ "Omslag bysny",
   /* 340 */ "Hele prent",

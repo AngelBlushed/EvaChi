@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const da: readonly string[] = [  /* 1 */ "Med controller",
+export const da: readonly string[] = [
+  /* 1 */ "Med controller",
   /* 2 */ "A start · X favorit · Y beskær · L1/R1 konsoller · L2/R2 bogstav · B tilbage",
   /* 3 */ "Om EvaChi",
   /* 4 */ "Om…",
@@ -343,7 +344,7 @@ export const da: readonly string[] = [  /* 1 */ "Med controller",
   /* 334 */ "I den animerede menu, fem spil ad gangen",
   /* 335 */ "Spilhastighed",
   /* 336 */ "Annuller",
-  /* 337 */ "Træk i rammen, eller hiv i et hjørne. Piletasterne flytter den, og med Shift strammer du den ind. På controlleren flytter retningerne den, og triggerne strammer eller udvider.",
+  /* 337 */ "Træk i rammen, eller hiv i et hjørne. Med piletasterne flytter du den, og med Shift gør du den større eller mindre. Går den ud over billedet, kommer der gennemsigtige kanter omkring — sådan zoomer du ud på et omslag, der sidder for stramt. På controlleren flytter retningerne den, og triggerne styrer størrelsen.",
   /* 338 */ "Beskær",
   /* 339 */ "Beskær omslaget",
   /* 340 */ "Hele billedet",

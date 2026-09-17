@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const nb: readonly string[] = [  /* 1 */ "Med kontroller",
+export const nb: readonly string[] = [
+  /* 1 */ "Med kontroller",
   /* 2 */ "A start · X favoritt · Y beskjær · L1/R1 konsoller · L2/R2 bokstav · B tilbake",
   /* 3 */ "Om EvaChi",
   /* 4 */ "Om…",
@@ -343,7 +344,7 @@ export const nb: readonly string[] = [  /* 1 */ "Med kontroller",
   /* 334 */ "I den animerte menyen, fem spill om gangen",
   /* 335 */ "Spillfart",
   /* 336 */ "Avbryt",
-  /* 337 */ "Dra i rammen, eller trekk i et hjørne. Med piltastene flytter du den, med Shift strammer du den inn. På kontrolleren flytter retningene, og triggerne strammer inn eller utvider.",
+  /* 337 */ "Dra i rammen, eller trekk i et hjørne. Piltastene flytter den, og med Shift blir den større eller mindre. Går den utenfor bildet, legges det til gjennomsiktige striper – slik zoomer du ut et omslag som er for tett beskåret. På håndkontrolleren flytter retningsknappene rammen, og skulderknappene styrer størrelsen.",
   /* 338 */ "Beskjær",
   /* 339 */ "Beskjær omslaget",
   /* 340 */ "Hele bildet",

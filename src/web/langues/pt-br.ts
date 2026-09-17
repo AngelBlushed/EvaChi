@@ -6,7 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const ptBR: readonly string[] = [  /* 1 */ "No controle",
+export const ptBR: readonly string[] = [
+  /* 1 */ "No controle",
   /* 2 */ "A jogar · X favorito · Y recortar · L1/R1 consoles · L2/R2 letra · B voltar",
   /* 3 */ "Sobre o EvaChi",
   /* 4 */ "Sobre…",
@@ -342,7 +343,7 @@ export const ptBR: readonly string[] = [  /* 1 */ "No controle",
   /* 334 */ "No menu animado, cinco jogos de uma vez",
   /* 335 */ "Velocidade do jogo",
   /* 336 */ "Cancelar",
-  /* 337 */ "Arraste a moldura, ou puxe um canto. As setas movem a moldura e o Shift aperta. No controle, as direções movem e os gatilhos apertam ou alargam.",
+  /* 337 */ "Arraste a moldura ou puxe por um canto. As setas movem a moldura; com Shift, ela cresce ou encolhe. Se passar da imagem, entram faixas transparentes: é assim que você dá menos zoom numa capa apertada demais. No controle, as direções movem a moldura e os gatilhos ajustam o tamanho.",
   /* 338 */ "Recortar",
   /* 339 */ "Recortar a capa",
   /* 340 */ "Imagem inteira",

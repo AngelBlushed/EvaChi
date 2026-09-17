@@ -172,6 +172,8 @@ fn main() {
             commands::set_manual_cover,
             commands::set_cropped_cover,
             commands::cover_image,
+            commands::cover_original,
+            commands::cropped_covers,
             commands::clear_manual_cover,
             commands::note,
         ])

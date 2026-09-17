@@ -7,7 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const hr: readonly string[] = [  /* 1 */ "Na kontroleru",
+export const hr: readonly string[] = [
+  /* 1 */ "Na kontroleru",
   /* 2 */ "A pokreni · X favorit · Y obreži · L1/R1 konzole · L2/R2 slovo · B natrag",
   /* 3 */ "O EvaChi",
   /* 4 */ "O programu…",
@@ -343,7 +344,7 @@ export const hr: readonly string[] = [  /* 1 */ "Na kontroleru",
   /* 334 */ "U animiranom izborniku, pet igara odjednom",
   /* 335 */ "Brzina igre",
   /* 336 */ "Odustani",
-  /* 337 */ "Povucite okvir ili uhvatite njegov kut. Strelice ga pomiču, a uz Shift ga sužavaju. Na upravljaču smjerovi pomiču, a okidači sužavaju ili šire okvir.",
+  /* 337 */ "Povucite okvir ili uhvatite jedan njegov kut. Strelice ga pomiču, a sa Shiftom se povećava ili smanjuje. Kad okvir izađe izvan slike, oko omota se pojave prozirne trake: tako se omot koji je pretijesan prikaže šire. Na kontroleru smjerovi pomiču okvir, a okidači mu mijenjaju veličinu.",
   /* 338 */ "Obreži",
   /* 339 */ "Obreži omot",
   /* 340 */ "Cijela slika",

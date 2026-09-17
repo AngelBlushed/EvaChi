@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const vi: readonly string[] = [  /* 1 */ "Trên tay cầm",
+export const vi: readonly string[] = [
+  /* 1 */ "Trên tay cầm",
   /* 2 */ "A chạy · X yêu thích · Y cắt ảnh · L1/R1 máy · L2/R2 chữ cái · B quay lại",
   /* 3 */ "Giới thiệu về EvaChi",
   /* 4 */ "Giới thiệu…",
@@ -342,7 +343,7 @@ export const vi: readonly string[] = [  /* 1 */ "Trên tay cầm",
   /* 334 */ "Trong menu động, mỗi lần năm game",
   /* 335 */ "Tốc độ game",
   /* 336 */ "Hủy",
-  /* 337 */ "Kéo cả khung, hoặc kéo một góc. Phím mũi tên dời khung, giữ thêm Shift thì thu hẹp. Trên tay cầm, các hướng dời khung, còn nút cò thu hẹp hoặc mở rộng.",
+  /* 337 */ "Kéo khung đi, hoặc kéo một góc của nó. Phím mũi tên dùng để dời khung, giữ Shift thì phóng to hay thu nhỏ. Khi khung tràn ra ngoài ảnh, phần thừa thành viền trong suốt — đó là cách thu nhỏ một ảnh bìa bị cắt quá sát. Trên tay cầm, các nút hướng dùng để dời, còn nút cò chỉnh kích thước.",
   /* 338 */ "Cắt ảnh",
   /* 339 */ "Cắt lại ảnh bìa",
   /* 340 */ "Lấy cả ảnh",

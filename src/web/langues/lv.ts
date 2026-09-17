@@ -6,7 +6,8 @@
  * de rang en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const lv: readonly string[] = [  /* 1 */ "Ar spēļu pulti",
+export const lv: readonly string[] = [
+  /* 1 */ "Ar spēļu pulti",
   /* 2 */ "A palaist · X izlase · Y apgriezt · L1/R1 konsoles · L2/R2 burts · B atpakaļ",
   /* 3 */ "Par EvaChi",
   /* 4 */ "Par programmu…",
@@ -342,7 +343,7 @@ export const lv: readonly string[] = [  /* 1 */ "Ar spēļu pulti",
   /* 334 */ "Animētajā izvēlnē piecas spēles uzreiz",
   /* 335 */ "Spēles ātrums",
   /* 336 */ "Atcelt",
-  /* 337 */ "Velciet rāmi vai pavelciet kādu stūri. Ar bultiņām to pārvieto, ar Shift sašaurina. Ar kontrolieri virzieni to pārvieto, bet mēlītes sašaurina vai paplašina.",
+  /* 337 */ "Velciet rāmi vai pavelciet kādu tā stūri. Bultiņas to pārvieto, bet ar Shift tas palielinās vai samazinās. Kad rāmis iziet ārpus attēla, ap vāku parādās caurspīdīgas joslas: tā pārāk cieši kadrētu vāku var parādīt plašāk. Ar kontrolieri virzienu pogas pārvieto rāmi, bet sprūdi maina tā izmēru.",
   /* 338 */ "Apgriezt",
   /* 339 */ "Apgriezt vāku",
   /* 340 */ "Viss attēls",

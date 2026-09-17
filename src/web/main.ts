@@ -27,6 +27,8 @@ import {
   clearManualCover,
   coverImage,
   coverIndex,
+  coverOriginal,
+  croppedCovers,
   crashReport,
   dismissCrash,
   deleteShot,
@@ -651,8 +653,9 @@ const recadreBoite = $<HTMLElement>('recadre');
 const recadreImage = $<HTMLImageElement>('recadre-image');
 const recadreCadre = $<HTMLElement>('recadre-cadre');
 
-/** Le jeu dont on recadre la jaquette, et le cadre en cours. */
+/** Le jeu dont on recadre la jaquette, l'image d'origine, et le cadre en cours. */
 let recadreJeu: Playable | null = null;
+let recadreSource = '';
 let cadre: Cadre = TOUT;
 
 /**
@@ -681,23 +684,30 @@ async function adresseJaquette(item: Playable): Promise<string | null> {
  * adresse `data:`, et n'a pas ce détour à faire.
  */
 async function ouvrirRecadrage(item: Playable): Promise<void> {
-  const adresse = await adresseJaquette(item);
-  if (!adresse) {
-    log(dit('{0} — pas de jaquette à recadrer', item.rom.name), 'err');
-    return;
-  }
+  // L'image d'avant tout recadrage, si on l'a gardée : recadrer un recadrage
+  // perdrait un peu plus de l'image à chaque fois, et rien ne le rattraperait.
+  let source = await coverOriginal(item.rom.path).catch(() => null);
 
-  let source = adresse;
-  if (!adresse.startsWith('data:')) {
-    try {
-      source = await coverImage(adresse);
-    } catch (error) {
-      log(dit('jaquette illisible — {0}', reason(error)), 'err');
+  if (!source) {
+    const adresse = await adresseJaquette(item);
+    if (!adresse) {
+      log(dit('{0} — pas de jaquette à recadrer', item.rom.name), 'err');
       return;
+    }
+    if (adresse.startsWith('data:')) {
+      source = adresse;
+    } else {
+      try {
+        source = await coverImage(adresse);
+      } catch (error) {
+        log(dit('jaquette illisible — {0}', reason(error)), 'err');
+        return;
+      }
     }
   }
 
   recadreJeu = item;
+  recadreSource = source;
   cadre = TOUT;
   recadreImage.src = source;
   if (!recadreImage.complete) {
@@ -712,16 +722,55 @@ async function ouvrirRecadrage(item: Playable): Promise<void> {
   recadreBoite.focus();
 }
 
-/** Pose le cadre sur l'image, là où l'image est réellement dessinée. */
-function placerCadre(): void {
-  const image = recadreImage.getBoundingClientRect();
-  const hote = recadreBoite.getBoundingClientRect();
-  if (image.width === 0) return;
+/** Où l'image est dessinée dans la vue, en pixels : coin haut-gauche et taille. */
+let vueImage = { x: 0, y: 0, w: 0, h: 0 };
 
-  recadreCadre.style.left = `${image.left - hote.left + cadre.x * image.width}px`;
-  recadreCadre.style.top = `${image.top - hote.top + cadre.y * image.height}px`;
-  recadreCadre.style.width = `${cadre.w * image.width}px`;
-  recadreCadre.style.height = `${cadre.h * image.height}px`;
+/**
+ * Pose l'image et son cadre dans la vue.
+ *
+ * L'image ne remplit pas la vue une fois pour toutes : c'est la réunion de
+ * l'image et du cadre qui y tient. Un cadre qui déborde fait donc reculer
+ * l'image, et l'on voit d'un coup d'œil la bande qu'on est en train d'ajouter.
+ * Sans cela, dézoomer se ferait à l'aveugle, le cadre sortant de la vue.
+ */
+function placerCadre(): void {
+  const hote = recadreBoite.getBoundingClientRect();
+  const large = recadreImage.naturalWidth;
+  const haut = recadreImage.naturalHeight;
+  if (hote.width === 0 || large === 0 || haut === 0) return;
+
+  const x0 = Math.min(0, cadre.x);
+  const y0 = Math.min(0, cadre.y);
+  const x1 = Math.max(1, cadre.x + cadre.w);
+  const y1 = Math.max(1, cadre.y + cadre.h);
+
+  // Une marge constante : collée aux bords, la poignée d'un coin sortirait à
+  // moitié de la vue et deviendrait impossible à saisir.
+  const marge = 14;
+  const proportion = large / haut;
+  const echelle = Math.min(
+    (hote.width - 2 * marge) / ((x1 - x0) * proportion),
+    (hote.height - 2 * marge) / (y1 - y0),
+  );
+
+  const imageW = proportion * echelle;
+  const imageH = echelle;
+  vueImage = {
+    x: (hote.width - (x1 - x0) * imageW) / 2 - x0 * imageW,
+    y: (hote.height - (y1 - y0) * imageH) / 2 - y0 * imageH,
+    w: imageW,
+    h: imageH,
+  };
+
+  recadreImage.style.left = `${vueImage.x}px`;
+  recadreImage.style.top = `${vueImage.y}px`;
+  recadreImage.style.width = `${vueImage.w}px`;
+  recadreImage.style.height = `${vueImage.h}px`;
+
+  recadreCadre.style.left = `${vueImage.x + cadre.x * vueImage.w}px`;
+  recadreCadre.style.top = `${vueImage.y + cadre.y * vueImage.h}px`;
+  recadreCadre.style.width = `${cadre.w * vueImage.w}px`;
+  recadreCadre.style.height = `${cadre.h * vueImage.h}px`;
 }
 
 /**
@@ -738,24 +787,29 @@ function poserCadre(neuf: Cadre): void {
   if (bouge && sonsVoulus()) ticDeplacement();
 }
 
-/** Où se trouve un point de l'écran, en fraction de l'image. */
-function surImage(x: number, y: number): { x: number; y: number } {
-  const image = recadreImage.getBoundingClientRect();
-  return { x: (x - image.left) / image.width, y: (y - image.top) / image.height };
-}
-
 recadreBoite.addEventListener('pointerdown', (event) => {
-  const image = recadreImage.getBoundingClientRect();
-  if (image.width === 0) return;
+  if (vueImage.w === 0) return;
   event.preventDefault();
   recadreBoite.focus();
 
   const coin = (event.target as HTMLElement).dataset?.coin as Coin | undefined;
-  const depart = surImage(event.clientX, event.clientY);
+
+  // La vue est figée le temps du geste. L'image recule quand le cadre déborde,
+  // et mesurer sur une vue qui bouge ferait fuir le point sous le doigt : on
+  // tirerait un coin, l'image reculerait, le coin se retrouverait ailleurs, et
+  // le geste s'emballerait tout seul.
+  const hote = recadreBoite.getBoundingClientRect();
+  const fige = { ...vueImage };
+  const surVue = (x: number, y: number) => ({
+    x: (x - hote.left - fige.x) / fige.w,
+    y: (y - hote.top - fige.y) / fige.h,
+  });
+
+  const depart = surVue(event.clientX, event.clientY);
   const origine = cadre;
 
   const bouger = (suite: PointerEvent) => {
-    const ici = surImage(suite.clientX, suite.clientY);
+    const ici = surVue(suite.clientX, suite.clientY);
     poserCadre(
       coin
         ? tirer(origine, coin, ici.x, ici.y)
@@ -812,8 +866,14 @@ async function appliquerRecadrage(): Promise<void> {
   const item = recadreJeu;
   if (!item) return;
 
-  const largeur = Math.max(1, Math.round(recadreImage.naturalWidth * cadre.w));
-  const hauteur = Math.max(1, Math.round(recadreImage.naturalHeight * cadre.h));
+  // Le cadre peut déborder de l'image : la toile est alors plus grande qu'elle,
+  // et ce qui dépasse reste transparent. C'est ainsi qu'on dézoome une jaquette
+  // trop serrée — le décor se voit à travers les bandes.
+  const PLAFOND = 2048;
+  const brut = Math.max(1, recadreImage.naturalWidth * cadre.w);
+  const reduction = Math.min(1, PLAFOND / Math.max(brut, recadreImage.naturalHeight * cadre.h));
+  const largeur = Math.max(1, Math.round(recadreImage.naturalWidth * cadre.w * reduction));
+  const hauteur = Math.max(1, Math.round(recadreImage.naturalHeight * cadre.h * reduction));
 
   const canevas = document.createElement('canvas');
   canevas.width = largeur;
@@ -821,21 +881,26 @@ async function appliquerRecadrage(): Promise<void> {
   const pinceau = canevas.getContext('2d');
   if (!pinceau) return;
 
+  // Posée d'après le cadre plutôt que découpée dedans : une source qui sort de
+  // l'image ne se dessine pas, et c'est justement ce qu'on veut — du vide.
   pinceau.drawImage(
     recadreImage,
-    cadre.x * recadreImage.naturalWidth,
-    cadre.y * recadreImage.naturalHeight,
-    cadre.w * recadreImage.naturalWidth,
-    cadre.h * recadreImage.naturalHeight,
-    0,
-    0,
-    largeur,
-    hauteur,
+    (-cadre.x / cadre.w) * largeur,
+    (-cadre.y / cadre.h) * hauteur,
+    largeur / cadre.w,
+    hauteur / cadre.h,
   );
 
   try {
-    const adresse = await setCroppedCover(item.rom.path, canevas.toDataURL('image/png'));
+    const adresse = await setCroppedCover(
+      item.rom.path,
+      canevas.toDataURL('image/png'),
+      recadreSource,
+    );
     jaquettesPosees = { ...jaquettesPosees, [item.rom.path]: adresse };
+    // Elle rejoint les recadrées : c'est ce qui décide de la montrer en entier
+    // plutôt que de la recouper une seconde fois à l'affichage.
+    jaquettesRecadrees = new Set([...jaquettesRecadrees, item.rom.path]);
     if (sonsVoulus()) ticValidation();
     dialogs.crop.close();
     renderGames();
@@ -2222,8 +2287,39 @@ let signatureAffichee = '';
  */
 let boitesGrille: Boite[] = [];
 
+/** Les cases de la grille, dans l'ordre, relevées en même temps que leurs boîtes. */
+let casesGrille: HTMLElement[] = [];
+
+/** Le défilement en attente, s'il y en a un. */
+let defilementPrevu = 0;
+
+/**
+ * Met une case en vue, à la trame suivante.
+ *
+ * Poser la marque de sélection invalide la mise en page ; demander aussitôt le
+ * défilement oblige le navigateur à la refaire sur-le-champ, et cinq cents
+ * vignettes recalculées coûtaient quarante millisecondes par touche. La grille
+ * paraissait alors figée tant qu'on tenait une flèche, puis sautait d'un coup à
+ * l'arrivée.
+ *
+ * Reporté d'une trame, le calcul se fait une seule fois pour toutes les touches
+ * reçues entre-temps — et c'est le calcul que le navigateur allait faire de
+ * toute façon pour dessiner.
+ */
+function mettreEnVue(element: HTMLElement): void {
+  cancelAnimationFrame(defilementPrevu);
+  defilementPrevu = requestAnimationFrame(() => {
+    element.scrollIntoView({ block: 'nearest' });
+  });
+}
+
 function releverBoites(): void {
-  boitesGrille = ([...grilleTuiles.querySelectorAll<HTMLElement>('.tuile')]).map((element) => ({
+  // Les cases sont retenues en même temps que leurs positions. Les redemander
+  // à chaque changement de sélection coûtait une recherche sur six cents
+  // éléments par pression de touche, et la grille s'engorgeait dès qu'on
+  // tenait une flèche.
+  casesGrille = [...grilleTuiles.querySelectorAll<HTMLElement>('.tuile')];
+  boitesGrille = casesGrille.map((element) => ({
     x: element.offsetLeft,
     y: element.offsetTop,
     w: element.offsetWidth,
@@ -2327,20 +2423,28 @@ function renderGrille(shelves: Shelf[]): void {
   choisir(choisie);
 }
 
-/** Désigne une case, la met en vue, et annonce ce qu'elle porte. */
+/**
+ * Désigne une case, la met en vue, et annonce ce qu'elle porte.
+ *
+ * Deux cases changent de marque, pas six cents : parcourir toute la grille à
+ * chaque pression de touche la faisait bégayer dès qu'on tenait une flèche.
+ * Et la mise en vue est immédiate, sans glissé : chaque appui relançait
+ * l'animation du précédent, si bien que la grille semblait figée tant qu'on
+ * tenait la touche, puis sautait d'un coup à l'arrivée.
+ */
 function choisir(rang: number): void {
+  const avant = choisie;
   choisie = Math.min(Math.max(rang, 0), Math.max(0, tuiles.length - 1));
 
   // Les cases seules, sans les titres de section : ceux-ci sont aussi des
   // enfants de la grille, et les compter décalait la sélection d'un cran par
   // section traversée — la marque se posait alors sur un titre.
-  const cases = [...grilleTuiles.querySelectorAll<HTMLElement>('.tuile')];
-  for (const [index, element] of cases.entries()) {
-    element.setAttribute('aria-selected', String(index === choisie));
+  casesGrille[avant]?.setAttribute('aria-selected', 'false');
+  const courante = casesGrille[choisie];
+  if (courante) {
+    courante.setAttribute('aria-selected', 'true');
+    mettreEnVue(courante);
   }
-
-  const courante = cases[choisie];
-  if (courante) courante.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 
   const item = tuiles[choisie];
   grilleTitre.textContent = item ? item.rom.name : '';
@@ -2360,9 +2464,25 @@ function choisir(rang: number): void {
 /** Les volets tels qu'ils viennent d'être classés. */
 let volets: Shelf[] = [];
 
+/**
+ * Le volet d'où vient chaque jeu, tout prêt.
+ *
+ * Cherché à la volée, c'était un parcours de toute la bibliothèque à chaque
+ * pression de touche — six cents jeux comparés un à un pour retrouver la
+ * console d'une seule case.
+ */
+let voletParJeu = new Map<Playable, Shelf>();
+
+function relierVolets(shelves: readonly Shelf[]): void {
+  voletParJeu = new Map();
+  for (const shelf of shelves) {
+    for (const item of shelf.games) if (!voletParJeu.has(item)) voletParJeu.set(item, shelf);
+  }
+}
+
 /** Le volet d'où ce jeu vient. */
 function voletDe(item: Playable): Shelf | undefined {
-  return volets.find((shelf) => shelf.games.includes(item));
+  return voletParJeu.get(item);
 }
 
 /** Le cœur retenu pour le volet dont ce jeu vient. */
@@ -2651,8 +2771,11 @@ function conduireRecadrage(
     poserCadre(deplacer(cadre, dx * PAS_CADRE * 2, dy * PAS_CADRE * 2));
   }
 
-  const serrer = boutons.serrer.update(appuye(6), maintenant);
-  const elargir = boutons.elargir.update(appuye(7), maintenant);
+  // Les quatre gâchettes, hautes et basses : toutes les manettes n'annoncent
+  // pas les basses comme des boutons, et se priver des hautes laissait la
+  // fenêtre sans moyen de resserrer.
+  const serrer = boutons.serrer.update(appuye(4) || appuye(6), maintenant);
+  const elargir = boutons.elargir.update(appuye(5) || appuye(7), maintenant);
   if (serrer.pressed || serrer.repeat) poserCadre(zoomer(cadre, 0.96));
   if (elargir.pressed || elargir.repeat) poserCadre(zoomer(cadre, 1 / 0.96));
 }
@@ -3181,7 +3304,12 @@ function renderColonnesXmb(): void {
     etiquette.textContent = shelf.label;
 
     pastille.append(rond, etiquette);
-    pastille.addEventListener('click', () => allerColonne(rang));
+    // Le même cran qu'à la manette : choisir une console d'un clic est le même
+    // geste, et le silence donnait l'impression que le clic n'avait pas porté.
+    pastille.addEventListener('click', () => {
+      if (rang !== colonneXmb && sonsVoulus()) ticDeplacement();
+      allerColonne(rang);
+    });
     xmbColonnes.append(pastille);
   }
 }
@@ -3273,8 +3401,13 @@ function renderEntreesXmb(): void {
       entree.append(etoile);
     }
     entree.addEventListener('click', () => {
-      if (rang === entreeXmb) void jouerXmb();
-      else allerEntree(rang);
+      if (rang === entreeXmb) {
+        if (sonsVoulus()) ticValidation();
+        void jouerXmb();
+      } else {
+        if (sonsVoulus()) ticDeplacement();
+        allerEntree(rang);
+      }
     });
     entree.addEventListener('contextmenu', (event) => {
       allerEntree(rang);
@@ -3362,6 +3495,9 @@ function poserAffiche(item: Playable | undefined): void {
 
   // Une jaquette posée à la main n'a rien à aller chercher : elle est déjà là.
   const posee = jaquettesPosees[item.rom.path];
+  const recadree = jaquettesRecadrees.has(item.rom.path);
+  xmbAfficheImage.classList.toggle('recadree', recadree);
+  xmbAfficheImage.parentElement?.classList.toggle('recadree', recadree);
   if (posee) {
     xmbAfficheImage.src = posee;
     return;
@@ -3650,11 +3786,19 @@ function regarderJaquette(img: HTMLImageElement): void {
  */
 let jaquettesPosees: Record<string, string> = {};
 
+/** Celles qui ont été recadrées, et non simplement désignées. */
+let jaquettesRecadrees = new Set<string>();
+
 async function relireJaquettesPosees(): Promise<void> {
   try {
     jaquettesPosees = await manualCovers();
   } catch {
     jaquettesPosees = {};
+  }
+  try {
+    jaquettesRecadrees = new Set(await croppedCovers());
+  } catch {
+    jaquettesRecadrees = new Set();
   }
 }
 
@@ -3666,6 +3810,13 @@ async function habiller(img: HTMLImageElement): Promise<void> {
 
   const posee = jaquettesPosees[chemin];
   if (posee) {
+    // Recadrée à la main : on la montre telle qu'elle a été cadrée, en entier,
+    // et le fond de la case s'efface pour laisser voir le décor par les bandes.
+    // Une jaquette simplement désignée garde, elle, l'affichage habituel.
+    if (jaquettesRecadrees.has(chemin)) {
+      img.classList.add('recadree');
+      img.parentElement?.classList.add('recadree');
+    }
     img.addEventListener('load', () => img.classList.add('vue'), { once: true });
     img.src = posee;
     return;
@@ -3782,6 +3933,7 @@ function renderGames(): void {
     ...classes,
   ];
   volets = shelves;
+  relierVolets(shelves);
 
   shelvesBox.replaceChildren();
 

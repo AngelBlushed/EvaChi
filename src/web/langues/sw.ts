@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const sw: readonly string[] = [  /* 1 */ "Kwa kidhibiti",
+export const sw: readonly string[] = [
+  /* 1 */ "Kwa kidhibiti",
   /* 2 */ "A anzisha · X kipendwa · Y punguza · L1/R1 konsoli · L2/R2 herufi · B rudi",
   /* 3 */ "Kuhusu EvaChi",
   /* 4 */ "Kuhusu…",
@@ -342,7 +343,7 @@ export const sw: readonly string[] = [  /* 1 */ "Kwa kidhibiti",
   /* 334 */ "Kwenye menyu inayosogea, michezo mitano kwa wakati mmoja",
   /* 335 */ "Kasi ya mchezo",
   /* 336 */ "Ghairi",
-  /* 337 */ "Buruta fremu, au vuta pembe yake. Vishale husogeza fremu, na Shift huibana. Kwenye kidhibiti, mishale husogeza na vichochezi hubana au hupanua.",
+  /* 337 */ "Buruta fremu, au vuta pembe yake. Mishale huihamisha, na kwa Shift huikuza au kuipunguza. Ikitoka nje ya picha, huongeza kingo za uwazi – ndivyo unavyoonyesha kwa upana zaidi jalada lililobana sana. Kwenye kidhibiti cha mchezo, vitufe vya pande huhamisha, na vifyatuo hurekebisha ukubwa.",
   /* 338 */ "Punguza",
   /* 339 */ "Punguza jalada",
   /* 340 */ "Picha nzima",

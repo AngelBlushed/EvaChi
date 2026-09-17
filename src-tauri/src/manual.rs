@@ -169,12 +169,75 @@ pub fn poser(covers: &Path, rom_path: &str, image: &Path) -> Result<String, Stri
 /// C'est par là que passe le recadrage : la fenêtre a redessiné la jaquette
 /// dans un canevas et n'en rend qu'une adresse `data:`. Écrire d'abord un
 /// fichier temporaire pour le recopier aussitôt ne servirait à rien.
-pub fn poser_donnees(covers: &Path, rom_path: &str, adresse: &str) -> Result<String, String> {
+///
+/// `source` est l'image d'avant le recadrage. Elle est mise de côté, une seule
+/// fois : un recadrage écrase ce qui dépasse, et sans cet original on ne
+/// pourrait que recadrer par-dessus un recadrage, en perdant un peu plus à
+/// chaque fois. Avec lui, on repart toujours de l'image entière.
+pub fn poser_donnees(
+    covers: &Path,
+    rom_path: &str,
+    adresse: &str,
+    source: Option<&str>,
+) -> Result<String, String> {
     let octets = crate::b64::depuis_data(adresse, MAX_IMAGE as usize)?;
     if octets.is_empty() {
         return Err("image vide".into());
     }
+
+    if let Some(source) = source {
+        if original(covers, rom_path).is_none() {
+            let bruts = crate::b64::depuis_data(source, MAX_IMAGE as usize)?;
+            let base = dossier(covers);
+            std::fs::create_dir_all(&base).map_err(|error| format!("dossier : {error}"))?;
+            let nom = nom_de_fichier(rom_path, &format!("{ORIGINAL}.png"));
+            std::fs::write(base.join(nom), &bruts)
+                .map_err(|error| format!("original : {error}"))?;
+        }
+    }
+
     ranger(covers, rom_path, "png", &octets)
+}
+
+/// Le morceau qui distingue l'image d'origine de celle qu'on affiche.
+const ORIGINAL: &str = "origine";
+
+/// Les jeux dont la jaquette a été recadrée à la main.
+///
+/// On les distingue des jaquettes simplement désignées : celles-là gardent
+/// l'affichage habituel, tandis qu'une jaquette recadrée se montre telle qu'on
+/// l'a cadrée, bandes comprises. Changer l'allure des premières parce qu'on a
+/// ajouté de quoi recadrer les secondes serait une surprise qu'on n'a pas
+/// demandée.
+pub fn recadrees(covers: &Path) -> Vec<String> {
+    lire_index(covers)
+        .into_keys()
+        .filter(|jeu| a_un_original(covers, jeu))
+        .collect()
+}
+
+/// Vrai quand l'image d'avant recadrage a été gardée pour ce jeu.
+fn a_un_original(covers: &Path, rom_path: &str) -> bool {
+    let base = dossier(covers);
+    FORMATS
+        .iter()
+        .any(|extension| base.join(nom_de_fichier(rom_path, &format!("{ORIGINAL}.{extension}"))).exists())
+}
+
+/// L'image d'avant tout recadrage, si on l'a gardée.
+///
+/// Elle n'est pas dans l'index : ce n'est pas une jaquette à montrer, c'est ce
+/// qu'on reprend quand on veut recadrer autrement. On la retrouve par son nom,
+/// qui se déduit de celui du jeu.
+pub fn original(covers: &Path, rom_path: &str) -> Option<String> {
+    let base = dossier(covers);
+    for extension in FORMATS {
+        let chemin = base.join(nom_de_fichier(rom_path, &format!("{ORIGINAL}.{extension}")));
+        if chemin.exists() {
+            return en_adresse(&chemin);
+        }
+    }
+    None
 }
 
 /// Écrit l'image, la rattache au jeu, et rend l'adresse à afficher.
@@ -200,9 +263,21 @@ fn ranger(covers: &Path, rom_path: &str, extension: &str, octets: &[u8]) -> Resu
 
 /// Détache l'image d'un jeu, et l'efface.
 pub fn retirer(covers: &Path, rom_path: &str) -> Result<(), String> {
+    let base = dossier(covers);
+
+    // L'original s'en va avec : retirer la jaquette veut dire revenir à celle du
+    // serveur, et garder de côté l'image d'un recadrage qu'on vient d'annuler ne
+    // servirait qu'à remplir le dossier.
+    for extension in FORMATS {
+        let _ = std::fs::remove_file(base.join(nom_de_fichier(
+            rom_path,
+            &format!("{ORIGINAL}.{extension}"),
+        )));
+    }
+
     let mut table = lire_index(covers);
     if let Some(nom) = table.remove(rom_path) {
-        let _ = std::fs::remove_file(dossier(covers).join(nom));
+        let _ = std::fs::remove_file(base.join(nom));
         ecrire_index(covers, &table)?;
     }
     Ok(())
@@ -273,7 +348,7 @@ mod tests {
         let jeu = "D:/roms/Nes/Zelda.nes";
 
         let adresse = format!("data:image/png;base64,{}", crate::b64::encode(PIXEL));
-        let rendue = poser_donnees(&base, jeu, &adresse).expect("pose");
+        let rendue = poser_donnees(&base, jeu, &adresse, None).expect("pose");
         assert!(rendue.starts_with("data:image/png;base64,"));
         assert_eq!(toutes(&base).get(jeu), Some(&rendue));
 
@@ -291,9 +366,34 @@ mod tests {
         let base = bac("vide");
         let jeu = "D:/roms/Nes/Zelda.nes";
 
-        assert!(poser_donnees(&base, jeu, "data:image/png;base64,").is_err());
-        assert!(poser_donnees(&base, jeu, "pas une adresse").is_err());
+        assert!(poser_donnees(&base, jeu, "data:image/png;base64,", None).is_err());
+        assert!(poser_donnees(&base, jeu, "pas une adresse", None).is_err());
         assert!(toutes(&base).is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn garde_l_original_pour_qu_un_second_recadrage_reparte_de_l_image_entiere() {
+        // Sans cela, recadrer deux fois rognerait le recadrage : ce qui dépasse
+        // au premier passage serait perdu pour toujours.
+        let base = bac("original");
+        let jeu = "D:/roms/Nes/Zelda.nes";
+        let entiere = format!("data:image/png;base64,{}", crate::b64::encode(PIXEL));
+
+        assert!(original(&base, jeu).is_none(), "rien avant le premier recadrage");
+
+        let premier = poser_donnees(&base, jeu, &entiere, Some(&entiere)).expect("premier");
+        let garde = original(&base, jeu).expect("l'original est mis de côté");
+        assert_eq!(garde, entiere);
+
+        // Un second recadrage part de l'original et ne le remplace pas par la
+        // version déjà rognée.
+        poser_donnees(&base, jeu, &premier, Some(&premier)).expect("second");
+        assert_eq!(original(&base, jeu).as_deref(), Some(entiere.as_str()));
+
+        // Retirer la jaquette emporte l'original avec elle.
+        retirer(&base, jeu).expect("retrait");
+        assert!(original(&base, jeu).is_none());
         let _ = std::fs::remove_dir_all(&base);
     }
 

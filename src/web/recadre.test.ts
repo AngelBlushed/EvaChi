@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MINIMUM, TOUT, borner, change, deplacer, etirer, tirer, zoomer } from './recadre.ts';
+import { DEBORD, MINIMUM, TOUT, borner, change, deplacer, etirer, tirer, zoomer } from './recadre.ts';
 
 const proche = (obtenu: number, attendu: number, quoi: string) =>
   assert.ok(Math.abs(obtenu - attendu) < 1e-9, `${quoi} : ${obtenu} au lieu de ${attendu}`);
@@ -25,8 +25,12 @@ describe('bornes du cadre', () => {
     memeCadre(borner(TOUT), { x: 0, y: 0, w: 1, h: 1 });
   });
 
-  it('ramène dans l’image un cadre qui déborde', () => {
-    memeCadre(borner({ x: 0.9, y: -0.3, w: 0.4, h: 0.5 }), { x: 0.6, y: 0, w: 0.4, h: 0.5 });
+  it('laisse le cadre déborder, pour pouvoir dézoomer', () => {
+    // Une jaquette trop serrée ne se répare qu'en prenant plus que l'image :
+    // ce qui dépasse deviendra une bande transparente.
+    const large = borner({ x: -0.3, y: -0.3, w: 1.6, h: 1.6 });
+    proche(large.x, -0.3, 'x');
+    proche(large.w, 1.6, 'largeur');
   });
 
   it('ne laisse pas le cadre se réduire à rien', () => {
@@ -35,8 +39,18 @@ describe('bornes du cadre', () => {
     proche(petit.h, MINIMUM, 'hauteur');
   });
 
-  it('ne laisse pas le cadre dépasser l’image', () => {
-    memeCadre(borner({ x: 0, y: 0, w: 3, h: 2 }), { x: 0, y: 0, w: 1, h: 1 });
+  it('garde toujours un pied dans l’image', () => {
+    // Parti tout à fait à côté, le cadre ne donnerait qu'une jaquette vide, et
+    // on ne saurait plus comment le ramener.
+    const perdu = borner({ x: 9, y: -9, w: 0.5, h: 0.5 });
+    proche(perdu.x, 0.75, 'x');
+    proche(perdu.y, 0.25 - 0.5, 'y');
+  });
+
+  it('ne laisse pas le cadre grandir sans fin', () => {
+    const geant = borner({ x: 0, y: 0, w: 99, h: 99 });
+    proche(geant.w, 1 + 2 * DEBORD, 'largeur');
+    proche(geant.h, 1 + 2 * DEBORD, 'hauteur');
   });
 });
 
@@ -47,11 +61,18 @@ describe('déplacement', () => {
     memeCadre(deplacer(moitie, 0.1, -0.1), { x: 0.35, y: 0.15, w: 0.5, h: 0.5 });
   });
 
-  it('s’arrête au bord plutôt que de sortir', () => {
-    // Poussé contre le bord, le cadre s'y colle et garde sa taille : le
-    // rétrécir au passage ferait perdre une part d'image sans le vouloir.
-    memeCadre(deplacer(moitie, 5, 5), { x: 0.5, y: 0.5, w: 0.5, h: 0.5 });
-    memeCadre(deplacer(moitie, -5, -5), { x: 0, y: 0, w: 0.5, h: 0.5 });
+  it('garde sa taille en butant sur la limite', () => {
+    // Poussé à bout, le cadre s'arrête en gardant sa taille : le rétrécir au
+    // passage ferait perdre une part d'image sans le vouloir.
+    const loin = deplacer(moitie, 5, 5);
+    proche(loin.w, 0.5, 'largeur');
+    proche(loin.x, 0.75, 'x');
+  });
+
+  it('peut sortir par la gauche pour ajouter une bande', () => {
+    const dehors = deplacer(moitie, -0.4, 0);
+    proche(dehors.x, -0.15, 'x');
+    proche(dehors.w, 0.5, 'largeur');
   });
 });
 
@@ -63,8 +84,12 @@ describe('resserrement', () => {
     proche(serre.w, 0.25, 'largeur');
   });
 
-  it('s’arrête à l’image entière', () => {
-    memeCadre(zoomer({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, 10), { x: 0, y: 0, w: 1, h: 1 });
+  it('peut dépasser l’image, et c’est là tout l’intérêt', () => {
+    // Élargir au-delà de 1, c'est ajouter des bandes autour de la jaquette :
+    // le seul moyen de la dézoomer quand elle est trop serrée.
+    const large = zoomer({ x: 0.25, y: 0.25, w: 0.5, h: 0.5 }, 3);
+    proche(large.w, 1.5, 'largeur');
+    proche(large.x, -0.25, 'x');
   });
 
   it('étire une seule dimension à la fois', () => {
@@ -90,9 +115,10 @@ describe('coin tiré', () => {
     memeCadre(tire, { x: 0.75, y: 0.75, w: 0.15, h: 0.15 });
   });
 
-  it('ne sort pas de l’image', () => {
+  it('peut être tiré au-delà du bord', () => {
     const tire = tirer(moitie, 'bd', 4, 4);
-    memeCadre(tire, { x: 0.25, y: 0.25, w: 0.75, h: 0.75 });
+    proche(tire.x, 0.25, 'x');
+    proche(tire.w, 1 + DEBORD - 0.25, 'largeur');
   });
 });
 

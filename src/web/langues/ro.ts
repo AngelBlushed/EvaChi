@@ -6,7 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const ro: readonly string[] = [  /* 1 */ "Cu controlerul",
+export const ro: readonly string[] = [
+  /* 1 */ "Cu controlerul",
   /* 2 */ "A pornește · X favorit · Y reîncadrează · L1/R1 console · L2/R2 literă · B înapoi",
   /* 3 */ "Despre EvaChi",
   /* 4 */ "Despre…",
@@ -342,7 +343,7 @@ export const ro: readonly string[] = [  /* 1 */ "Cu controlerul",
   /* 334 */ "În meniul animat, cinci jocuri deodată",
   /* 335 */ "Viteza jocului",
   /* 336 */ "Anulează",
-  /* 337 */ "Trageți cadrul sau apucați-l de un colț. Cu săgețile îl mutați, cu Shift îl strângeți. La controller, direcțiile îl mută, iar trăgacele îl strâng sau îl lărgesc.",
+  /* 337 */ "Trage de chenar sau de un colț. Săgețile îl mută, iar cu Shift îl mărești sau îl micșorezi. Dacă iese din imagine, se adaugă benzi transparente: așa reduci zoomul la o copertă prea strânsă. Pe controller, direcțiile mută chenarul, iar trăgacele reglează dimensiunea.",
   /* 338 */ "Reîncadrează",
   /* 339 */ "Reîncadrează coperta",
   /* 340 */ "Toată imaginea",

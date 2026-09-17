@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const en: readonly string[] = [  /* 1 */ "On the gamepad",
+export const en: readonly string[] = [
+  /* 1 */ "On the gamepad",
   /* 2 */ "A play · X favorite · Y crop · L1/R1 consoles · L2/R2 letter · B back",
   /* 3 */ "About EvaChi",
   /* 4 */ "About…",
@@ -343,7 +344,7 @@ export const en: readonly string[] = [  /* 1 */ "On the gamepad",
   /* 334 */ "In the animated menu, five games at a time",
   /* 335 */ "Game speed",
   /* 336 */ "Cancel",
-  /* 337 */ "Drag the frame, or pull a corner. The arrow keys move it, Shift tightens it. On the controller, the directions move it and the triggers tighten or widen it.",
+  /* 337 */ "Drag the frame, or pull a corner. The arrow keys move it, and with Shift it grows or shrinks. Let it spill past the image and transparent bands appear around it — that's how you zoom out a cover that sits too tight. On the controller, the directions move it and the triggers set the size.",
   /* 338 */ "Crop",
   /* 339 */ "Crop the cover",
   /* 340 */ "Whole image",

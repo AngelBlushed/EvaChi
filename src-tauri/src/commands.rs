@@ -984,18 +984,44 @@ pub async fn cover_image(url: String) -> Result<String, String> {
 }
 
 /// Enregistre une jaquette recadrée, rendue par la fenêtre.
+///
+/// `source` est l'image d'avant : elle est mise de côté une fois pour toutes,
+/// de sorte qu'un second recadrage reparte de l'image entière et non de ce
+/// qu'il restait du premier.
 #[tauri::command]
 pub async fn set_cropped_cover(
     rom_path: String,
     data: String,
+    source: Option<String>,
     paths: State<'_, Paths>,
 ) -> Result<String, String> {
     let dossier = paths.covers.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        crate::manual::poser_donnees(&dossier, &rom_path, &data)
+        crate::manual::poser_donnees(&dossier, &rom_path, &data, source.as_deref())
     })
     .await
     .map_err(|error| format!("enregistrement interrompu : {error}"))?
+}
+
+/// Les jeux dont la jaquette a été recadrée à la main.
+#[tauri::command]
+pub async fn cropped_covers(paths: State<'_, Paths>) -> Result<Vec<String>, String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::manual::recadrees(&dossier))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
+}
+
+/// L'image d'avant tout recadrage, si on l'a gardée.
+#[tauri::command]
+pub async fn cover_original(
+    rom_path: String,
+    paths: State<'_, Paths>,
+) -> Result<Option<String>, String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::manual::original(&dossier, &rom_path))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
 }
 
 /// Détache la jaquette posée sur un jeu.

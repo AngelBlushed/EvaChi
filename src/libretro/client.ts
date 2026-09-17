@@ -351,9 +351,28 @@ export async function coverImage(url: string): Promise<string> {
   return invoke<string>('cover_image', { url });
 }
 
-/** Enregistre une jaquette recadrée. Rend l'adresse à afficher. */
-export async function setCroppedCover(romPath: string, data: string): Promise<string> {
-  return invoke<string>('set_cropped_cover', { romPath, data });
+/**
+ * Enregistre une jaquette recadrée. Rend l'adresse à afficher.
+ *
+ * `source` est l'image d'avant recadrage : gardée de côté une fois pour toutes,
+ * elle permet de recadrer autrement sans repartir de ce qu'il restait.
+ */
+export async function setCroppedCover(
+  romPath: string,
+  data: string,
+  source?: string,
+): Promise<string> {
+  return invoke<string>('set_cropped_cover', { romPath, data, source });
+}
+
+/** L'image d'avant tout recadrage, si elle a été gardée. */
+export async function coverOriginal(romPath: string): Promise<string | null> {
+  return invoke<string | null>('cover_original', { romPath });
+}
+
+/** Les jeux dont la jaquette a été recadrée à la main. */
+export async function croppedCovers(): Promise<string[]> {
+  return invoke<string[]>('cropped_covers');
 }
 
 /** Détache la jaquette posée sur un jeu. */

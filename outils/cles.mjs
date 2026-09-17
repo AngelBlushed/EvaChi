@@ -184,8 +184,11 @@ const relevees = [
 const cheminCles = path.join(WEB, 'langues', 'cles.ts');
 let ancien = [];
 if (fs.existsSync(cheminCles)) {
-  const source = fs.readFileSync(cheminCles, 'utf8');
-  const debut = source.indexOf('= [\n');
+  // Les retours chariot sont ôtés d'abord : git rend les fichiers en CRLF sur
+  // cette machine, et chercher « = [\n » ne trouvait alors rien du tout — le
+  // relevé repartait de zéro et décalait toutes les traductions en silence.
+  const source = fs.readFileSync(cheminCles, 'utf8').replace(/\r\n/g, '\n');
+  const debut = source.indexOf('= [');
   if (debut > 0) {
     ancien = source
       .slice(debut + 3, source.indexOf('\n];', debut))
@@ -208,6 +211,10 @@ const RENOMMEES = new Map([
   [
     'A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start',
     'A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour',
+  ],
+  [
+    "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on le resserre. À la manette, les directions déplacent et les gâchettes resserrent ou élargissent.",
+    "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop serrée. À la manette, les directions déplacent et les gâchettes règlent la taille.",
   ],
 ]);
 

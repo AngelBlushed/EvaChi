@@ -30,6 +30,16 @@ export type Coin = 'hg' | 'hd' | 'bg' | 'bd';
  */
 export const MINIMUM = 0.08;
 
+/**
+ * Jusqu'où le cadre peut déborder de l'image.
+ *
+ * Il le peut, et c'est voulu : une jaquette trop serrée — un logo qui touche
+ * les bords — ne se répare qu'en prenant *plus* que l'image. Ce qui dépasse
+ * devient une bande transparente, à travers laquelle on voit le décor. Sans
+ * cela, on ne saurait que zoomer, jamais dézoomer.
+ */
+export const DEBORD = 1;
+
 const borne = (valeur: number, bas: number, haut: number) =>
   Math.min(haut, Math.max(bas, valeur));
 
@@ -37,16 +47,25 @@ const borne = (valeur: number, bas: number, haut: number) =>
 export const TOUT: Cadre = { x: 0, y: 0, w: 1, h: 1 };
 
 /**
- * Ramène un cadre dans l'image, et lui garde une taille tenable.
+ * Garde au cadre une taille tenable, et un pied dans l'image.
  *
- * La largeur est corrigée avant la position : un cadre trop large qu'on
- * déplacerait d'abord se retrouverait collé au bord, puis rétréci depuis là,
- * et aurait glissé sans qu'on l'ait demandé.
+ * Il peut sortir, mais pas s'en aller : on exige qu'il en recouvre toujours au
+ * moins un quart de côté. Un cadre parti tout à fait à côté ne donnerait
+ * qu'une jaquette vide, et on ne saurait plus comment le ramener.
  */
 export function borner(cadre: Cadre): Cadre {
-  const w = borne(cadre.w, MINIMUM, 1);
-  const h = borne(cadre.h, MINIMUM, 1);
-  return { x: borne(cadre.x, 0, 1 - w), y: borne(cadre.y, 0, 1 - h), w, h };
+  const w = borne(cadre.w, MINIMUM, 1 + 2 * DEBORD);
+  const h = borne(cadre.h, MINIMUM, 1 + 2 * DEBORD);
+
+  // Le cadre doit mordre sur l'image : son bord droit au-delà d'un quart de
+  // largeur, son bord gauche en deçà des trois quarts, et de même en hauteur.
+  const morsure = 0.25;
+  return {
+    x: borne(cadre.x, morsure - w, 1 - morsure),
+    y: borne(cadre.y, morsure - h, 1 - morsure),
+    w,
+    h,
+  };
 }
 
 /** Déplace le cadre sans le laisser sortir, ni changer de taille. */
@@ -64,8 +83,8 @@ export function deplacer(cadre: Cadre, dx: number, dy: number): Cadre {
 export function zoomer(cadre: Cadre, facteur: number): Cadre {
   const cx = cadre.x + cadre.w / 2;
   const cy = cadre.y + cadre.h / 2;
-  const w = borne(cadre.w * facteur, MINIMUM, 1);
-  const h = borne(cadre.h * facteur, MINIMUM, 1);
+  const w = cadre.w * facteur;
+  const h = cadre.h * facteur;
   return borner({ x: cx - w / 2, y: cy - h / 2, w, h });
 }
 
@@ -78,8 +97,8 @@ export function zoomer(cadre: Cadre, facteur: number): Cadre {
 export function etirer(cadre: Cadre, dw: number, dh: number): Cadre {
   const cx = cadre.x + cadre.w / 2;
   const cy = cadre.y + cadre.h / 2;
-  const w = borne(cadre.w + dw, MINIMUM, 1);
-  const h = borne(cadre.h + dh, MINIMUM, 1);
+  const w = cadre.w + dw;
+  const h = cadre.h + dh;
   return borner({ x: cx - w / 2, y: cy - h / 2, w, h });
 }
 
@@ -98,8 +117,8 @@ export function tirer(cadre: Cadre, coin: Coin, x: number, y: number): Cadre {
   const fixeX = gauche ? cadre.x + cadre.w : cadre.x;
   const fixeY = haut ? cadre.y + cadre.h : cadre.y;
 
-  const tireX = borne(x, 0, 1);
-  const tireY = borne(y, 0, 1);
+  const tireX = borne(x, -DEBORD, 1 + DEBORD);
+  const tireY = borne(y, -DEBORD, 1 + DEBORD);
 
   return borner({
     x: Math.min(fixeX, tireX),

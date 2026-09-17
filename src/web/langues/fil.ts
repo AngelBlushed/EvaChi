@@ -6,7 +6,8 @@
  * sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const fil: readonly string[] = [  /* 1 */ "Sa controller",
+export const fil: readonly string[] = [
+  /* 1 */ "Sa controller",
   /* 2 */ "A simulan · X paborito · Y i-crop · L1/R1 konsola · L2/R2 letra · B balik",
   /* 3 */ "Tungkol sa EvaChi",
   /* 4 */ "Tungkol dito…",
@@ -342,7 +343,7 @@ export const fil: readonly string[] = [  /* 1 */ "Sa controller",
   /* 334 */ "Sa animadong menu, lima-limang laro",
   /* 335 */ "Bilis ng laro",
   /* 336 */ "Kanselahin",
-  /* 337 */ "Hilahin ang kuwadro, o ang isang sulok nito. Inililipat ito ng mga arrow key, at pinaliliit kapag may Shift. Sa controller, naglilipat ang mga direksyon at nagpapaliit o nagpapalaki ang mga trigger.",
+  /* 337 */ "I-drag ang frame, o hilahin ang isang sulok. Inililipat ito ng mga arrow key, at kapag hawak ang Shift ay lumalaki o lumiliit. Kapag lumampas ito sa larawan, nadaragdagan ng transparent na espasyo ang mga gilid: ganito pinalalayo ang cover na masyadong masikip. Sa controller, inililipat ito ng mga direksiyon at ang laki naman ay inaayos ng mga trigger.",
   /* 338 */ "I-crop",
   /* 339 */ "I-crop ang cover",
   /* 340 */ "Buong larawan",

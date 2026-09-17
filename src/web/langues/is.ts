@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const is: readonly string[] = [  /* 1 */ "Með leikjastýringu",
+export const is: readonly string[] = [
+  /* 1 */ "Með leikjastýringu",
   /* 2 */ "A spila · X uppáhald · Y sníða · L1/R1 leikjatölvur · L2/R2 stafur · B til baka",
   /* 3 */ "Um EvaChi",
   /* 4 */ "Um forritið…",
@@ -342,7 +343,7 @@ export const is: readonly string[] = [  /* 1 */ "Með leikjastýringu",
   /* 334 */ "Í hreyfivalmyndinni, fimm leikir í einu",
   /* 335 */ "Leikhraði",
   /* 336 */ "Hætta við",
-  /* 337 */ "Dragðu rammann til, eða gríptu í horn hans. Örvarnar færa hann, með Shift þrengist hann. Á leikjastýringu færa áttirnar hann og gikkirnir þrengja eða víkka.",
+  /* 337 */ "Dragðu rammann til, eða gríptu í eitt horn hans. Örvalyklarnir færa hann, og með Shift stækkar hann eða minnkar. Fari ramminn út fyrir myndina bætast gegnsæjar rendur við kápuna: þannig sýnirðu kápu sem er of þröng aðeins víðar. Á leikjastýringunni færa stefnutakkarnir rammann og gikkirnir stilla stærðina.",
   /* 338 */ "Sníða",
   /* 339 */ "Sníða kápuna",
   /* 340 */ "Öll myndin",

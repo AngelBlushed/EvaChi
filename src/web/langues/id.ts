@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const id: readonly string[] = [  /* 1 */ "Dengan gamepad",
+export const id: readonly string[] = [
+  /* 1 */ "Dengan gamepad",
   /* 2 */ "A mainkan · X favorit · Y pangkas · L1/R1 konsol · L2/R2 huruf · B kembali",
   /* 3 */ "Tentang EvaChi",
   /* 4 */ "Tentang…",
@@ -342,7 +343,7 @@ export const id: readonly string[] = [  /* 1 */ "Dengan gamepad",
   /* 334 */ "Di menu beranimasi, lima game sekaligus",
   /* 335 */ "Kecepatan game",
   /* 336 */ "Batal",
-  /* 337 */ "Geser bingkainya, atau tarik salah satu sudutnya. Tombol panah menggesernya, dengan Shift bingkai menyempit. Di gamepad, arah menggeser dan trigger menyempitkan atau melebarkan.",
+  /* 337 */ "Geser bingkainya, atau tarik salah satu sudutnya. Tombol panah memindahkannya, dan dengan Shift bingkai membesar atau mengecil. Kalau bingkai keluar dari gambar, sampul akan dikelilingi bidang transparan: begitulah cara memperkecil sampul yang terlalu rapat. Pada gamepad, tombol arah memindahkan bingkai dan tombol pelatuk mengatur ukurannya.",
   /* 338 */ "Pangkas",
   /* 339 */ "Pangkas sampul",
   /* 340 */ "Seluruh gambar",

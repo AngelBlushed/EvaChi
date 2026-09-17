@@ -6,7 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const ms: readonly string[] = [  /* 1 */ "Pada pad kawalan",
+export const ms: readonly string[] = [
+  /* 1 */ "Pada pad kawalan",
   /* 2 */ "A main · X kegemaran · Y pangkas · L1/R1 konsol · L2/R2 huruf · B kembali",
   /* 3 */ "Tentang EvaChi",
   /* 4 */ "Tentang…",
@@ -342,7 +343,7 @@ export const ms: readonly string[] = [  /* 1 */ "Pada pad kawalan",
   /* 334 */ "Dalam menu animasi, lima permainan serentak",
   /* 335 */ "Kelajuan permainan",
   /* 336 */ "Batal",
-  /* 337 */ "Seret bingkai itu, atau tarik salah satu bucunya. Anak panah menggerakkannya, Shift pula mengecilkannya. Pada pad kawalan, arah menggerakkannya manakala picu mengecilkan atau membesarkannya.",
+  /* 337 */ "Seret bingkai itu, atau tarik salah satu sudutnya. Kekunci anak panah menggerakkannya, dan dengan Shift ia membesar atau mengecil. Apabila bingkai terkeluar daripada gambar, jalur lutsinar ditambah di sekeliling kulit permainan: begitulah caranya memaparkan kulit yang terlalu rapat dengan lebih luas. Pada pengawal permainan, butang arah menggerakkan bingkai dan butang pemicu mengatur saiznya.",
   /* 338 */ "Pangkas",
   /* 339 */ "Pangkas kulit permainan",
   /* 340 */ "Ambil semua",

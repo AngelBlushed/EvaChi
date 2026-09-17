@@ -7,7 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const sv: readonly string[] = [  /* 1 */ "Med handkontroll",
+export const sv: readonly string[] = [
+  /* 1 */ "Med handkontroll",
   /* 2 */ "A starta · X favorit · Y beskär · L1/R1 konsoler · L2/R2 bokstav · B tillbaka",
   /* 3 */ "Om EvaChi",
   /* 4 */ "Om…",
@@ -343,7 +344,7 @@ export const sv: readonly string[] = [  /* 1 */ "Med handkontroll",
   /* 334 */ "Fem spel i taget i den animerade menyn",
   /* 335 */ "Spelets hastighet",
   /* 336 */ "Avbryt",
-  /* 337 */ "Dra i ramen eller i ett hörn. Pilarna flyttar den, med Skift dras den ihop. På handkontrollen flyttar riktningarna, och avtryckarna drar ihop eller vidgar.",
+  /* 337 */ "Dra ramen dit du vill, eller dra i ett hörn. Piltangenterna flyttar den, och med Skift förstorar eller förminskar du den. Sticker den utanför bilden läggs genomskinliga kanter till – så zoomar du ut ett omslag som sitter för trångt. Med handkontrollen flyttar riktningsknapparna ramen, och avtryckarna ställer in storleken.",
   /* 338 */ "Beskär",
   /* 339 */ "Beskär omslaget",
   /* 340 */ "Hela bilden",
