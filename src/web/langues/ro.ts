@@ -336,4 +336,10 @@ export const ro: readonly string[] = [
   /* 327 */ "Un emulator rulează în aceeași fereastră ca EvaChi: când cade, o ia cu el, fără niciun mesaj. Dacă îl lași deoparte, rămâne instalat, dar nu mai e propus. Îl poți restabili oricând din <strong>Fișier → Emulatoare</strong>, în josul ferestrei.",
   /* 328 */ "Un singur fișier pentru fiecare joc pe disc <small> Un joc pe CD vine cu o filă <code>.cue</code> și cu atâtea fișiere <code>.bin</code> câte piste avea discul. Se pornește doar fila: pistele sunt ascunse când ea e acolo. Fără filă, nu se ascunde nimic. </small>",
   /* 329 */ "(gol) sau --fullscreen {rom}",
+  /* 330 */ "O sută la sută este viteza consolei. Mai jos jocul încetinește, mai sus zboară — iar sunetul îl urmează, mai grav sau mai ascuțit. Pe controler, stânga și dreapta trec de la o treaptă la următoarea. Doar nucleele interne: un emulator extern își păstrează propria viteză.",
+  /* 331 */ "Cinci console deodată",
+  /* 332 */ "Cruce direcțională",
+  /* 333 */ "De la o inițială la următoarea",
+  /* 334 */ "În meniul animat, cinci jocuri deodată",
+  /* 335 */ "Viteza jocului",
 ];

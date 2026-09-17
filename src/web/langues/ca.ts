@@ -337,4 +337,10 @@ export const ca: readonly string[] = [
   /* 327 */ "Un emulador funciona a la mateixa finestra que EvaChi: quan cau, se l'emporta amb ell, sense dir res. Apartar aquest emulador el deixa instal·lat però deixa d'oferir-lo. El podreu restablir en qualsevol moment des de <strong>Fitxer → Emuladors</strong>, a baix de la finestra.",
   /* 328 */ "Un sol fitxer per joc al disc <small> Un joc en CD arriba en un full <code>.cue</code> i en tants fitxers <code>.bin</code> com pistes tenia el disc. Només el full s'inicia: les pistes queden amagades mentre hi és. Sense full, no s'amaga res. </small>",
   /* 329 */ "(buit) o --fullscreen {rom}",
+  /* 330 */ "Cent per cent és la velocitat pròpia de la consola. Per sota, el joc va més lent; per damunt, vola — i el so el segueix, més greu o més agut. Amb el comandament, l'esquerra i la dreta passen d'un graó al següent. Només els nuclis interns: un emulador extern manté la seva.",
+  /* 331 */ "Cinc consoles alhora",
+  /* 332 */ "Creu direccional",
+  /* 333 */ "D'una inicial a la següent",
+  /* 334 */ "Al menú animat, cinc jocs alhora",
+  /* 335 */ "Velocitat del joc",
 ];

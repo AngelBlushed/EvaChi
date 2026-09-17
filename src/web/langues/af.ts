@@ -336,4 +336,10 @@ export const af: readonly string[] = [
   /* 327 */ "'n Emulator loop in dieselfde venster as EvaChi: as hy val, sleep hy haar saam, sonder 'n boodskap. Om hierdie emulator opsy te sit laat hom geïnstalleer, maar hy word nie meer aangebied nie. Jy kan hom enige tyd herstel by <strong>Lêer → Emulators</strong>, onder in die venster.",
   /* 328 */ "Net een lêer per speletjie op die skyf <small> 'n Speletjie op CD kom as een <code>.cue</code>-blaadjie en soveel <code>.bin</code>-lêers as wat die skyf snitte gehad het. Net die blaadjie word begin: die snitte word versteek wanneer dit daar is. Sonder 'n blaadjie word niks versteek nie. </small>",
   /* 329 */ "(leeg) of --fullscreen {rom}",
+  /* 330 */ "Honderd persent is die konsole se eie snelheid. Daaronder loop die speletjie stadiger, daarbo jaag dit — en die klank volg saam, dieper of hoër. Op die beheerder skuif links en regs van die een stap na die volgende. Net vir die interne kerne: 'n eksterne emulator hou by sy eie snelheid.",
+  /* 331 */ "Vyf konsoles op 'n slag",
+  /* 332 */ "Rigtingkruis",
+  /* 333 */ "Van een beginletter na die volgende",
+  /* 334 */ "In die geanimeerde kieslys, vyf speletjies op 'n slag",
+  /* 335 */ "Spelsnelheid",
 ];

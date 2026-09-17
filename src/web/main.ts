@@ -113,7 +113,15 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
-import { Held, echelle, initiale, sautInitiale, step, voisin } from './navigation.ts';
+import {
+  Held,
+  cranSuivant,
+  echelle,
+  initiale,
+  sautInitiale,
+  step,
+  voisin,
+} from './navigation.ts';
 import type { Boite } from './navigation.ts';
 import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } from './recents.ts';
 import type { Recent } from './recents.ts';
@@ -207,6 +215,8 @@ const chip8Options = $<HTMLDivElement>('chip8-options');
 const presetSelect = $<HTMLSelectElement>('preset');
 const speedInput = $<HTMLInputElement>('speed');
 const speedValue = $<HTMLElement>('speed-value');
+const tempoInput = $<HTMLInputElement>('tempo');
+const tempoValue = $<HTMLElement>('tempo-value');
 const soundToggle = $<HTMLInputElement>('sound');
 
 const dialogs = {
@@ -248,6 +258,7 @@ const RETENU = {
   emplacement: 'evachi.emplacement',
   recents: 'evachi.recents',
   langue: 'evachi.langue',
+  tempo: 'evachi.tempo',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -369,6 +380,9 @@ function choisirLangue(code: string): void {
   // ici.
   buildKeypad();
   renderRaccourcisEtat();
+  // Le pourcentage de la jauge passe par `Intl` : « 100 % » en français,
+  // « 100% » en anglais.
+  renderTempo();
   refreshMenus();
 }
 
@@ -1572,6 +1586,41 @@ function setRunning(next: boolean): void {
   if (next) void runLoop();
 }
 
+// --- Vitesse du jeu ---------------------------------------------------------
+
+/** Les bornes de la jauge, en pourcentage de la vitesse de la console. */
+const TEMPO = { plancher: 50, normal: 100, plafond: 900 } as const;
+
+/**
+ * La vitesse voulue, en multiple de celle de la console.
+ *
+ * Cent pour cent par défaut, et on y revient dès que la valeur retenue n'a pas
+ * de sens : une jauge abîmée dans le stockage ne doit pas rendre un jeu
+ * injouable sans qu'on comprenne pourquoi.
+ */
+function tempoJeu(): number {
+  const garde = Number(retenu(RETENU.tempo));
+  if (!Number.isFinite(garde) || garde < TEMPO.plancher || garde > TEMPO.plafond) return 1;
+  return garde / 100;
+}
+
+/** Écrit le pourcentage à côté de la jauge, dans la langue en cours. */
+function renderTempo(): void {
+  const pourcent = Math.round(tempoJeu() * 100);
+  tempoInput.value = String(pourcent);
+  // `Intl` sait où va le signe et s'il prend une espace : « 100 % » en
+  // français, « 100% » en anglais et en japonais.
+  tempoValue.textContent = new Intl.NumberFormat(localeCourante(), {
+    style: 'percent',
+    maximumFractionDigits: 0,
+  }).format(pourcent / 100);
+}
+
+tempoInput.addEventListener('input', () => {
+  retenir(RETENU.tempo, tempoInput.value);
+  renderTempo();
+});
+
 // --- Boucle d'exécution -----------------------------------------------------
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -1590,8 +1639,13 @@ async function runLoop(): Promise<void> {
   const token = ++loopToken;
   let next = performance.now();
 
+  let dernierDessin = 0;
+
   while (running && core && token === loopToken) {
-    const frameMs = 1000 / (core.info.fps || 60);
+    // Relue à chaque trame : la jauge se glisse en cours de partie, et la
+    // vitesse doit suivre le doigt.
+    const tempo = tempoJeu();
+    const frameMs = 1000 / (core.info.fps || 60) / tempo;
 
     sampleInput();
 
@@ -1609,13 +1663,31 @@ async function runLoop(): Promise<void> {
     // Le cœur a pu changer pendant l'attente : cette trame ne vaut plus rien.
     if (token !== loopToken) return;
 
-    present(frame);
-    audio.push(frame.audio, core.info.sampleRate);
+    const now = performance.now();
+
+    // En accéléré, on ne dessine pas chaque trame : l'écran n'en montre que
+    // soixante par seconde, et neuf cents mises en page pour en voir soixante
+    // met la machine à genoux pour rien. À vitesse normale ou ralentie, chaque
+    // trame compte.
+    if (tempo <= 1 || now - dernierDessin >= 1000 / 60) {
+      present(frame);
+      dernierDessin = now;
+    }
+
+    // Le son est rééchantillonné plutôt que joué tel quel : annoncer une
+    // cadence multipliée le comprime d'autant, et il reste à l'heure au lieu de
+    // prendre une avance qui grandirait sans fin. Le prix est un son plus aigu
+    // en accéléré, plus grave au ralenti — c'est ce qu'on attend.
+    audio.push(frame.audio, core.info.sampleRate * tempo);
     framesThisSecond += 1;
 
-    const now = performance.now();
     if (now - lastReport >= 1000) {
-      fpsOut.textContent = dit('{0} im/s', framesThisSecond);
+      // La vitesse s'affiche dès qu'elle n'est plus celle de la console : sans
+      // cela, une jauge oubliée à 400 % d'un lancement à l'autre passerait pour
+      // un jeu détraqué. Le pourcentage est déjà écrit à côté de la jauge, on
+      // le reprend tel quel.
+      const images = dit('{0} im/s', framesThisSecond);
+      fpsOut.textContent = tempo === 1 ? images : `${images} · ${tempoValue.textContent}`;
       framesThisSecond = 0;
       lastReport = now;
       void drainMessages();
@@ -2467,8 +2539,24 @@ function conduireFenetre(
 
     if ((sens === 'gauche' || sens === 'droite') && geste === 'glisser') {
       const curseur = vise as HTMLInputElement;
-      const enjambee = Number(curseur.step) || 1;
-      curseur.value = String(Number(curseur.value) + (sens === 'droite' ? enjambee : -enjambee));
+      const valeur = Number(curseur.value);
+
+      // Une jauge peut porter des paliers, et la manette n'y passe alors que
+      // par eux.
+      const crans = (curseur.dataset.crans ?? '')
+        .split(/\s+/)
+        .map(Number)
+        .filter((cran) => Number.isFinite(cran));
+
+      if (crans.length > 0) {
+        const suivant = cranSuivant(valeur, crans, sens);
+        if (suivant === null) continue;
+        curseur.value = String(suivant);
+      } else {
+        const enjambee = Number(curseur.step) || 1;
+        curseur.value = String(valeur + (sens === 'droite' ? enjambee : -enjambee));
+      }
+
       curseur.dispatchEvent(new Event('input', { bubbles: true }));
       curseur.dispatchEvent(new Event('change', { bubbles: true }));
       tic();
@@ -4231,7 +4319,10 @@ const actions: Record<string, () => void | Promise<void>> = {
     renderRaccourcisEtat();
     openDialog(dialogs.controls);
   },
-  settings: () => openDialog(dialogs.settings),
+  settings: () => {
+    renderTempo();
+    openDialog(dialogs.settings);
+  },
   log: () => openDialog(dialogs.log),
   about: () => {
     renderAbout();
@@ -4656,6 +4747,7 @@ async function start(): Promise<void> {
   // Le menu des langues est dans la barre, et non plus dans une fenêtre : il
   // doit donc être rempli au démarrage, et non à l'ouverture d'un dialogue.
   renderLangues();
+  renderTempo();
 
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.

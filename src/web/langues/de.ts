@@ -337,4 +337,10 @@ export const de: readonly string[] = [
   /* 327 */ "Ein Emulator läuft im selben Fenster wie EvaChi: Wenn er fällt, reißt er es kommentarlos mit. Diesen Emulator beiseitezulegen lässt ihn installiert, bietet ihn aber nicht mehr an. Sie können ihn jederzeit unter <strong>Datei → Emulatoren</strong> am unteren Rand des Fensters wiederherstellen.",
   /* 328 */ "Nur eine Datei je Spiel auf der Festplatte <small> Ein Spiel auf CD kommt als <code>.cue</code>-Blatt und als so viele <code>.bin</code>-Dateien, wie die CD Spuren hatte. Nur das Blatt startet: Ist es da, werden die Spuren ausgeblendet. Ohne Blatt wird nichts ausgeblendet. </small>",
   /* 329 */ "(leer) oder --fullscreen {rom}",
+  /* 330 */ "Hundert Prozent ist die Geschwindigkeit der Konsole selbst. Darunter läuft das Spiel langsamer, darüber rast es — und der Ton geht mit, tiefer oder höher. Am Controller springen links und rechts von einer Stufe zur nächsten. Nur bei internen Cores: ein externer Emulator behält seine eigene Geschwindigkeit.",
+  /* 331 */ "Fünf Konsolen auf einmal",
+  /* 332 */ "Steuerkreuz",
+  /* 333 */ "Zum nächsten Anfangsbuchstaben",
+  /* 334 */ "Im animierten Menü fünf Spiele auf einmal",
+  /* 335 */ "Spielgeschwindigkeit",
 ];

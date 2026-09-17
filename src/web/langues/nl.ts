@@ -337,4 +337,10 @@ export const nl: readonly string[] = [
   /* 327 */ "Een emulator draait in hetzelfde venster als EvaChi: als hij valt, sleurt hij EvaChi mee, zonder bericht. Deze emulator opzijzetten laat hem geïnstalleerd staan, maar biedt hem niet meer aan. Je kunt hem op elk moment terugzetten via <strong>Bestand → Emulators</strong>, onderaan het venster.",
   /* 328 */ "Eén bestand per spel op de schijf <small> Een spel op cd komt als één <code>.cue</code>-blad en als evenveel <code>.bin</code>-bestanden als de schijf sporen had. Alleen het blad start: de sporen worden verborgen zodra het er is. Zonder blad wordt er niets verborgen. </small>",
   /* 329 */ "(leeg) of --fullscreen {rom}",
+  /* 330 */ "Honderd procent is de snelheid van de console zelf. Daaronder gaat het spel langzamer, daarboven vliegt het – en het geluid gaat mee, lager of hoger. Op de controller ga je met links en rechts van de ene stand naar de volgende. Alleen voor interne cores: een externe emulator houdt zijn eigen snelheid.",
+  /* 331 */ "Vijf consoles tegelijk",
+  /* 332 */ "Richtingskruis",
+  /* 333 */ "Van de ene beginletter naar de volgende",
+  /* 334 */ "In het geanimeerde menu, vijf spellen tegelijk",
+  /* 335 */ "Spelsnelheid",
 ];

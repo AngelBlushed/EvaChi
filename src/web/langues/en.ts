@@ -337,4 +337,10 @@ export const en: readonly string[] = [
   /* 327 */ "An emulator runs in the same window as EvaChi: when it falls, it takes EvaChi down with it, without a word. Setting this emulator aside leaves it installed but stops offering it. You can restore it at any time from <strong>File → Emulators</strong>, at the bottom of the window.",
   /* 328 */ "A single file per game on the disk <small> A game on CD arrives as one <code>.cue</code> sheet and as many <code>.bin</code> files as the disc had tracks. Only the sheet starts: the tracks are hidden while it is there. With no sheet, nothing is hidden. </small>",
   /* 329 */ "(empty) or --fullscreen {rom}",
+  /* 330 */ "One hundred percent is the console's own speed. Below that the game slows down, above it the game races — and the sound follows along, lower or higher. On the controller, left and right step from one notch to the next. Internal cores only: an external emulator keeps its own speed.",
+  /* 331 */ "Five consoles at a time",
+  /* 332 */ "D-pad",
+  /* 333 */ "From one letter to the next",
+  /* 334 */ "In the animated menu, five games at a time",
+  /* 335 */ "Game speed",
 ];

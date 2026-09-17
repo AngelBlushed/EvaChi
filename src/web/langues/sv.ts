@@ -337,4 +337,10 @@ export const sv: readonly string[] = [
   /* 327 */ "En emulator körs i samma fönster som EvaChi: när den faller tar den EvaChi med sig, utan ett ord. Att ställa undan emulatorn låter den vara installerad men slutar erbjuda den. Du kan ta tillbaka den när du vill från <strong>Arkiv → Emulatorer</strong>, längst ned i fönstret.",
   /* 328 */ "En fil per spel på disken <small> Ett CD-spel kommer som ett <code>.cue</code>-blad och lika många <code>.bin</code>-filer som skivan hade spår. Bara bladet startas: spåren göms när det finns. Utan blad göms ingenting. </small>",
   /* 329 */ "(tomt) eller --fullscreen {rom}",
+  /* 330 */ "Hundra procent är konsolens egen hastighet. Under den saktar spelet ner, över den rusar det — och ljudet följer med, mörkare eller ljusare. På handkontrollen flyttar vänster och höger ett steg i taget. Gäller bara interna kärnor: en extern emulator behåller sin egen.",
+  /* 331 */ "Fem konsoler i taget",
+  /* 332 */ "Styrkors",
+  /* 333 */ "Från en bokstav till nästa",
+  /* 334 */ "Fem spel i taget i den animerade menyn",
+  /* 335 */ "Spelets hastighet",
 ];

@@ -337,4 +337,10 @@ export const sl: readonly string[] = [
   /* 327 */ "Emulator teče v istem oknu kot EvaChi: ko pade, jo potegne s sabo, brez besede. Če ga umaknete, ostane nameščen, le ponujen ni več. Kadar koli ga lahko obnovite pod <strong>Datoteka → Emulatorji</strong>, na dnu okna.",
   /* 328 */ "Samo ena datoteka za igro na disku <small> Igra na CD-ju pride kot list <code>.cue</code> in toliko datotek <code>.bin</code>, kolikor je imel disk sledi. Zažene se samo list: sledi so skrite, dokler je ta tu. Brez lista ni skrito nič. </small>",
   /* 329 */ "(prazno) ali --fullscreen {rom}",
+  /* 330 */ "Sto odstotkov je hitrost same konzole. Pod tem se igra upočasni, nad tem zdrvi — in zvok ji sledi, nižji ali višji. Na igralnem ploščku levo in desno preklapljata s stopnje na naslednjo. Velja samo za notranja jedra: zunanji emulator obdrži svojo.",
+  /* 331 */ "Pet konzol hkrati",
+  /* 332 */ "Smerni križec",
+  /* 333 */ "Od začetnice do naslednje",
+  /* 334 */ "V animiranem meniju pet iger hkrati",
+  /* 335 */ "Hitrost igre",
 ];

@@ -339,4 +339,10 @@ export const tr: readonly string[] = [
   /* 327 */ "Emülatör, EvaChi ile aynı pencerede çalışır: çöktüğünde tek söz etmeden onu da beraberinde götürür. Bu emülatörü kenara almak onu kurulu bırakır, yalnızca artık önerilmez. Dilediğiniz zaman, pencerenin altındaki <strong>Dosya → Emülatörler</strong> üzerinden geri getirebilirsiniz.",
   /* 328 */ "Diskte oyun başına tek dosya <small> CD'deki bir oyun, bir <code>.cue</code> künyesi ve diskin iz sayısı kadar <code>.bin</code> dosyası olarak gelir. Yalnızca künye başlatılır: künye varken izler gizlenir. Künye yoksa hiçbir şey gizlenmez. </small>",
   /* 329 */ "(boş) veya --fullscreen {rom}",
+  /* 330 */ "Yüzde yüz, konsolun kendi hızıdır. Altında oyun yavaşlar, üstünde uçar — ses de peşinden gelir, kalınlaşır ya da tizleşir. Kumandada sol ve sağ, bir kademeden diğerine geçer. Yalnızca dahili çekirdekler için: harici bir emülatör kendi hızını korur.",
+  /* 331 */ "Bir seferde beş konsol",
+  /* 332 */ "Yön tuşları",
+  /* 333 */ "Bir baş harften diğerine",
+  /* 334 */ "Hareketli menüde bir seferde beş oyun",
+  /* 335 */ "Oyun hızı",
 ];

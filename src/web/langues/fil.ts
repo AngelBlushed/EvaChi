@@ -336,4 +336,10 @@ export const fil: readonly string[] = [
   /* 327 */ "Sa iisang bintana ng EvaChi tumatakbo ang emulator: kapag bumagsak ito, kasama nitong bumabagsak ang EvaChi, nang walang anumang mensahe. Kapag isinantabi ang emulator na ito, mananatili itong naka-install ngunit hindi na ito iaalok. Maibabalik mo ito anumang oras mula sa <strong>File → Mga emulator</strong>, sa ibaba ng bintana.",
   /* 328 */ "Isang file lamang bawat laro sa disk <small> Ang larong nasa CD ay dumarating bilang isang <code>.cue</code> na talaan at kasingdami ng <code>.bin</code> na file ng mga track ng disc. Ang talaan lamang ang nabubuksan: itinatago ang mga track kapag naroon ito. Kapag walang talaan, walang itinatago. </small>",
   /* 329 */ "(walang laman) o --fullscreen {rom}",
+  /* 330 */ "Sandaang porsyento — iyon ang bilis ng console. Pababa, bumabagal ang laro; pataas, humaharurot ito — at sumasabay ang tunog, mas mababa o mas matinis. Sa controller, ang kaliwa at kanan ay lumilipat sa susunod na baitang. Sa panloob na core lang: sariling bilis ang hawak ng panlabas na emulator.",
+  /* 331 */ "Lima-limang console",
+  /* 332 */ "Direksyonal na pad",
+  /* 333 */ "Sa susunod na unang titik",
+  /* 334 */ "Sa animadong menu, lima-limang laro",
+  /* 335 */ "Bilis ng laro",
 ];

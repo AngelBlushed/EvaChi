@@ -336,4 +336,10 @@ export const id: readonly string[] = [
   /* 327 */ "Emulator berjalan di jendela yang sama dengan EvaChi: ketika ia jatuh, ia membawa EvaChi serta, tanpa sepatah pesan. Menyingkirkan emulator ini membiarkannya tetap terpasang, tetapi berhenti menawarkannya. Anda bisa memulihkannya kapan saja dari <strong>Berkas → Emulator</strong>, di bagian bawah jendela.",
   /* 328 */ "Satu berkas saja per game di disk <small> Game CD datang sebagai satu lembar <code>.cue</code> dan sebanyak itu berkas <code>.bin</code> sesuai jumlah trek pada cakramnya. Hanya lembarnya yang bisa dijalankan: trek-treknya disembunyikan selama lembar itu ada. Tanpa lembar itu, tidak ada yang disembunyikan. </small>",
   /* 329 */ "(kosong) atau --fullscreen {rom}",
+  /* 330 */ "Seratus persen adalah kecepatan asli konsol. Di bawah itu game melambat, di atasnya melaju kencang — dan suaranya ikut, jadi lebih berat atau lebih melengking. Pada kontroler, kiri dan kanan berpindah dari satu tingkat ke tingkat berikutnya. Hanya untuk core internal: emulator eksternal tetap memakai kecepatannya sendiri.",
+  /* 331 */ "Lima konsol sekaligus",
+  /* 332 */ "Tombol arah",
+  /* 333 */ "Dari satu huruf awal ke berikutnya",
+  /* 334 */ "Di menu beranimasi, lima game sekaligus",
+  /* 335 */ "Kecepatan game",
 ];

@@ -339,4 +339,10 @@ export const hu: readonly string[] = [
   /* 327 */ "Az emulátor ugyanabban az ablakban fut, mint az EvaChi: ha elesik, szó nélkül magával rántja. Ha félreteszi ezt az emulátort, telepítve marad, csak nem ajánlja fel többé. Bármikor visszaállíthatja a <strong>Fájl → Emulátorok</strong> menüpontból, az ablak alján.",
   /* 328 */ "Játékonként egyetlen fájl a lemezen <small> A CD-s játék egy <code>.cue</code> leíróból és annyi <code>.bin</code> fájlból áll, ahány sávja a lemeznek volt. Csak a leíró indul el: mellette a sávok rejtve maradnak. Leíró nélkül semmi sincs elrejtve. </small>",
   /* 329 */ "(üres) vagy --fullscreen {rom}",
+  /* 330 */ "Száz százalék a konzol saját sebessége. Ez alatt a játék lelassul, fölötte száguld – és a hang is követi, mélyebben vagy élesebben. A kontrolleren a balra és a jobbra egyik fokozatról a másikra lép. Csak a belső magokra vonatkozik: a külső emulátor a sajátját tartja meg.",
+  /* 331 */ "Öt konzol egyszerre",
+  /* 332 */ "Iránykereszt",
+  /* 333 */ "Kezdőbetűről a következőre",
+  /* 334 */ "Az animált menüben öt játék egyszerre",
+  /* 335 */ "Játék sebessége",
 ];

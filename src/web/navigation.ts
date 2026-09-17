@@ -273,3 +273,25 @@ export class Held {
     return { pressed: false, repeat: false };
   }
 }
+
+/**
+ * Le palier suivant d'une jauge, dans un sens donné.
+ *
+ * Une jauge se glisse finement à la souris, mais à la manette chaque appui doit
+ * compter : de 50 à 900 par pas de cinq, il faudrait cent soixante-dix appuis
+ * pour la traverser. On ne s'arrête donc qu'aux paliers, et on rend `null` à
+ * bout de course plutôt que de boucler — une vitesse qui repasserait de 900 % à
+ * 50 % sur un appui de trop serait une surprise désagréable.
+ */
+export function cranSuivant(
+  valeur: number,
+  crans: readonly number[],
+  sens: 'gauche' | 'droite',
+): number | null {
+  const ranges = [...crans].sort((a, b) => a - b);
+  const trouve =
+    sens === 'droite'
+      ? ranges.find((cran) => cran > valeur)
+      : ranges.reverse().find((cran) => cran < valeur);
+  return trouve ?? null;
+}

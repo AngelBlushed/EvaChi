@@ -336,4 +336,10 @@ export const fi: readonly string[] = [
   /* 327 */ "Emulaattori pyörii samassa ikkunassa kuin EvaChi: kun se kaatuu, se vie EvaChin mukanaan ilman varoitusta. Käytöstä poistaminen jättää emulaattorin asennetuksi mutta lakkaa tarjoamasta sitä. Voit palauttaa sen milloin tahansa kohdasta <strong>Tiedosto → Emulaattorit</strong>, ikkunan alaosasta.",
   /* 328 */ "Yksi tiedosto peliä kohti levyllä <small> CD-peli saapuu yhtenä <code>.cue</code>-luettelona ja niin monena <code>.bin</code>-tiedostona kuin levyllä oli raitoja. Vain luettelo käynnistyy: raidat piilotetaan, kun se on paikallaan. Ilman luetteloa mitään ei piiloteta. </small>",
   /* 329 */ "(tyhjä) tai --fullscreen {rom}",
+  /* 330 */ "Sata prosenttia on konsolin oma nopeus. Sitä pienemmällä peli hidastuu, suuremmalla se kiitää — ja ääni seuraa mukana, matalampana tai korkeampana. Ohjaimella vasen ja oikea siirtyvät portaalta seuraavalle. Vain sisäiset ytimet: ulkoinen emulaattori pitää oman nopeutensa.",
+  /* 331 */ "Viisi konsolia kerrallaan",
+  /* 332 */ "Ristiohjain",
+  /* 333 */ "Alkukirjaimesta seuraavaan",
+  /* 334 */ "Animoidussa valikossa viisi peliä kerrallaan",
+  /* 335 */ "Pelin nopeus",
 ];

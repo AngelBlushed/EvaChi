@@ -336,4 +336,10 @@ export const ms: readonly string[] = [
   /* 327 */ "Emulator berjalan dalam tetingkap yang sama dengan EvaChi: apabila ia jatuh, ia membawa EvaChi sekali, tanpa sepatah mesej. Mengetepikan emulator ini membiarkannya tetap terpasang, tetapi berhenti menawarkannya. Anda boleh memulihkannya bila-bila masa melalui <strong>Fail → Emulator</strong>, di bahagian bawah tetingkap.",
   /* 328 */ "Satu fail sahaja bagi setiap permainan pada cakera <small> Permainan CD datang sebagai satu helaian <code>.cue</code> dan sebanyak fail <code>.bin</code> seperti bilangan trek pada cakeranya. Hanya helaian itu yang boleh dimainkan: treknya disembunyikan selagi helaian itu ada. Tanpa helaian itu, tiada apa yang disembunyikan. </small>",
   /* 329 */ "(kosong) atau --fullscreen {rom}",
+  /* 330 */ "Seratus peratus ialah kelajuan konsol itu sendiri. Di bawah itu permainan jadi perlahan, di atasnya ia meluru — dan bunyi turut berubah, lebih rendah atau lebih tinggi. Pada pengawal permainan, kiri dan kanan berpindah dari satu takat ke takat berikutnya. Teras dalaman sahaja: emulator luaran mengekalkan kelajuannya sendiri.",
+  /* 331 */ "Lima konsol serentak",
+  /* 332 */ "Pad arah",
+  /* 333 */ "Dari satu huruf awal ke huruf seterusnya",
+  /* 334 */ "Dalam menu animasi, lima permainan serentak",
+  /* 335 */ "Kelajuan permainan",
 ];

@@ -337,4 +337,10 @@ export const eu: readonly string[] = [
   /* 327 */ "Emulagailu bat EvaChi-ren leiho berean dabil: erortzen denean, berarekin eramaten du, mezurik gabe. Emulagailu hau baztertzeak instalatuta uzten du, baina ez du gehiago eskaintzen. Edonoiz leheneratu ahal izango duzu <strong>Fitxategia → Emulagailuak</strong> atalean, leihoaren behealdean.",
   /* 328 */ "Fitxategi bakarra joko bakoitzeko diskoan <small> CDko joko bat <code>.cue</code> orri batean eta diskoak pista adina <code>.bin</code> fitxategitan iristen da. Orria bakarrik abiarazten da: pistak ezkutatuta gelditzen dira hura dagoenean. Orririk gabe, ez da ezer ezkutatzen. </small>",
   /* 329 */ "(hutsik) edo --fullscreen {rom}",
+  /* 330 */ "Ehuneko ehun kontsolaren beraren abiadura da. Hortik behera jokoa mantsotzen da, gorago azkartzen — eta soinuak jarraitzen dio, baxuagoa edo altuagoa. Kontrolagailuan, ezkerrak eta eskuinak maila batetik hurrengora eramaten dute. Barneko nukleoetan bakarrik: kanpoko emuladoreak berea gordetzen du.",
+  /* 331 */ "Bost kontsola aldi berean",
+  /* 332 */ "Norabide-gurutzea",
+  /* 333 */ "Hasierako letra batetik hurrengora",
+  /* 334 */ "Menu animatuan, bost joko aldi berean",
+  /* 335 */ "Jokoaren abiadura",
 ];

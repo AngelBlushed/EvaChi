@@ -1720,6 +1720,29 @@
           Son
         </label>
 
+        <label class="field">
+          Vitesse du jeu
+          <!-- `data-crans` : les paliers où la manette s'arrête. De 50 à 900 par
+               pas de cinq, traverser la jauge demanderait cent soixante-dix
+               appuis ; à la souris, le pas de cinq reste fin sous le doigt. -->
+          <input
+            type="range"
+            id="tempo"
+            min="50"
+            max="900"
+            step="5"
+            value="100"
+            data-crans="50 75 100 150 200 300 400 500 600 700 800 900"
+          />
+          <span id="tempo-value">100 %</span>
+        </label>
+        <p class="hint-text">
+          Cent pour cent, c'est la vitesse de la console. En dessous le jeu
+          ralentit, au-dessus il file — et le son suit, plus grave ou plus aigu.
+          À la manette, gauche et droite passent d'un palier au suivant. Les
+          cœurs internes seulement : un émulateur externe garde la sienne.
+        </p>
+
         <div id="chip8-options">
           <label class="field">
             Interpréteur
@@ -1756,6 +1779,12 @@
         <dl class="about raccourcis">
           <dt>Directions / stick gauche</dt>
           <dd>Parcourir la bibliothèque, les fenêtres et la barre de menus</dd>
+          <dt>Croix directionnelle</dt>
+          <dd>Dans le menu animé, cinq jeux à la fois</dd>
+          <dt>L1 / R1</dt>
+          <dd>Cinq consoles à la fois</dd>
+          <dt>L2 / R2</dt>
+          <dd>D'une initiale à la suivante</dd>
           <dt>A</dt>
           <dd>Lancer le jeu, valider</dd>
           <dt>X</dt>
@@ -1764,6 +1793,8 @@
           <dd>Revenir en arrière, refermer</dd>
           <dt>Start</dt>
           <dd>Ouvrir la barre de menus</dd>
+          <dt>Select + Y</dt>
+          <dd>Prendre une capture</dd>
           <dt>Select + Start</dt>
           <dd>
             En cours de partie, revenir à la bibliothèque — deux boutons à la

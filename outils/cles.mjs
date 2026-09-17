@@ -58,6 +58,8 @@ const HORS = new Set([
   'Select + R1',
   'Select + Start',
   'Select + Y',
+  'L1 / R1',
+  'L2 / R2',
   'Fichier → Émulateurs',
   'SUPER-CHIP',
   'XO-CHIP',

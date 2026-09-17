@@ -336,4 +336,10 @@ export const lt: readonly string[] = [
   /* 327 */ "Emuliatorius sukasi tame pačiame lange kaip ir EvaChi: krisdamas jis nusineša ją kartu, be jokios žinutės. Atidėjus šį emuliatorių, jis lieka įdiegtas, bet nebesiūlomas. Bet kada galėsite jį atkurti per <strong>Failas → Emuliatoriai</strong>, lango apačioje.",
   /* 328 */ "Tik vienas failas kiekvienam žaidimui diske <small> CD žaidimas ateina vienu <code>.cue</code> lapeliu ir tiek <code>.bin</code> failų, kiek diske buvo takelių. Paleidžiamas tik lapelis: kai jis yra, takeliai paslepiami. Be lapelio nieko neslepiama. </small>",
   /* 329 */ "(tuščia) arba --fullscreen {rom}",
+  /* 330 */ "Šimtas procentų – tikrasis konsolės greitis. Žemiau žaidimas sulėtėja, aukščiau – skuodžia, o garsas seka iš paskos: žemesnis arba aukštesnis. Pulte kairė ir dešinė perkelia iš vienos padalos į kitą. Tik vidiniams branduoliams: išorinis emuliatorius laikosi savojo greičio.",
+  /* 331 */ "Penkios konsolės iš karto",
+  /* 332 */ "Krypčių kryžiukas",
+  /* 333 */ "Iš vienos pradinės raidės į kitą",
+  /* 334 */ "Animuotame meniu – penki žaidimai iš karto",
+  /* 335 */ "Žaidimo greitis",
 ];

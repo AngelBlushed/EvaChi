@@ -9,7 +9,17 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { Held, columnsFor, echelle, initiale, move, sautInitiale, step, voisin } from './navigation.ts';
+import {
+  Held,
+  columnsFor,
+  cranSuivant,
+  echelle,
+  initiale,
+  move,
+  sautInitiale,
+  step,
+  voisin,
+} from './navigation.ts';
 import type { Boite } from './navigation.ts';
 
 /*  Grille de référence, 4 colonnes, 10 jeux :
@@ -325,5 +335,32 @@ describe('bords d’une rangée', () => {
     assert.equal(voisin(0, boites, 'droite'), 1);
     assert.equal(voisin(1, boites, 'droite'), 2);
     assert.equal(voisin(4, boites, 'gauche'), 3);
+  });
+});
+
+describe('paliers d’une jauge', () => {
+  // De 50 % à 900 % par pas de cinq, traverser la jauge à la manette
+  // demanderait cent soixante-dix appuis. On ne s'arrête qu'aux paliers.
+  const CRANS = [50, 75, 100, 150, 200, 300, 400, 500, 600, 700, 800, 900];
+
+  it('passe au palier suivant, jamais au pas de la jauge', () => {
+    assert.equal(cranSuivant(100, CRANS, 'droite'), 150);
+    assert.equal(cranSuivant(100, CRANS, 'gauche'), 75);
+  });
+
+  it('repart du palier voisin quand la souris s’est arrêtée entre deux', () => {
+    assert.equal(cranSuivant(115, CRANS, 'droite'), 150);
+    assert.equal(cranSuivant(115, CRANS, 'gauche'), 100);
+  });
+
+  it('s’arrête en bout de course plutôt que de boucler', () => {
+    // Repasser de 900 % à 50 % sur un appui de trop serait une surprise
+    // désagréable, et on ne la découvrirait qu'en pleine partie.
+    assert.equal(cranSuivant(900, CRANS, 'droite'), null);
+    assert.equal(cranSuivant(50, CRANS, 'gauche'), null);
+  });
+
+  it('ne compte pas sur l’ordre des paliers qu’on lui donne', () => {
+    assert.equal(cranSuivant(100, [300, 50, 150, 100], 'droite'), 150);
   });
 });

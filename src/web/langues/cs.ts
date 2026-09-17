@@ -337,4 +337,10 @@ export const cs: readonly string[] = [
   /* 327 */ "Emulátor běží ve stejném okně jako EvaChi: když spadne, vezme ji s sebou, beze slova. Vyřazením zůstane nainstalovaný, jen se přestane nabízet. Kdykoli ho můžete obnovit přes <strong>Soubor → Emulátory</strong>, dole v okně.",
   /* 328 */ "Jeden soubor na hru na disku <small> Hra na CD přijde jako soupis <code>.cue</code> a tolik souborů <code>.bin</code>, kolik mělo CD stop. Spouští se jen soupis: stopy se skryjí, když je na místě. Bez soupisu se neskryje nic. </small>",
   /* 329 */ "(prázdné) nebo --fullscreen {rom}",
+  /* 330 */ "Sto procent je vlastní rychlost konzole. Pod ní se hra zpomalí, nad ní letí — a zvuk jde s ní, hlubší, nebo vyšší. Na ovladači vlevo a vpravo přepínají z jednoho stupně na další. Jen vnitřní jádra: externí emulátor si drží svou rychlost.",
+  /* 331 */ "Pět konzolí najednou",
+  /* 332 */ "Směrový kříž",
+  /* 333 */ "Z jednoho počátečního písmene na další",
+  /* 334 */ "V animované nabídce pět her najednou",
+  /* 335 */ "Rychlost hry",
 ];

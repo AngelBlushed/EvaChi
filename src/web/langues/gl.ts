@@ -336,4 +336,10 @@ export const gl: readonly string[] = [
   /* 327 */ "Un emulador corre na mesma xanela ca EvaChi: cando cae, lévaa con el, sen aviso. Apartar este emulador déixao instalado pero deixa de ofrecelo. Poderá restauralo cando queira desde <strong>Ficheiro → Emuladores</strong>, ao pé da xanela.",
   /* 328 */ "Un só ficheiro por xogo no disco <small> Un xogo en CD chega nunha folla <code>.cue</code> e en tantos ficheiros <code>.bin</code> como pistas tiña o disco. Só se inicia a folla: as pistas agóchanse cando ela está. Sen folla, non se agocha nada. </small>",
   /* 329 */ "(baleiro) ou --fullscreen {rom}",
+  /* 330 */ "O cen por cento é a velocidade propia da consola. Por debaixo o xogo vai máis lento, por riba voa — e o son vai con el, máis grave ou máis agudo. No mando, esquerda e dereita pasan dun paso ao seguinte. Só nos núcleos internos: un emulador externo mantén a súa propia.",
+  /* 331 */ "Cinco consolas de cada vez",
+  /* 332 */ "Cruceta direccional",
+  /* 333 */ "Dunha inicial á seguinte",
+  /* 334 */ "No menú animado, cinco xogos de cada vez",
+  /* 335 */ "Velocidade do xogo",
 ];

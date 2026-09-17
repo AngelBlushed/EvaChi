@@ -337,4 +337,10 @@ export const pl: readonly string[] = [
   /* 327 */ "Emulator działa w tym samym oknie co EvaChi: kiedy pada, zabiera ją ze sobą, bez słowa. Po odstawieniu zostaje zainstalowany, przestaje się tylko pojawiać w wyborze. Możesz go przywrócić w każdej chwili przez <strong>Plik → Emulatory</strong>, na dole okna.",
   /* 328 */ "Jeden plik na grę na dysku <small> Gra z płyty przychodzi jako arkusz <code>.cue</code> i tyle plików <code>.bin</code>, ile ścieżek miała płyta. Uruchamia się tylko arkusz: przy nim ścieżki są ukryte. Bez arkusza nic nie jest ukryte. </small>",
   /* 329 */ "(puste) lub --fullscreen {rom}",
+  /* 330 */ "Sto procent to prędkość samej konsoli. Niżej gra zwalnia, wyżej pędzi — a dźwięk idzie za nią, niżej albo wyżej. Na padzie lewo i prawo przeskakują z jednego stopnia na następny. Tylko rdzenie wewnętrzne: zewnętrzny emulator trzyma się własnej prędkości.",
+  /* 331 */ "Pięć konsol naraz",
+  /* 332 */ "Krzyżak kierunkowy",
+  /* 333 */ "Od jednej litery do następnej",
+  /* 334 */ "W animowanym menu pięć gier naraz",
+  /* 335 */ "Prędkość gry",
 ];

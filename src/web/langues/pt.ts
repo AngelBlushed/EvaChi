@@ -336,4 +336,10 @@ export const pt: readonly string[] = [
   /* 327 */ "Um emulador corre na mesma janela que o EvaChi: quando cai, leva-a consigo, sem aviso. Pôr este emulador de parte deixa-o instalado mas deixa de o propor. Poderá restaurá-lo a qualquer momento em <strong>Ficheiro → Emuladores</strong>, no fundo da janela.",
   /* 328 */ "Um só ficheiro por jogo no disco <small> Um jogo em CD chega numa folha <code>.cue</code> e em tantos ficheiros <code>.bin</code> quantas as faixas que o disco tinha. Só a folha se lança: as faixas ficam escondidas quando ela está lá. Sem folha, nada fica escondido. </small>",
   /* 329 */ "(vazio) ou --fullscreen {rom}",
+  /* 330 */ "Cem por cento é a velocidade da própria consola. Abaixo disso o jogo abranda, acima dispara — e o som acompanha, mais grave ou mais agudo. No comando, esquerda e direita passam de um patamar para o seguinte. Só nos núcleos internos: um emulador externo conserva a sua.",
+  /* 331 */ "Cinco consolas de uma vez",
+  /* 332 */ "Cruz direcional",
+  /* 333 */ "De uma inicial para a seguinte",
+  /* 334 */ "No menu animado, cinco jogos de uma vez",
+  /* 335 */ "Velocidade do jogo",
 ];

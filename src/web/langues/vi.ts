@@ -336,4 +336,10 @@ export const vi: readonly string[] = [
   /* 327 */ "Trình giả lập chạy trong cùng cửa sổ với EvaChi: khi nó sập, nó kéo EvaChi theo, không một lời báo trước. Ngưng dùng trình giả lập này thì nó vẫn còn được cài, chỉ là không còn được đề nghị nữa. Bạn có thể khôi phục nó bất cứ lúc nào từ <strong>Tệp → Trình giả lập</strong>, ở cuối cửa sổ.",
   /* 328 */ "Mỗi trò chơi chỉ một tệp trên đĩa <small> Trò chơi trên CD đến dưới dạng một tờ mục lục <code>.cue</code> và nhiều tệp <code>.bin</code> đúng bằng số rãnh của đĩa. Chỉ tờ mục lục là chạy được: các rãnh bị ẩn đi khi có nó. Không có tờ mục lục thì chẳng có gì bị ẩn cả. </small>",
   /* 329 */ "(để trống) hoặc --fullscreen {rom}",
+  /* 330 */ "Một trăm phần trăm là tốc độ gốc của máy. Thấp hơn thì game chạy chậm lại, cao hơn thì game lao đi — và âm thanh cũng theo đó, trầm hơn hoặc cao hơn. Trên tay cầm, trái và phải chuyển sang mức kế tiếp. Chỉ với các core nội bộ: trình giả lập bên ngoài giữ tốc độ riêng của nó.",
+  /* 331 */ "Mỗi lần năm máy",
+  /* 332 */ "Nút điều hướng",
+  /* 333 */ "Từ chữ cái đầu này sang chữ kế tiếp",
+  /* 334 */ "Trong menu động, mỗi lần năm game",
+  /* 335 */ "Tốc độ game",
 ];

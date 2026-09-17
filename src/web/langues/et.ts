@@ -336,4 +336,10 @@ export const et: readonly string[] = [
   /* 327 */ "Emulaator töötab EvaChiga samas aknas: kui ta kukub, viib ta EvaChi endaga kaasa, ilma ühegi teateta. Emulaatori kõrvale panek jätab selle paigaldatuks, aga lakkab seda pakkumast. Saate selle igal ajal taastada akna allservas <strong>Fail → Emulaatorid</strong> alt.",
   /* 328 */ "Üks fail mängu kohta kettal <small> CD-mäng saabub ühe <code>.cue</code>-lehena ja nii mitme <code>.bin</code>-failina, kui palju kettal radu oli. Käivitub ainult leht: kui see on olemas, on rajad peidetud. Lehe puudumisel ei peideta midagi. </small>",
   /* 329 */ "(tühi) või --fullscreen {rom}",
+  /* 330 */ "Sada protsenti on konsooli enda kiirus. Sellest allpool mäng aeglustub, ülalpool kiireneb — ja heli tuleb kaasa, madalamaks või kõrgemaks. Puldil viivad vasak ja parem ühelt astmelt järgmisele. Ainult sisemised tuumad: väline emulaator hoiab oma kiirust.",
+  /* 331 */ "Viis konsooli korraga",
+  /* 332 */ "Suunanupud",
+  /* 333 */ "Ühelt algustähelt järgmisele",
+  /* 334 */ "Animeeritud menüüs viis mängu korraga",
+  /* 335 */ "Mängu kiirus",
 ];

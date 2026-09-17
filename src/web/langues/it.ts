@@ -336,4 +336,10 @@ export const it: readonly string[] = [
   /* 327 */ "Un emulatore gira nella stessa finestra di EvaChi: quando cade, se la porta dietro, senza un messaggio. Escluderlo lo lascia installato ma smette di proporlo. Potrai ripristinarlo in qualsiasi momento da <strong>File → Emulatori</strong>, in fondo alla finestra.",
   /* 328 */ "Un solo file per gioco su disco <small> Un gioco su CD arriva come un foglietto <code>.cue</code> e tanti file <code>.bin</code> quante erano le tracce del disco. Si avvia solo il foglietto: le tracce sono nascoste quando c'è. Senza foglietto, non si nasconde niente. </small>",
   /* 329 */ "(vuoto) o --fullscreen {rom}",
+  /* 330 */ "Il cento per cento è la velocità della console. Sotto, il gioco rallenta; sopra, corre — e il suono lo segue, più grave o più acuto. Sul controller, sinistra e destra passano da una tacca alla successiva. Solo per i core interni: un emulatore esterno mantiene la sua.",
+  /* 331 */ "Cinque console alla volta",
+  /* 332 */ "Croce direzionale",
+  /* 333 */ "Da un'iniziale alla successiva",
+  /* 334 */ "Nel menu animato, cinque giochi alla volta",
+  /* 335 */ "Velocità del gioco",
 ];

@@ -336,4 +336,10 @@ export const sw: readonly string[] = [
   /* 327 */ "Emulata inafanya kazi katika dirisha lile moja la EvaChi: inapoanguka, inaiangusha nayo, bila neno lolote. Kuweka emulata hii kando inaibakiza imesakinishwa lakini inaacha kuipendekeza. Unaweza kuirejesha wakati wowote kutoka <strong>Faili → Emulata</strong>, chini ya dirisha.",
   /* 328 */ "Faili moja tu kwa kila mchezo kwenye diski <small> Mchezo wa CD huja kama karatasi ya <code>.cue</code> na faili za <code>.bin</code> nyingi kama vipande vilivyokuwa kwenye diski. Ni karatasi pekee inayoanzishwa: vipande vinafichwa ikiwa ipo. Bila karatasi, hakuna kinachofichwa. </small>",
   /* 329 */ "(wazi) au --fullscreen {rom}",
+  /* 330 */ "Asilimia mia moja ni kasi ya konsoli yenyewe. Chini ya hapo mchezo hupunguza mwendo, juu yake hukimbia — na sauti hufuata, nzito zaidi au nyembamba zaidi. Kwenye kidhibiti, kushoto na kulia husogeza hatua moja kwa wakati. Ni kwa viini vya ndani tu: emulator ya nje huhifadhi kasi yake.",
+  /* 331 */ "Konsoli tano kwa wakati mmoja",
+  /* 332 */ "Vitufe vya mwelekeo",
+  /* 333 */ "Kutoka herufi moja hadi nyingine",
+  /* 334 */ "Kwenye menyu inayosogea, michezo mitano kwa wakati mmoja",
+  /* 335 */ "Kasi ya mchezo",
 ];

@@ -337,4 +337,10 @@ export const ga: readonly string[] = [
   /* 327 */ "Ritheann aithriseoir san fhuinneog chéanna le EvaChi: nuair a thiteann sé, beireann sé leis í, gan focal. Má chuirtear an t-aithriseoir seo i leataobh fanann sé suiteáilte ach ní thairgtear a thuilleadh é. Is féidir leat é a chur ar ais am ar bith ó <strong>Comhad → Aithriseoirí</strong>, ag bun na fuinneoige.",
   /* 328 */ "Comhad amháin in aghaidh an chluiche ar an diosca <small> Tagann cluiche ar CD i bhfoirm bileoige <code>.cue</code> agus an oiread comhad <code>.bin</code> agus a bhí de rianta ar an diosca. Ní thosaíonn ach an bhileog: cuirtear na rianta i bhfolach nuair atá sí ann. Gan bhileog, ní chuirtear rud ar bith i bhfolach. </small>",
   /* 329 */ "(folamh) nó --fullscreen {rom}",
+  /* 330 */ "Is é céad faoin gcéad luas dílis an chonsóil. Faoina bhun moillíonn an cluiche, os a chionn scinneann sé — agus leanann an fhuaim é, níos doimhne nó níos géire. Ar an rialtán, tugann clé agus deas ó chéim go dtí an chéad chéim eile. Na croíthe inmheánacha amháin: coinníonn aithriseoir seachtrach a luas féin.",
+  /* 331 */ "Cúig chonsól san am",
+  /* 332 */ "Ceap treo",
+  /* 333 */ "Go dtí an chéad litir eile",
+  /* 334 */ "Sa roghchlár beoite, cúig chluiche san am",
+  /* 335 */ "Luas an chluiche",
 ];

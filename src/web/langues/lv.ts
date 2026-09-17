@@ -336,4 +336,10 @@ export const lv: readonly string[] = [
   /* 327 */ "Emulators darbojas tajā pašā logā, kur EvaChi: kad tas nokrīt, tas paņem viņu sev līdzi, bez neviena ziņojuma. Noliekot šo emulatoru malā, tas paliek uzstādīts, bet vairs netiek piedāvāts. Jebkurā brīdī to varēsiet atjaunot loga apakšā, sadaļā <strong>Fails → Emulatori</strong>.",
   /* 328 */ "Tikai viens fails katrai spēlei diskā <small> CD spēle nāk kā viena <code>.cue</code> lapiņa un tik daudz <code>.bin</code> failu, cik diskam bija celiņu. Palaižas tikai lapiņa: kad tā ir klāt, celiņi ir paslēpti. Bez lapiņas nekas netiek slēpts. </small>",
   /* 329 */ "(tukšs) vai --fullscreen {rom}",
+  /* 330 */ "Simts procenti ir pašas konsoles ātrums. Zemāk spēle palēninās, augstāk tā traucas uz priekšu — un skaņa seko līdzi, zemāka vai augstāka. Ar kontrolieri kreisais un labais virziens pārslēdz no vienas pakāpes uz nākamo. Tikai iekšējiem kodoliem: ārējs emulators patur savu ātrumu.",
+  /* 331 */ "Piecas konsoles uzreiz",
+  /* 332 */ "Virzienu krusts",
+  /* 333 */ "No viena sākuma burta uz nākamo",
+  /* 334 */ "Animētajā izvēlnē piecas spēles uzreiz",
+  /* 335 */ "Spēles ātrums",
 ];

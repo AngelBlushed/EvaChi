@@ -336,4 +336,10 @@ export const is: readonly string[] = [
   /* 327 */ "Hermir keyrir í sama glugga og EvaChi: þegar hann fellur tekur hann forritið með sér, án nokkurra skilaboða. Að leggja herminn til hliðar skilur hann eftir uppsettan en hættir að bjóða hann. Þú getur endurvakið hann hvenær sem er í <strong>Skrá → Hermar</strong>, neðst í glugganum.",
   /* 328 */ "Ein skrá á hvern leik á disknum <small> CD-leikur kemur sem eitt <code>.cue</code>-blað og jafnmargar <code>.bin</code>-skrár og lögin voru á disknum. Aðeins blaðið ræsist: lögin eru falin þegar það er til staðar. Án blaðs er ekkert falið. </small>",
   /* 329 */ "(tómt) eða --fullscreen {rom}",
+  /* 330 */ "Hundrað prósent er hraði leikjatölvunnar sjálfrar. Undir því hægist á leiknum, yfir því flýgur hann af stað — og hljóðið fylgir með, dýpra eða hvellara. Á leikjastýringunni færa vinstri og hægri þig um eitt þrep í senn. Gildir aðeins um innri kjarna: ytri hermir heldur sínum eigin hraða.",
+  /* 331 */ "Fimm leikjatölvur í einu",
+  /* 332 */ "Stýrikross",
+  /* 333 */ "Frá einum upphafsstaf til næsta",
+  /* 334 */ "Í hreyfivalmyndinni, fimm leikir í einu",
+  /* 335 */ "Leikhraði",
 ];

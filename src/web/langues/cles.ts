@@ -350,6 +350,12 @@ export const CLES: readonly string[] = [
   "Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe, il l'emporte avec lui, sans message. Écarter cet émulateur le laisse installé mais cesse de le proposer. Vous pourrez le rétablir à tout moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.",
   "Un seul fichier par jeu sur disque <small> Un jeu sur CD arrive en un feuillet <code>.cue</code> et en autant de fichiers <code>.bin</code> que le disque avait de pistes. Seul le feuillet se lance : les pistes sont masquées quand il est là. Sans feuillet, rien n'est masqué. </small>",
   "(vide) ou --fullscreen {rom}",
+  "Cent pour cent, c'est la vitesse de la console. En dessous le jeu ralentit, au-dessus il file — et le son suit, plus grave ou plus aigu. À la manette, gauche et droite passent d'un palier au suivant. Les cœurs internes seulement : un émulateur externe garde la sienne.",
+  "Cinq consoles à la fois",
+  "Croix directionnelle",
+  "D'une initiale à la suivante",
+  "Dans le menu animé, cinq jeux à la fois",
+  "Vitesse du jeu",
 ];
 
 /**
