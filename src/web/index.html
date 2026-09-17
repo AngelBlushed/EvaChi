@@ -1677,15 +1677,18 @@
     </dialog>
 
     <dialog id="crash-dialog">
-      <h2>La fois précédente s'est mal terminée</h2>
+      <!-- Le titre est posé par le code : la même fenêtre sert à l'incident
+           qu'on découvre au démarrage et à celui qu'on vient de voir arriver. -->
+      <h2 id="crash-titre">La fois précédente s'est mal terminée</h2>
       <div class="dialog-body">
         <p class="hint-text" id="crash-quoi"></p>
         <p class="hint-text" data-i18n-html>
-          Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe,
-          il l'emporte avec lui, sans message. Écarter cet émulateur le laisse
-          installé mais cesse de le proposer. Vous pourrez le rétablir à tout
-          moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la
-          fenêtre.
+          Chaque émulateur tourne dans son propre processus : quand il tombe,
+          EvaChi le voit et revient à la bibliothèque. La partie en cours est
+          perdue, et la sauvegarde du jeu n'a peut-être pas été écrite. Écarter
+          cet émulateur le laisse installé mais cesse de le proposer. Vous
+          pourrez le rétablir à tout moment depuis
+          <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.
         </p>
       </div>
       <div class="dialog-foot">
@@ -1904,6 +1907,8 @@
           <dd>Plein écran</dd>
           <dt>Select + Y</dt>
           <dd>Prendre une capture</dd>
+          <dt>L3 + R3</dt>
+          <dd>Avance rapide, tant que les deux manches restent enfoncés</dd>
           <dt>Select + Start</dt>
           <dd>
             En cours de partie, revenir à la bibliothèque — deux boutons à la

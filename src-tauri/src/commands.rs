@@ -815,7 +815,7 @@ pub fn set_core_usable(
 }
 
 /// La base des données de l'application, où vivent captures et sauvegardes.
-fn racine(paths: &Paths) -> std::path::PathBuf {
+pub fn racine(paths: &Paths) -> std::path::PathBuf {
     paths
         .covers
         .parent()
@@ -2473,10 +2473,18 @@ fn pack_frame(video: Option<&VideoFrame>, audio: &[i16], shutdown: bool) -> Vec<
     out
 }
 
-/// Émule une trame et renvoie image et son au format décrit sur [`pack_frame`].
+/// Émule une ou plusieurs trames et renvoie image et son au format décrit sur
+/// [`pack_frame`].
+///
+/// `frames` sert l'avance rapide : à neuf cents pour cent, on exécute neuf
+/// trames pour n'en regarder qu'une, et les demander une par une paierait
+/// l'aller-retour neuf fois. `video` dit si la fenêtre compte peindre celle-ci ;
+/// quand elle ne le compte pas, l'image ne traverse pas.
 #[tauri::command]
 pub async fn run_frame(
     input: Vec<i16>,
+    frames: Option<u32>,
+    video: Option<bool>,
     session: State<'_, Arc<Session>>,
 ) -> Result<Response, String> {
     let mut buttons = [0i16; JOYPAD_BUTTONS];
@@ -2484,9 +2492,12 @@ pub async fn run_frame(
         *slot = value;
     }
 
+    let combien = frames.unwrap_or(1).clamp(1, 64);
+    let image = video.unwrap_or(true);
+
     let session = Arc::clone(&session);
     let bloc = au_travail(move || {
-        let frame = session.run_frame(buttons)?;
+        let frame = session.run_frames(buttons, combien, image)?;
         Ok(pack_frame(
             frame.video.as_ref(),
             &frame.audio,

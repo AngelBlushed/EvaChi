@@ -77,7 +77,10 @@ impl Demande {
             Self::Trame => Duration::from_secs(5),
             Self::Reinitialiser => Duration::from_secs(30),
             Self::SauverEtat | Self::ReprendreEtat => Duration::from_secs(120),
-            Self::Decharger => Duration::from_secs(45),
+            // Généreuse, mais pas au point de faire attendre qui ferme la
+            // fenêtre : on décharge aussi à l'extinction, et un cœur sain rend
+            // la main en quelques millisecondes.
+            Self::Decharger => Duration::from_secs(20),
             Self::Messages => Duration::from_secs(5),
         }
     }

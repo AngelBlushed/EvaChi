@@ -503,6 +503,16 @@ export interface DecodedFrame {
 }
 
 /**
+ * La marque que porte une erreur venue d'un cœur qui n'est plus là.
+ *
+ * L'autre moitié est `TOMBE`, dans `src-tauri/src/libretro/distant/tuyau.rs`.
+ * Écrite des deux côtés plutôt que partagée : il n'y a pas de canal entre les
+ * deux, et une marque qui divergerait se verrait tout de suite — l'incident ne
+ * s'annoncerait plus.
+ */
+export const COEUR_TOMBE = 'coeur-tombe';
+
+/**
  * Encode et décode les octets qui traversent le pont.
  *
  * Le pont vers la coque native ne transporte que du texte dans ce sens-là ; un
@@ -677,12 +687,16 @@ export class LibretroCore implements AsyncEmulatorCore {
     await invoke('reset');
   }
 
-  async runFrame(input: InputState): Promise<Frame> {
+  async runFrame(input: InputState, trames = 1, image = true): Promise<Frame> {
     // La manette libretro compte seize boutons ; l'interface envoie un tableau
     // plat de booléens, converti ici en pressions 0 ou 1.
     const buttons = Array.from({ length: 16 }, (_, index) => (input[index] ? 1 : 0));
 
-    const raw = await invoke<ArrayBuffer>('run_frame', { input: buttons });
+    const raw = await invoke<ArrayBuffer>('run_frame', {
+      input: buttons,
+      frames: trames,
+      video: image,
+    });
     return this.#decode(raw);
   }
 

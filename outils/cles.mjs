@@ -217,6 +217,12 @@ const RENOMMEES = new Map([
     "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on le resserre. À la manette, les directions déplacent et les gâchettes resserrent ou élargissent.",
     "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop serrée. À la manette, les directions déplacent et les gâchettes règlent la taille.",
   ],
+  // Le cœur ne vit plus dans la fenêtre : la phrase qui l'affirmait est devenue
+  // fausse du jour au lendemain.
+  [
+    "Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe, il l'emporte avec lui, sans message. Écarter cet émulateur le laisse installé mais cesse de le proposer. Vous pourrez le rétablir à tout moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.",
+    "Chaque émulateur tourne dans son propre processus : quand il tombe, EvaChi le voit et revient à la bibliothèque. La partie en cours est perdue, et la sauvegarde du jeu n'a peut-être pas été écrite. Écarter cet émulateur le laisse installé mais cesse de le proposer. Vous pourrez le rétablir à tout moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.",
+  ],
 ]);
 
 ancien = ancien.map((clef) => RENOMMEES.get(clef) ?? clef);

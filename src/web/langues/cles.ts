@@ -347,7 +347,7 @@ export const CLES: readonly string[] = [
   "Aucune capture. Pressez <strong>F12</strong> en cours de partie, ou <strong>Select + Y</strong> à la manette.",
   "Chaque console a besoin de son émulateur. EvaChi va les chercher sur la forge officielle du projet libretro, <code>buildbot.libretro.com</code>, et les installe dans son propre dossier. Rien n'est redistribué : ce sont les versions publiées par leurs auteurs.",
   "Quatre emplacements par jeu, gardés sur le disque. L'emplacement en gras est celui qu'utilisent <strong>F2</strong> et <strong>F4</strong> — et <strong>Select + L1</strong> / <strong>Select + R1</strong> à la manette. Clic droit sur un emplacement pour le vider.",
-  "Un émulateur tourne dans la même fenêtre qu'EvaChi : quand il tombe, il l'emporte avec lui, sans message. Écarter cet émulateur le laisse installé mais cesse de le proposer. Vous pourrez le rétablir à tout moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.",
+  "Chaque émulateur tourne dans son propre processus : quand il tombe, EvaChi le voit et revient à la bibliothèque. La partie en cours est perdue, et la sauvegarde du jeu n'a peut-être pas été écrite. Écarter cet émulateur le laisse installé mais cesse de le proposer. Vous pourrez le rétablir à tout moment depuis <strong>Fichier → Émulateurs</strong>, en bas de la fenêtre.",
   "Un seul fichier par jeu sur disque <small> Un jeu sur CD arrive en un feuillet <code>.cue</code> et en autant de fichiers <code>.bin</code> que le disque avait de pistes. Seul le feuillet se lance : les pistes sont masquées quand il est là. Sans feuillet, rien n'est masqué. </small>",
   "(vide) ou --fullscreen {rom}",
   "Cent pour cent, c'est la vitesse de la console. En dessous le jeu ralentit, au-dessus il file — et le son suit, plus grave ou plus aigu. À la manette, gauche et droite passent d'un palier au suivant. Les cœurs internes seulement : un émulateur externe garde la sienne.",
@@ -366,6 +366,12 @@ export const CLES: readonly string[] = [
   "jaquette illisible — {0}",
   "recadrage impossible — {0}",
   "Recadrer la jaquette…",
+  "Avance rapide, tant que les deux manches restent enfoncés",
+  "{0} écarté",
+  "L'émulateur {0} s'est arrêté pendant « {1} ».",
+  "L'émulateur {0} s'est arrêté.",
+  "L'émulateur s'est arrêté",
+  "mise à l'écart impossible — {0}",
 ];
 
 /**

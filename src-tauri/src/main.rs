@@ -209,6 +209,28 @@ fn main() {
             commands::clear_manual_cover,
             commands::note,
         ])
-        .run(tauri::generate_context!())
-        .expect("le lancement d'EvaChi a échoué");
+        .build(tauri::generate_context!())
+        .expect("le lancement d'EvaChi a échoué")
+        .run(|app, evenement| {
+            // Le témoin de partie ne doit survivre qu'à une fin brutale : c'est
+            // tout son sens. Une fermeture ordinaire l'efface — sans quoi
+            // quitter EvaChi en pleine partie ferait annoncer, au lancement
+            // suivant, un plantage qui n'a pas eu lieu. Et maintenant que les
+            // cœurs vivent à côté, ce cas-là n'est plus rare : c'est devenu la
+            // façon ordinaire de s'arrêter.
+            if matches!(evenement, tauri::RunEvent::Exit) {
+                // Et le cœur est déchargé pour de bon. C'est là, et nulle part
+                // ailleurs, que la plupart des cœurs écrivent leur sauvegarde de
+                // pile : fermer la fenêtre en pleine partie ne doit pas coûter
+                // les deux dernières heures de jeu.
+                if let Some(session) = app.try_state::<std::sync::Arc<Session>>() {
+                    if let Err(raison) = session.unload() {
+                        eprintln!("[sortie] {raison}");
+                    }
+                }
+                if let Some(paths) = app.try_state::<commands::Paths>() {
+                    sentinel::fermer(&commands::racine(&paths));
+                }
+            }
+        });
 }

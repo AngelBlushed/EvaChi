@@ -27,6 +27,7 @@ import {
   clearManualCover,
   coverImage,
   coverIndex,
+  COEUR_TOMBE,
   coverOriginal,
   decodeBase64,
   encodeBase64,
@@ -205,6 +206,7 @@ const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
 const emplacementsBoite = $<HTMLDivElement>('emplacements');
+const crashTitre = $<HTMLElement>('crash-titre');
 const crashQuoi = $<HTMLElement>('crash-quoi');
 const crashEcarter = $<HTMLButtonElement>('crash-ecarter');
 const ecartesBloc = $<HTMLDivElement>('ecartes-bloc');
@@ -1209,28 +1211,85 @@ async function signalerIncident(): Promise<void> {
   if (!rapport) return;
 
   const nom = rapport.label || rapport.core;
-  crashQuoi.textContent = rapport.game
-    ? dit("EvaChi s'est arrêtée en lançant « {0} », avec l'émulateur {1}.", rapport.game, nom)
-    : dit("EvaChi s'est arrêtée, avec l'émulateur {0}.", nom);
   log(dit('arrêt brutal la fois précédente — {0}', nom), 'err');
+
+  montrerIncident(
+    t("La fois précédente s'est mal terminée"),
+    rapport.game
+      ? dit("EvaChi s'est arrêtée en lançant « {0} », avec l'émulateur {1}.", rapport.game, nom)
+      : dit("EvaChi s'est arrêtée, avec l'émulateur {0}.", nom),
+    rapport.core,
+    nom,
+    // La note est effacée dès qu'on l'a montrée : on ne prévient qu'une fois.
+    () => void dismissCrash().catch(() => {}),
+  );
+}
+
+/**
+ * Montre la fenêtre d'incident, et propose d'écarter le cœur en cause.
+ *
+ * Deux moments s'y retrouvent : le plantage qu'on découvre au démarrage
+ * suivant, et celui qu'on vient de voir arriver. Ils n'annoncent pas la même
+ * chose, mais la suite est la même — écarter cet émulateur, ou le garder.
+ */
+function montrerIncident(
+  titre: string,
+  quoi: string,
+  coeur: string,
+  nom: string,
+  apres?: () => void,
+): void {
+  crashTitre.textContent = titre;
+  crashQuoi.textContent = quoi;
 
   crashEcarter.onclick = async () => {
     try {
-      await setCoreUsable(rapport.core, false);
-      log(`${rapport.label} écarté`, 'ok');
+      await setCoreUsable(coeur, false);
+      log(dit('{0} écarté', nom), 'ok');
       await reloadCatalog();
       await refreshLibrary();
     } catch (error) {
-      log(`mise à l'écart impossible — ${reason(error)}`, 'err');
+      log(dit("mise à l'écart impossible — {0}", reason(error)), 'err');
     }
     dialogs.crash.close();
   };
 
-  // La note est effacée dès qu'on l'a montrée : on ne prévient qu'une fois.
-  dialogs.crash.addEventListener('close', () => void dismissCrash().catch(() => {}), {
-    once: true,
-  });
+  if (apres) dialogs.crash.addEventListener('close', apres, { once: true });
   openDialog(dialogs.crash);
+}
+
+/**
+ * Dit ce qui vient d'arrêter la partie, et range derrière.
+ *
+ * Un cœur qui tombe ne fait plus disparaître la fenêtre — il vit dans son
+ * propre processus. Encore faut-il que la fenêtre en tire les conséquences :
+ * sans cela, la boucle s'arrêtait et écrivait une ligne, mais le cœur, le jeu
+ * et le nom restaient posés, la bibliothèque ne revenait pas, et « Reprendre »
+ * aurait relancé la boucle sur un cœur mort.
+ */
+async function signalerArret(raison: string): Promise<void> {
+  const tombe = raison.includes(COEUR_TOMBE);
+  // Relevés avant de ranger : `stopPlaying` efface tout cela.
+  const coeur = entry?.id ?? '';
+  const nom = entry?.label ?? '';
+  const jeu = contentName;
+
+  log(dit('arrêt — {0}', raison), 'err');
+  // Ce que le cœur a dit juste avant de tomber explique souvent pourquoi. On le
+  // relève tant qu'on sait encore à qui il appartient : `stopPlaying` oublie le
+  // cœur, et la relève se taira ensuite.
+  await drainMessages();
+  await stopPlaying();
+
+  if (!tombe || !coeur) return;
+  montrerIncident(
+    t("L'émulateur s'est arrêté"),
+    jeu
+      ? dit("L'émulateur {0} s'est arrêté pendant « {1} ».", nom, jeu)
+      : dit("L'émulateur {0} s'est arrêté.", nom),
+    coeur,
+    nom,
+  );
 }
 
 // --- Emplacements de sauvegarde ---------------------------------------------
@@ -1874,6 +1933,15 @@ function setRunning(next: boolean): void {
 const TEMPO = { plancher: 50, normal: 100, plafond: 900 } as const;
 
 /**
+ * Combien de trames on demande au plus d'un seul coup.
+ *
+ * Neuf suffisent à couvrir la jauge entière. La borne existe pour qu'une valeur
+ * aberrante — un stockage abîmé, un jour — ne fasse pas partir le cœur pour un
+ * travail dont il ne reviendrait qu'après l'échéance.
+ */
+const LOT_MAXIMUM = 9;
+
+/**
  * La vitesse voulue, en multiple de celle de la console.
  *
  * Cent pour cent par défaut, et on y revient dès que la valeur retenue n'a pas
@@ -1943,17 +2011,26 @@ async function runLoop(): Promise<void> {
     // vitesse doit suivre le doigt. L'avance rapide se pose par-dessus, le
     // temps qu'on tienne les deux manches.
     const tempo = vitesseAvance(tempoJeu(), avanceRapide);
-    const frameMs = 1000 / (core.info.fps || 60) / tempo;
+    // En accéléré, on demande plusieurs trames d'un coup. L'écran n'en montre
+    // que soixante par seconde de toute façon, et le cœur vit derrière une
+    // frontière de processus : les demander une par une paierait l'aller-retour
+    // autant de fois, pour huit images sur neuf que personne ne verra.
+    const lot = tempo > 1 ? Math.max(1, Math.min(Math.round(tempo), LOT_MAXIMUM)) : 1;
+    const frameMs = (1000 * lot) / (core.info.fps || 60) / tempo;
 
     sampleInput();
 
+    // On dit d'avance si on peindra : l'image d'une trame qu'on ne regardera
+    // pas n'a aucune raison de traverser.
+    const peindra = tempo <= 1 || performance.now() - dernierDessin >= 1000 / 60;
+
     let frame: Frame;
     try {
-      frame = await core.runFrame(buttons);
+      frame = await core.runFrame(buttons, lot, peindra);
     } catch (error) {
       if (token === loopToken) {
         setRunning(false);
-        log(dit('arrêt — {0}', reason(error)), 'err');
+        await signalerArret(reason(error));
       }
       return;
     }
@@ -1963,11 +2040,7 @@ async function runLoop(): Promise<void> {
 
     const now = performance.now();
 
-    // En accéléré, on ne dessine pas chaque trame : l'écran n'en montre que
-    // soixante par seconde, et neuf cents mises en page pour en voir soixante
-    // met la machine à genoux pour rien. À vitesse normale ou ralentie, chaque
-    // trame compte.
-    if (tempo <= 1 || now - dernierDessin >= 1000 / 60) {
+    if (peindra) {
       present(frame);
       dernierDessin = now;
     }
@@ -1977,7 +2050,9 @@ async function runLoop(): Promise<void> {
     // prendre une avance qui grandirait sans fin. Le prix est un son plus aigu
     // en accéléré, plus grave au ralenti — c'est ce qu'on attend.
     audio.push(frame.audio, core.info.sampleRate * tempo);
-    framesThisSecond += 1;
+    // Le lot compte pour ce qu'il vaut : ce sont des trames émulées, même si
+    // l'écran n'en a montré qu'une.
+    framesThisSecond += lot;
 
     if (now - lastReport >= 1000) {
       // La vitesse s'affiche dès qu'elle n'est plus celle de la console : sans
@@ -2118,6 +2193,10 @@ async function stopPlaying(): Promise<void> {
   contentName = '';
   contentBytes = null;
   contentPath = null;
+  // Oublié ici aussi : c'est lui qui nomme le dossier des emplacements de
+  // sauvegarde, et le laisser en place faisait pointer les emplacements sur le
+  // dernier jeu joué alors qu'on était revenu à la bibliothèque.
+  cheminEnCours = '';
   savedState = null;
   nowPlaying.textContent = 'EvaChi';
   fpsOut.textContent = '—';

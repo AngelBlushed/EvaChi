@@ -108,7 +108,17 @@ export interface AsyncEmulatorCore {
   readonly info: SystemInfo;
   load(rom: Uint8Array, path?: string): Promise<void>;
   reset(): Promise<void>;
-  runFrame(input: InputState): Promise<Frame>;
+  /**
+   * Émule `trames` trames et rend la dernière image, avec tout le son produit.
+   *
+   * Plus d'une seule sert l'avance rapide : à neuf cents pour cent, on en
+   * exécute neuf pour n'en regarder qu'une, et un cœur qui vit derrière une
+   * frontière de processus paierait l'aller-retour neuf fois.
+   *
+   * `image` dit si l'appelant compte peindre celle-ci. Quand il ne le compte
+   * pas, un cœur distant s'épargne de la faire traverser.
+   */
+  runFrame(input: InputState, trames?: number, image?: boolean): Promise<Frame>;
   saveState(): Promise<Uint8Array>;
   loadState(state: Uint8Array): Promise<void>;
   /**
@@ -132,8 +142,28 @@ export function toAsync(core: EmulatorCore): AsyncEmulatorCore {
     async reset() {
       core.reset();
     },
-    async runFrame(input) {
-      return core.runFrame(input);
+    async runFrame(input, trames = 1) {
+      let derniere = core.runFrame(input);
+      if (trames <= 1) return derniere;
+
+      // Le son de toutes les trames, et non celui de la dernière : sans quoi
+      // l'accéléré ne ferait plus entendre qu'un neuvième du jeu. Chaque
+      // morceau est recopié — le contrat dit que les tampons appartiennent au
+      // cœur et sont réutilisés à la trame suivante.
+      const morceaux: Float32Array[] = [Float32Array.from(derniere.audio)];
+      for (let reste = trames - 1; reste > 0; reste -= 1) {
+        derniere = core.runFrame(input);
+        morceaux.push(Float32Array.from(derniere.audio));
+      }
+
+      const total = morceaux.reduce((somme, part) => somme + part.length, 0);
+      const audio = new Float32Array(total);
+      let ou = 0;
+      for (const part of morceaux) {
+        audio.set(part, ou);
+        ou += part.length;
+      }
+      return { ...derniere, audio };
     },
     async saveState() {
       return core.saveState();
