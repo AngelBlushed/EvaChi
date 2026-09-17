@@ -91,7 +91,7 @@ fn build_test_core() {
 fn session_with_content() -> (MutexGuard<'static, ()>, Session, tempdir::TempDir) {
     let guard = exclusive();
     let scratch = tempdir::TempDir::new();
-    let session = Session::spawn();
+    let session = Session::locale();
 
     session
         .load_core(&test_core_path(), scratch.path(), scratch.path())
@@ -122,7 +122,7 @@ fn pixel(rgba: &[u8], x: u32, y: u32) -> [u8; 4] {
 fn le_coeur_annonce_son_identite() {
     let _guard = exclusive();
     let scratch = tempdir::TempDir::new();
-    let session = Session::spawn();
+    let session = Session::locale();
 
     let info = session
         .load_core(&test_core_path(), scratch.path(), scratch.path())
@@ -295,7 +295,7 @@ fn la_reinitialisation_repart_de_zero() {
 #[test]
 fn une_session_sans_coeur_refuse_de_tourner() {
     let _guard = exclusive();
-    let session = Session::spawn();
+    let session = Session::locale();
     let error = session.run_frame(NO_BUTTONS).expect_err("doit échouer");
     assert!(error.contains("aucun cœur"), "message inattendu : {error}");
 }
@@ -304,7 +304,7 @@ fn une_session_sans_coeur_refuse_de_tourner() {
 fn un_fichier_qui_n_est_pas_un_coeur_est_rejete() {
     let _guard = exclusive();
     let scratch = tempdir::TempDir::new();
-    let session = Session::spawn();
+    let session = Session::locale();
 
     let bogus = scratch.path().join("pas-un-coeur.dll");
     std::fs::write(&bogus, b"ceci n'est pas une bibliotheque").expect("écriture");

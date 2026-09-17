@@ -7,6 +7,11 @@
 
 pub mod abi;
 pub mod core;
+/// Le cœur dans un processus voisin. Windows seulement : le tuyau nommé, la
+/// mémoire partagée et l'objet de travail n'ont pas d'équivalent portable, et
+/// c'est la seule plateforme que l'application vise.
+#[cfg(windows)]
+pub mod distant;
 /// Contexte OpenGL pour les cœurs 3D. Windows seulement : c'est WGL qui le
 /// porte, et la seule plateforme que l'application vise aujourd'hui.
 #[cfg(windows)]

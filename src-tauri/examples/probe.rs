@@ -52,7 +52,7 @@ fn main() {
     let system = system.unwrap_or_else(|| workdir.clone());
     println!("système     {}", system.display());
 
-    let session = Session::spawn();
+    let session = Session::locale();
 
     let info = match session.load_core(&core_path, &system, &workdir) {
         Ok(info) => info,

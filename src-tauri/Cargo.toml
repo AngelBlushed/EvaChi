@@ -39,13 +39,26 @@ sevenz-rust = "0.6"
 
 # Contexte OpenGL pour les coeurs 3D. WGL directement plutot qu une couche
 # de fenetrage : la fenetre est cachee et ne sert qu a porter le contexte.
+#
+# Et, depuis l isolement des coeurs : le tuyau nomme et la memoire partagee qui
+# relient la fenetre au processus qui tient le coeur, l objet Job qui garantit
+# qu aucun enfant ne survit a sa fenetre, et de quoi empecher Windows de brider
+# un processus sans fenetre visible ou d afficher sa boite d erreur.
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",
     "Win32_Graphics_OpenGL",
+    "Win32_Security",
+    "Win32_System_Diagnostics_Debug",
+    "Win32_System_IO",
+    "Win32_System_JobObjects",
+    "Win32_System_Kernel",
     "Win32_System_LibraryLoader",
+    "Win32_System_Memory",
+    "Win32_System_Pipes",
     "Win32_System_Registry",
+    "Win32_System_Threading",
     "Win32_Storage_FileSystem",
     "Win32_UI_WindowsAndMessaging",
 ] }

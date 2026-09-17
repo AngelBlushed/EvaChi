@@ -1,12 +1,25 @@
-//! Le thread propriétaire du cœur.
+//! Qui tient le cœur, et où.
 //!
-//! Un cœur libretro n'est pas déplaçable entre threads : ses rappels écrivent
-//! dans une variable de thread, et la plupart des cœurs supposent un fil
-//! d'exécution unique. Les commandes de l'interface arrivent en revanche depuis
-//! le pool de Tauri, sur n'importe quel thread.
+//! Deux réponses possibles, derrière la même porte.
 //!
-//! [`Session`] réconcilie les deux : un thread dédié détient le cœur, tout le
-//! reste lui parle par messages.
+//! **Dans la fenêtre**, sur un fil dédié : c'est la façon d'origine. Un cœur
+//! libretro n'est pas déplaçable entre fils — ses rappels écrivent dans une
+//! variable de fil, et la plupart supposent un fil d'exécution unique —, alors
+//! que les commandes de l'interface arrivent depuis le pool de Tauri, sur
+//! n'importe lequel. [`Locale`] réconcilie les deux : un fil détient le cœur,
+//! tout le reste lui parle par messages.
+//!
+//! **Dans un processus voisin**, un par partie : c'est la façon ordinaire
+//! depuis que les cœurs sont isolés. Elle coûte un aller-retour de tuyau par
+//! trame et rapporte ceci — un cœur qui plante ne fait plus disparaître la
+//! fenêtre, un cœur qui se fige ne la fige plus, et deux cœurs 3D lancés
+//! l'un après l'autre ne se marchent plus dessus.
+//!
+//! Le repli existe, mais il est à sens unique : si le processus voisin ne peut
+//! pas démarrer *avant qu'aucun cœur n'ait vécu*, on retombe dans la fenêtre et
+//! on l'écrit. Jamais après. Un cœur qui vient de tuer son processus serait
+//! sinon réessayé dans la fenêtre, qu'il tuerait à son tour — le repli serait
+//! devenu le chemin le plus sûr vers le défaut qu'on supprime.
 
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::{channel, Sender};
@@ -23,7 +36,8 @@ type Reply<T> = Sender<Result<T, String>>;
 
 /// Ce qu'une trame rapporte au thread appelant.
 pub struct FramePayload {
-    /// Absente quand le cœur a demandé de réafficher la trame précédente.
+    /// Absente quand le cœur a demandé de réafficher la trame précédente, ou
+    /// quand la fenêtre a dit qu'elle ne peindrait pas celle-ci.
     pub video: Option<VideoFrame>,
     pub audio: Vec<i16>,
     pub messages: Vec<String>,
@@ -49,6 +63,8 @@ impl std::fmt::Debug for FramePayload {
     }
 }
 
+// --- Le cœur dans la fenêtre ------------------------------------------------
+
 enum Request {
     LoadCore {
         path: PathBuf,
@@ -62,6 +78,7 @@ enum Request {
     },
     RunFrame {
         input: [i16; JOYPAD_BUTTONS],
+        trames: u32,
         reply: Reply<FramePayload>,
     },
     Reset {
@@ -79,35 +96,26 @@ enum Request {
     },
 }
 
-/// Poignée vers le thread d'émulation. Clonable et utilisable depuis n'importe
-/// quel thread ; le cœur, lui, ne bouge pas.
-pub struct Session {
+/// Poignée vers le fil d'émulation. Le cœur, lui, ne bouge pas.
+pub struct Locale {
     /// Enveloppé dans une `Option` pour pouvoir fermer le canal à la
-    /// destruction, ce qui fait sortir le thread de sa boucle.
+    /// destruction, ce qui fait sortir le fil de sa boucle.
     tx: Option<Sender<Request>>,
-    /// Conservé pour attendre le thread : sans cela, le cœur serait déchargé
+    /// Conservé pour attendre le fil : sans cela, le cœur serait déchargé
     /// après le retour de `drop`, et un cœur chargé entre-temps se ferait
     /// déinitialiser sous les pieds.
     thread: Option<thread::JoinHandle<()>>,
-    /// Messages émis par le cœur, en attente de relève par l'interface. C'est
-    /// par là qu'un cœur signale un BIOS manquant ou un contenu douteux.
-    messages: Mutex<Vec<String>>,
 }
 
-/// Au-delà, on jette les plus anciens : un cœur bavard ne doit pas faire enfler
-/// la file indéfiniment si personne ne la relève.
-const MAX_PENDING_MESSAGES: usize = 64;
-
-impl Session {
-    /// Démarre le thread d'émulation. Il vit jusqu'à la destruction de la
-    /// session, cœur compris.
+impl Locale {
+    /// Démarre le fil d'émulation. Il vit jusqu'à la destruction, cœur compris.
     pub fn spawn() -> Self {
         let (tx, rx) = channel::<Request>();
 
         let handle = thread::Builder::new()
             .name("evachi-emulation".into())
             .spawn(move || {
-                // Le cœur naît et meurt sur ce thread, jamais ailleurs.
+                // Le cœur naît et meurt sur ce fil, jamais ailleurs.
                 let mut core: Option<Core> = None;
 
                 while let Ok(request) = rx.recv() {
@@ -119,7 +127,7 @@ impl Session {
                             reply,
                         } => {
                             // Le cœur précédent est détruit d'abord : deux cœurs
-                            // se disputeraient la même variable de thread.
+                            // se disputeraient la même variable de fil.
                             core = None;
 
                             // SAFETY : charger une bibliothèque exécute son code
@@ -145,17 +153,13 @@ impl Session {
                             });
                         }
 
-                        Request::RunFrame { input, reply } => {
+                        Request::RunFrame {
+                            input,
+                            trames,
+                            reply,
+                        } => {
                             let _ = reply.send(match core.as_mut() {
-                                Some(core) => core
-                                    .run_frame(input)
-                                    .map(|frame| FramePayload {
-                                        video: frame.video,
-                                        audio: frame.audio,
-                                        messages: frame.messages,
-                                        shutdown: frame.shutdown,
-                                    })
-                                    .map_err(|error| error.to_string()),
+                                Some(core) => tourner(core, input, trames),
                                 None => Err("aucun cœur chargé".into()),
                             });
                         }
@@ -190,12 +194,11 @@ impl Session {
                     }
                 }
             })
-            .expect("le thread d'émulation n'a pas pu démarrer");
+            .expect("le fil d'émulation n'a pas pu démarrer");
 
         Self {
             tx: Some(tx),
             thread: Some(handle),
-            messages: Mutex::new(Vec::new()),
         }
     }
 
@@ -209,12 +212,12 @@ impl Session {
         let (tx, rx) = channel();
         sender
             .send(build(tx))
-            .map_err(|_| "le thread d'émulation s'est arrêté".to_string())?;
+            .map_err(|_| "le fil d'émulation s'est arrêté".to_string())?;
         rx.recv()
-            .map_err(|_| "le thread d'émulation n'a pas répondu".to_string())?
+            .map_err(|_| "le fil d'émulation n'a pas répondu".to_string())?
     }
 
-    pub fn load_core(
+    fn load_core(
         &self,
         path: &Path,
         system_dir: &Path,
@@ -227,66 +230,46 @@ impl Session {
             reply,
         })
     }
-
-    pub fn load_content(&self, path: &Path) -> Result<AvInfo, String> {
-        self.call(|reply| Request::LoadContent {
-            path: path.to_path_buf(),
-            reply,
-        })
-    }
-
-    pub fn run_frame(&self, input: [i16; JOYPAD_BUTTONS]) -> Result<FramePayload, String> {
-        let mut payload = self.call(|reply| Request::RunFrame { input, reply })?;
-
-        if !payload.messages.is_empty() {
-            if let Ok(mut pending) = self.messages.lock() {
-                pending.append(&mut payload.messages);
-                let excess = pending.len().saturating_sub(MAX_PENDING_MESSAGES);
-                if excess > 0 {
-                    pending.drain(..excess);
-                }
-            }
-        }
-
-        Ok(payload)
-    }
-
-    /// Relève les messages accumulés et vide la file.
-    pub fn take_messages(&self) -> Vec<String> {
-        let mut pending = self
-            .messages
-            .lock()
-            .map(|mut pending| std::mem::take(&mut *pending))
-            .unwrap_or_default();
-
-        // Ce que le cœur a écrit avant de refuser le contenu ne passait par
-        // aucune trame — puisqu'il n'y en a jamais eu — et n'arrivait donc
-        // qu'au jeu suivant, où il n'expliquait plus rien. C'est pourtant le
-        // seul endroit où l'on apprend *pourquoi* un chargement a échoué.
-        pending.extend(super::host::take_core_log());
-        pending
-    }
-
-    pub fn reset(&self) -> Result<(), String> {
-        self.call(|reply| Request::Reset { reply })
-    }
-
-    pub fn save_state(&self) -> Result<Vec<u8>, String> {
-        self.call(|reply| Request::SaveState { reply })
-    }
-
-    pub fn load_state(&self, data: Vec<u8>) -> Result<(), String> {
-        self.call(|reply| Request::LoadState { data, reply })
-    }
-
-    pub fn unload(&self) -> Result<(), String> {
-        self.call(|reply| Request::Unload { reply })
-    }
 }
 
-impl Drop for Session {
+/// Fait tourner le cœur, une fois ou plusieurs, et rassemble le résultat.
+///
+/// Partagé par les deux façons de tenir un cœur : la fenêtre doit obtenir la
+/// même chose de l'une et de l'autre, sans quoi l'un des deux chemins finirait
+/// par diverger sans que rien ne le dise.
+fn tourner(
+    core: &mut Core,
+    input: [i16; JOYPAD_BUTTONS],
+    trames: u32,
+) -> Result<FramePayload, String> {
+    let mut audio: Vec<i16> = Vec::new();
+    let mut messages: Vec<String> = Vec::new();
+    let mut video = None;
+    let mut shutdown = false;
+
+    for _ in 0..trames.max(1) {
+        let frame = core.run_frame(input).map_err(|error| error.to_string())?;
+        // La dernière image *produite*, et non celle de la dernière trame : un
+        // cœur a le droit de redemander la précédente, et cela arrive souvent.
+        if frame.video.is_some() {
+            video = frame.video;
+        }
+        audio.extend_from_slice(&frame.audio);
+        messages.extend(frame.messages);
+        shutdown |= frame.shutdown;
+    }
+
+    Ok(FramePayload {
+        video,
+        audio,
+        messages,
+        shutdown,
+    })
+}
+
+impl Drop for Locale {
     fn drop(&mut self) {
-        // Fermer le canal fait sortir le thread de sa boucle, ce qui détruit le
+        // Fermer le canal fait sortir le fil de sa boucle, ce qui détruit le
         // cœur et appelle `retro_deinit`. On attend ce ménage : sinon il se
         // produirait après le retour de `drop`, et déinitialiserait un cœur
         // chargé entre-temps — les cœurs libretro n'existant qu'en un
@@ -295,5 +278,446 @@ impl Drop for Session {
         if let Some(handle) = self.thread.take() {
             let _ = handle.join();
         }
+    }
+}
+
+// --- Le cœur à côté ---------------------------------------------------------
+
+/// Ce qu'il faut pour relancer un processus de cœur à chaque partie.
+#[cfg(windows)]
+struct Chantier {
+    /// L'exécutable à relancer. Passé plutôt que déduit : dans un programme
+    /// d'épreuve, `current_exe` désigne le programme d'épreuve, pas EvaChi.
+    exe: PathBuf,
+    voisin: Option<super::distant::Distante>,
+    /// Vrai dès qu'un cœur a vécu dans un processus voisin. À partir de là, on
+    /// ne revient plus jamais dans la fenêtre.
+    engage: bool,
+}
+
+// --- La porte commune -------------------------------------------------------
+
+enum Tenant {
+    Local(Locale),
+    #[cfg(windows)]
+    Distant(Chantier),
+}
+
+/// Ce qui tient le cœur, quel que soit l'endroit où il vit.
+pub struct Session {
+    tenant: Mutex<Tenant>,
+    /// Ce que le cœur a dit, en attente de relève par l'interface. C'est par là
+    /// qu'arrive un BIOS manquant ou un contenu douteux.
+    messages: Mutex<Vec<String>>,
+}
+
+/// Au-delà, on jette les plus anciens : un cœur bavard ne doit pas faire enfler
+/// la file indéfiniment si personne ne la relève.
+const MAX_PENDING_MESSAGES: usize = 64;
+
+impl Session {
+    /// Le cœur dans cette fenêtre, sur un fil dédié.
+    pub fn locale() -> Self {
+        Self {
+            tenant: Mutex::new(Tenant::Local(Locale::spawn())),
+            messages: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Le cœur dans un processus voisin, relancé à chaque partie.
+    ///
+    /// Le processus n'est pas lancé tout de suite : il naît au premier cœur
+    /// chargé, et meurt avec lui.
+    #[cfg(windows)]
+    pub fn isolee(exe: PathBuf) -> Self {
+        Self {
+            tenant: Mutex::new(Tenant::Distant(Chantier {
+                exe,
+                voisin: None,
+                engage: false,
+            })),
+            messages: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Ailleurs que sous Windows, il n'y a pas d'ailleurs.
+    #[cfg(not(windows))]
+    pub fn isolee(_exe: PathBuf) -> Self {
+        Self::locale()
+    }
+
+    /// Range ce que le cœur vient de dire.
+    fn retenir(&self, dits: Vec<String>) {
+        if dits.is_empty() {
+            return;
+        }
+        if let Ok(mut file) = self.messages.lock() {
+            file.extend(dits);
+            let trop = file.len().saturating_sub(MAX_PENDING_MESSAGES);
+            if trop > 0 {
+                file.drain(..trop);
+            }
+        }
+    }
+
+    fn tenant(&self) -> std::sync::MutexGuard<'_, Tenant> {
+        self.tenant
+            .lock()
+            .unwrap_or_else(|poison| poison.into_inner())
+    }
+
+    pub fn load_core(
+        &self,
+        path: &Path,
+        system_dir: &Path,
+        save_dir: &Path,
+    ) -> Result<CoreInfo, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.load_core(path, system_dir, save_dir),
+            #[cfg(windows)]
+            Tenant::Distant(chantier) => {
+                let issue = self.ouvrir_a_cote(chantier, path, system_dir, save_dir);
+                match issue {
+                    Ok(info) => Ok(info),
+                    // Aucun cœur n'a encore vécu à côté : le repli est encore
+                    // honnête, et il vaut mieux qu'une application qui refuse
+                    // de jouer.
+                    Err(raison) if !chantier.engage && raison.starts_with("le processus du cœur") => {
+                        eprintln!("[session] {raison} — le cœur restera dans la fenêtre");
+                        let locale = Locale::spawn();
+                        let repli = locale.load_core(path, system_dir, save_dir);
+                        *tenant = Tenant::Local(locale);
+                        repli
+                    }
+                    Err(raison) => Err(raison),
+                }
+            }
+        }
+    }
+
+    /// Ouvre un cœur dans un processus neuf.
+    #[cfg(windows)]
+    fn ouvrir_a_cote(
+        &self,
+        chantier: &mut Chantier,
+        path: &Path,
+        system_dir: &Path,
+        save_dir: &Path,
+    ) -> Result<CoreInfo, String> {
+        use super::distant::{parent, protocole::Demande, Distante};
+
+        // Le précédent s'en va d'abord, et on attend qu'il soit vraiment parti :
+        // deux cœurs qui écrivent en même temps dans le même dossier de
+        // sauvegardes, c'est une carte mémoire abîmée.
+        chantier.voisin = None;
+
+        let mut voisin = Distante::demarrer(&chantier.exe, save_dir)?;
+        let charge = parent::ouverture(path, system_dir, save_dir)?;
+
+        let (dits, brut) = match voisin.demander(Demande::ChargerCoeur, &charge) {
+            Ok(reponse) => reponse,
+            Err(raison) => {
+                // Ce que le cœur a écrit avant de refuser est tout ce qu'on a
+                // pour comprendre pourquoi : on le garde même en échouant.
+                return Err(self.enrichir(&mut voisin, raison));
+            }
+        };
+        self.retenir(dits);
+
+        let info: CoreInfo = serde_json::from_slice(&brut)
+            .map_err(|erreur| format!("identité du cœur illisible : {erreur}"))?;
+
+        chantier.voisin = Some(voisin);
+        chantier.engage = true;
+        Ok(info)
+    }
+
+    /// Ajoute à une erreur ce que Windows dit de la mort du processus.
+    ///
+    /// « Il ne répond plus » et « il a fauté » n'appellent pas le même conseil,
+    /// et l'utilisateur a le droit de savoir lequel des deux il a sous les yeux.
+    #[cfg(windows)]
+    fn enrichir(&self, voisin: &mut super::distant::Distante, raison: String) -> String {
+        match voisin.epitaphe() {
+            Some(mot) if raison.contains(super::distant::TOMBE) => format!("{raison} — {mot}"),
+            _ => raison,
+        }
+    }
+
+    #[cfg(windows)]
+    fn voisin<'a>(&self, tenant: &'a mut Tenant) -> Result<&'a mut super::distant::Distante, String> {
+        match tenant {
+            Tenant::Distant(chantier) => chantier
+                .voisin
+                .as_mut()
+                .ok_or_else(|| "aucun cœur chargé".to_string()),
+            Tenant::Local(_) => Err("aucun cœur chargé".into()),
+        }
+    }
+
+    /// Demande quelque chose au processus voisin, en rangeant ce qu'il dit.
+    #[cfg(windows)]
+    fn demander(
+        &self,
+        tenant: &mut Tenant,
+        demande: super::distant::protocole::Demande,
+        charge: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        let voisin = self.voisin(tenant)?;
+        match voisin.demander(demande, charge) {
+            Ok((dits, utile)) => {
+                self.retenir(dits);
+                Ok(utile)
+            }
+            Err(raison) => {
+                let raison = self.enrichir(voisin, raison);
+                Err(raison)
+            }
+        }
+    }
+
+    pub fn load_content(&self, path: &Path) -> Result<AvInfo, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::LoadContent {
+                path: path.to_path_buf(),
+                reply,
+            }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                let brut = self.demander(
+                    &mut tenant,
+                    Demande::ChargerContenu,
+                    path.to_string_lossy().as_bytes(),
+                )?;
+                serde_json::from_slice(&brut)
+                    .map_err(|erreur| format!("géométrie illisible : {erreur}"))
+            }
+        }
+    }
+
+    /// Fait tourner une trame.
+    pub fn run_frame(&self, input: [i16; JOYPAD_BUTTONS]) -> Result<FramePayload, String> {
+        self.run_frames(input, 1, true)
+    }
+
+    /// Fait tourner `trames` trames d'affilée, et ne rapporte l'image que si la
+    /// fenêtre compte la peindre.
+    ///
+    /// Plusieurs trames d'un coup servent l'avance rapide : à neuf cents pour
+    /// cent, on en exécute neuf pour n'en regarder qu'une, et les demander une
+    /// par une paierait l'aller-retour neuf fois.
+    pub fn run_frames(
+        &self,
+        input: [i16; JOYPAD_BUTTONS],
+        trames: u32,
+        image: bool,
+    ) -> Result<FramePayload, String> {
+        let mut tenant = self.tenant();
+        let payload = match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::RunFrame {
+                input,
+                trames,
+                reply,
+            })?,
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Requete;
+                let requete = Requete {
+                    boutons: input,
+                    trames,
+                    image,
+                };
+                let voisin = self.voisin(&mut tenant)?;
+                match voisin.trame(requete) {
+                    Ok((dits, trame)) => {
+                        self.retenir(dits);
+                        FramePayload {
+                            video: trame.image.map(|image| VideoFrame {
+                                rgba: image.rgba,
+                                width: image.largeur,
+                                height: image.hauteur,
+                            }),
+                            audio: trame.audio,
+                            messages: Vec::new(),
+                            shutdown: trame.arret,
+                        }
+                    }
+                    Err(raison) => return Err(self.enrichir(voisin, raison)),
+                }
+            }
+        };
+
+        self.retenir(payload.messages);
+        Ok(FramePayload {
+            messages: Vec::new(),
+            ..payload
+        })
+    }
+
+    /// Relève les messages accumulés et vide la file.
+    pub fn take_messages(&self) -> Vec<String> {
+        let mut file = self
+            .messages
+            .lock()
+            .map(|mut file| std::mem::take(&mut *file))
+            .unwrap_or_default();
+
+        // Quand le cœur vit ici, le journal est une globale de ce processus : on
+        // le relève sur place. Quand il vit à côté, ces lignes sont déjà venues
+        // avec les réponses — elles voyagent sur toutes, et pas seulement sur
+        // celles des trames, faute de quoi un chargement refusé n'expliquerait
+        // jamais ce qui lui manquait.
+        if matches!(&*self.tenant(), Tenant::Local(_)) {
+            file.extend(super::host::prendre_messages());
+            file.extend(super::host::take_core_log());
+        }
+        file
+    }
+
+    pub fn reset(&self) -> Result<(), String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::Reset { reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                self.demander(&mut tenant, Demande::Reinitialiser, &[])
+                    .map(|_| ())
+            }
+        }
+    }
+
+    pub fn save_state(&self) -> Result<Vec<u8>, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::SaveState { reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                self.demander(&mut tenant, Demande::SauverEtat, &[])
+            }
+        }
+    }
+
+    pub fn load_state(&self, data: Vec<u8>) -> Result<(), String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::LoadState { data, reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                self.demander(&mut tenant, Demande::ReprendreEtat, &data)
+                    .map(|_| ())
+            }
+        }
+    }
+
+    /// Range le cœur. Le processus voisin, lui, s'en va pour de bon.
+    pub fn unload(&self) -> Result<(), String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::Unload { reply }),
+            #[cfg(windows)]
+            Tenant::Distant(chantier) => {
+                // La destruction fait le nécessaire : demander le déchargement,
+                // l'attendre — c'est là que le cœur écrit sa sauvegarde de pile
+                // —, puis s'assurer que le processus est bien parti.
+                match chantier.voisin.take() {
+                    Some(mut voisin) => {
+                        let propre = voisin.congedier();
+                        drop(voisin);
+                        if propre {
+                            Ok(())
+                        } else {
+                            Err("le cœur n'a pas répondu : la sauvegarde de cette partie n'a peut-être pas été écrite".into())
+                        }
+                    }
+                    None => Ok(()),
+                }
+            }
+        }
+    }
+
+    /// Vrai quand le cœur vit dans un processus à côté.
+    pub fn isolee_en_cours(&self) -> bool {
+        !matches!(&*self.tenant(), Tenant::Local(_))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn une_session_locale_se_dit_locale() {
+        let session = Session::locale();
+        assert!(!session.isolee_en_cours());
+    }
+
+    #[test]
+    fn une_session_sans_coeur_refuse_poliment() {
+        let session = Session::locale();
+        let erreur = session
+            .run_frame([0; JOYPAD_BUTTONS])
+            .expect_err("refus attendu");
+        assert!(erreur.contains("aucun cœur"), "{erreur}");
+    }
+
+    #[test]
+    fn les_messages_ne_s_accumulent_pas_sans_fin() {
+        // Un cœur bavard ne doit pas faire enfler la file quand personne ne la
+        // relève : on garde les derniers, qui sont les plus près de l'incident.
+        let session = Session::locale();
+        for rang in 0..MAX_PENDING_MESSAGES * 3 {
+            session.retenir(vec![format!("ligne {rang}")]);
+        }
+        let releve = session.take_messages();
+        assert_eq!(releve.len(), MAX_PENDING_MESSAGES);
+        assert_eq!(releve[MAX_PENDING_MESSAGES - 1], "ligne 191");
+    }
+
+    #[test]
+    fn relever_deux_fois_ne_rend_rien_la_seconde() {
+        let session = Session::locale();
+        session.retenir(vec!["une chose".to_string()]);
+        assert_eq!(session.take_messages().len(), 1);
+        assert!(session.take_messages().is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn une_session_isolee_sans_processus_refuse_poliment() {
+        // Aucun cœur chargé, donc aucun processus : la demande doit être
+        // refusée avec des mots, pas par une attente sans fin.
+        let session = Session::isolee(PathBuf::from("evachi-qui-n-existe-pas.exe"));
+        assert!(session.isolee_en_cours());
+        let erreur = session
+            .run_frame([0; JOYPAD_BUTTONS])
+            .expect_err("refus attendu");
+        assert!(erreur.contains("aucun cœur"), "{erreur}");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn un_executable_introuvable_retombe_dans_la_fenetre() {
+        // Le repli n'est légitime qu'ici : aucun cœur n'a encore vécu à côté.
+        // L'erreur rendue est alors celle du cœur, pas celle du lancement.
+        let session = Session::isolee(PathBuf::from("evachi-qui-n-existe-pas.exe"));
+        let erreur = session
+            .load_core(
+                Path::new("coeur-qui-n-existe-pas.dll"),
+                Path::new("."),
+                Path::new("."),
+            )
+            .expect_err("refus attendu");
+
+        assert!(!session.isolee_en_cours(), "on doit être retombé dans la fenêtre");
+        assert!(
+            erreur.contains("illisible") || erreur.contains("symbole"),
+            "{erreur}"
+        );
     }
 }

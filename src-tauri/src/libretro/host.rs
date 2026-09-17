@@ -39,8 +39,6 @@ pub struct HostState {
     pub geometry: Option<GameGeometry>,
     /// Le cœur a demandé l'arrêt de lui-même.
     pub shutdown: bool,
-    /// Messages que le cœur veut afficher à l'utilisateur.
-    pub messages: Vec<String>,
     /// Options du cœur : valeur courante par clé, gardée en `CString` pour que
     /// le pointeur rendu au cœur reste valide après le retour du rappel.
     pub options: HashMap<String, CString>,
@@ -97,7 +95,6 @@ impl Default for HostState {
             save_dir: CString::default(),
             geometry: None,
             shutdown: false,
-            messages: Vec::new(),
             options: HashMap::new(),
             options_dirty: false,
             rotation: 0,
@@ -410,6 +407,31 @@ extern "C" {
 /// ferait paniquer en pleine partie.
 static CORE_LOG: Mutex<Vec<String>> = Mutex::new(Vec::new());
 
+/// Ce que le cœur demande d'afficher à l'écran, en attente d'être relevé.
+///
+/// Globale et non dans l'état du fil, et pour la même raison encore : un cœur
+/// qui annonce « BIOS manquant » depuis un de ses propres fils écrirait sinon
+/// dans un état hôte tout neuf, que personne ne relit jamais. C'est justement
+/// le message qu'on voulait lire.
+static MESSAGES: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Au-delà, on cesse d'accumuler ce que le cœur demande d'afficher.
+const MESSAGES_MAX: usize = 64;
+
+/// Range un message que le cœur veut faire voir.
+pub fn poser_message(texte: String) {
+    let mut file = MESSAGES.lock().unwrap_or_else(|poison| poison.into_inner());
+    if file.len() < MESSAGES_MAX {
+        file.push(texte);
+    }
+}
+
+/// Relève ces messages et vide la file.
+pub fn prendre_messages() -> Vec<String> {
+    let mut file = MESSAGES.lock().unwrap_or_else(|poison| poison.into_inner());
+    std::mem::take(&mut file)
+}
+
 /// Au-delà, on cesse d'accumuler.
 ///
 /// Un cœur bavard en écrit des milliers par seconde avant qu'on ait relevé quoi
@@ -603,7 +625,7 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
             let text = data.cast::<*const c_char>().read();
             if !text.is_null() {
                 let message = CStr::from_ptr(text).to_string_lossy().into_owned();
-                with_host(|host| host.messages.push(message));
+                poser_message(message);
             }
             true
         }

@@ -322,10 +322,7 @@ impl Core {
                 }
             }
             Err(error) => {
-                with_host(|host| {
-                    host.messages
-                        .push(format!("rendu matériel indisponible : {error}"))
-                });
+                host::poser_message(format!("rendu matériel indisponible : {error}"));
             }
         }
     }
@@ -412,8 +409,8 @@ impl Core {
             messages: {
                 // Ce que le cœur a dit de lui-même vient après ce qu'il a
                 // demandé d'afficher : l'un explique souvent l'autre.
-                let mut dites = std::mem::take(&mut host.messages);
-                dites.extend(super::host::take_core_log());
+                let mut dites = host::prendre_messages();
+                dites.extend(host::take_core_log());
                 dites
             },
             shutdown: host.shutdown,

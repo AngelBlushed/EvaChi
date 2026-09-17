@@ -65,6 +65,24 @@ fn main() {
     // Doit passer avant toute initialisation de Tauri : ce mode ne doit rien
     // afficher, seulement écrire sur la sortie standard.
     let args: Vec<String> = std::env::args().collect();
+
+    // Celui-ci d'abord : c'est le seul qui ne ressorte pas tout de suite, et
+    // c'est celui qu'EvaChi se donne à elle-même à chaque partie.
+    #[cfg(windows)]
+    if let Some(position) = args
+        .iter()
+        .position(|arg| arg == evachi::libretro::distant::DRAPEAU)
+    {
+        let (Some(tuyau), Some(segment)) = (args.get(position + 1), args.get(position + 2)) else {
+            eprintln!(
+                "{} attend un nom de tuyau et un nom de mémoire partagée",
+                evachi::libretro::distant::DRAPEAU
+            );
+            std::process::exit(2);
+        };
+        std::process::exit(evachi::libretro::distant::enfant::servir(tuyau, segment));
+    }
+
     if let Some(position) = args.iter().position(|arg| arg == PROBE_FLAG) {
         let Some(path) = args.get(position + 1) else {
             eprintln!("{PROBE_FLAG} attend un chemin de cœur");
@@ -115,9 +133,23 @@ fn main() {
             // programmes lisent la leur eux-mêmes, et n'en ont parfois aucune.
             commands::configure_pads(&paths);
 
+            // Le cœur vit dans un processus voisin, relancé à chaque partie :
+            // celui qui plante ne fait plus disparaître la fenêtre. On lui passe
+            // le chemin de cet exécutable — c'est lui-même qu'il relancera — au
+            // lieu de le laisser le deviner.
+            let session = match std::env::current_exe() {
+                Ok(exe) => Session::isolee(exe),
+                Err(erreur) => {
+                    commands::write_log(
+                        &paths,
+                        &format!("programme introuvable ({erreur}) : le cœur restera dans la fenêtre"),
+                    );
+                    Session::locale()
+                }
+            };
+
             app.manage(paths);
-            // Le thread d'émulation vit aussi longtemps que l'application.
-            app.manage(std::sync::Arc::new(Session::spawn()));
+            app.manage(std::sync::Arc::new(session));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
