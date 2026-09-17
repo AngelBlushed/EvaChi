@@ -32,20 +32,46 @@ fn dossier(covers: &Path) -> PathBuf {
     covers.join("manuel")
 }
 
-/// Relit la table « chemin du jeu → nom de fichier ».
-fn lire_index(covers: &Path) -> BTreeMap<String, String> {
+/// Relit la table « chemin du jeu → nom de fichier », pour la modifier ensuite.
+///
+/// Un index illisible n'est pas traité comme un index vide : on refuse. La
+/// version précédente repartait de zéro en silence, et la première écriture qui
+/// suivait effaçait toutes les jaquettes posées — les images restaient sur le
+/// disque, mais plus rien ne disait à quel jeu elles appartenaient. C'est
+/// arrivé, et il a fallu reconstruire la table à partir des noms de fichiers.
+///
+/// Un index absent, lui, est bien un index vide : c'est le premier lancement.
+fn lire_index_sur(covers: &Path) -> Result<BTreeMap<String, String>, String> {
     let fichier = dossier(covers).join(INDEX);
-    std::fs::read_to_string(fichier)
-        .ok()
-        .and_then(|texte| serde_json::from_str(&texte).ok())
-        .unwrap_or_default()
+    match std::fs::read_to_string(&fichier) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BTreeMap::new()),
+        Err(error) => Err(format!("index illisible : {error}")),
+        Ok(texte) if texte.trim().is_empty() => Ok(BTreeMap::new()),
+        Ok(texte) => serde_json::from_str(&texte)
+            .map_err(|error| format!("index abîmé, rien n'a été touché : {error}")),
+    }
 }
 
+/// La table telle qu'elle est, pour la lire seulement.
+///
+/// Ici un index abîmé ne doit pas faire échouer l'affichage de la
+/// bibliothèque : on rend ce qu'on peut, c'est-à-dire rien.
+fn lire_index(covers: &Path) -> BTreeMap<String, String> {
+    lire_index_sur(covers).unwrap_or_default()
+}
+
+/// Écrit la table, d'un bloc.
+///
+/// Par un fichier temporaire puis un renommage : une écriture interrompue
+/// laisserait sinon un index tronqué, que la lecture suivante refuserait.
 fn ecrire_index(covers: &Path, table: &BTreeMap<String, String>) -> Result<(), String> {
     let base = dossier(covers);
     std::fs::create_dir_all(&base).map_err(|error| format!("dossier : {error}"))?;
     let texte = serde_json::to_string_pretty(table).map_err(|error| format!("{error}"))?;
-    std::fs::write(base.join(INDEX), texte).map_err(|error| format!("écriture : {error}"))
+
+    let brouillon = base.join(format!("{INDEX}.nouveau"));
+    std::fs::write(&brouillon, texte).map_err(|error| format!("écriture : {error}"))?;
+    std::fs::rename(&brouillon, base.join(INDEX)).map_err(|error| format!("échange : {error}"))
 }
 
 /// Un nom de fichier sûr, tiré du chemin du jeu.
@@ -250,7 +276,7 @@ fn ranger(covers: &Path, rom_path: &str, extension: &str, octets: &[u8]) -> Resu
 
     // L'ancienne image est retirée : garder les deux remplirait le dossier de
     // jaquettes que plus rien ne désigne.
-    let mut table = lire_index(covers);
+    let mut table = lire_index_sur(covers)?;
     if let Some(ancien) = table.insert(rom_path.to_owned(), nom.clone()) {
         if ancien != nom {
             let _ = std::fs::remove_file(base.join(ancien));
@@ -275,7 +301,7 @@ pub fn retirer(covers: &Path, rom_path: &str) -> Result<(), String> {
         )));
     }
 
-    let mut table = lire_index(covers);
+    let mut table = lire_index_sur(covers)?;
     if let Some(nom) = table.remove(rom_path) {
         let _ = std::fs::remove_file(base.join(nom));
         ecrire_index(covers, &table)?;
@@ -358,6 +384,31 @@ mod tests {
             .filter(|e| e.file_name() != INDEX)
             .count();
         assert_eq!(restants, 1);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn un_index_abime_ne_s_efface_pas_tout_seul() {
+        // C'est arrivé : l'index illisible était pris pour un index vide, et la
+        // première écriture qui suivait détachait toutes les jaquettes posées.
+        // Les images restaient sur le disque, orphelines.
+        let base = bac("abime");
+        let image = base.join("boite.png");
+        std::fs::write(&image, PIXEL).expect("image");
+
+        let jeu = "D:/roms/Nes/Zelda.nes";
+        poser(&base, jeu, &image).expect("pose");
+
+        let index = dossier(&base).join(INDEX);
+        std::fs::write(&index, b"{ ceci n'est pas du json").expect("abime");
+
+        let autre = "D:/roms/Nes/Metroid.nes";
+        assert!(poser(&base, autre, &image).is_err(), "la pose doit refuser");
+        assert!(retirer(&base, jeu).is_err(), "le retrait doit refuser");
+
+        // Et l'index abîmé est toujours là : on ne l'a pas remplacé par du vide.
+        let reste = std::fs::read_to_string(&index).expect("relecture");
+        assert!(reste.starts_with("{ ceci"), "l'index a été écrasé : {reste}");
         let _ = std::fs::remove_dir_all(&base);
     }
 
