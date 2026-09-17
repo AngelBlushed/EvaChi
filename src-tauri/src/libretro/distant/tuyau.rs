@@ -190,7 +190,7 @@ impl Canal {
 
             if fini == 0 {
                 if erreur() != ERROR_IO_PENDING {
-                    return Err(format!("{TOMBE} : écriture refusée ({})", erreur()));
+                    return Err(format!("{TOMBE} : le cœur n'a pas pris la demande ({})", erreur()));
                 }
                 combien = attendre(
                     self.tuyau,
@@ -202,7 +202,7 @@ impl Canal {
             }
 
             if combien == 0 {
-                return Err(format!("{TOMBE} : le tuyau s'est fermé pendant l'écriture"));
+                return Err(format!("{TOMBE} : le cœur s'est arrêté pendant qu'on lui parlait"));
             }
             ecrits += combien as usize;
         }
@@ -240,7 +240,7 @@ impl Canal {
 
             if fini == 0 {
                 if erreur() != ERROR_IO_PENDING {
-                    return Err(format!("{TOMBE} : lecture refusée ({})", erreur()));
+                    return Err(format!("{TOMBE} : le cœur n'a pas répondu ({})", erreur()));
                 }
                 combien = attendre(
                     self.tuyau,
@@ -252,7 +252,7 @@ impl Canal {
             }
 
             if combien == 0 {
-                return Err(format!("{TOMBE} : le tuyau s'est fermé"));
+                return Err(format!("{TOMBE} : le cœur s'est arrêté brutalement"));
             }
             lus += combien as usize;
         }
@@ -285,9 +285,9 @@ fn attendre(
     let ennui = match issue {
         WAIT_OBJECT_0 => None,
         // Le second objet, c'est le processus : il s'est terminé.
-        x if x == WAIT_OBJECT_0 + 1 => Some(format!("{TOMBE} : le processus du cœur s'est arrêté")),
+        x if x == WAIT_OBJECT_0 + 1 => Some(format!("{TOMBE} : le cœur s'est arrêté brutalement")),
         WAIT_TIMEOUT => Some(format!(
-            "{TOMBE} : pas de réponse en {} s",
+            "{TOMBE} : pas de réponse en {} s — le cœur ne répond plus",
             echeance.as_secs()
         )),
         _ => Some(format!("{TOMBE} : attente rompue ({})", erreur())),
@@ -308,7 +308,7 @@ fn attendre(
     // SAFETY : l'opération est finie ; on ne fait que relire son compte.
     let bon = unsafe { GetOverlappedResult(tuyau, recouvrement, &mut transferes, 0) };
     if bon == 0 {
-        return Err(format!("{TOMBE} : transfert interrompu ({})", erreur()));
+        return Err(format!("{TOMBE} : le cœur s'est arrêté brutalement ({})", erreur()));
     }
     Ok(transferes)
 }

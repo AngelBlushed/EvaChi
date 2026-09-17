@@ -279,11 +279,16 @@ impl Distante {
 
         let code = fin.code()? as u32;
         Some(match code {
-            0 => "le cœur s'est arrêté de lui-même".into(),
-            CODE_PLANTAGE => "le cœur a fauté".into(),
-            // 0xC0000005 et ses voisins : Windows a tué le processus.
-            autre if autre >= 0xC000_0000 => format!("le cœur a fauté (0x{autre:08x})"),
-            autre => format!("le cœur s'est arrêté (code {autre})"),
+            0 => "il s'est arrêté de lui-même".into(),
+            // Le code que l'enfant se donne quand il a rattrapé sa propre faute.
+            CODE_PLANTAGE => "il a fauté".into(),
+            // Les codes d'exception de Windows. Celui-là, on le nomme : c'est le
+            // plus fréquent de tous, et celui qui a motivé ce chantier.
+            0xC000_0005 => "il a fauté : violation d'accès".into(),
+            autre if (0xC000_0000..0xD000_0000).contains(&autre) => {
+                format!("il a fauté (0x{autre:08x})")
+            }
+            autre => format!("il s'est arrêté (0x{autre:08x})"),
         })
     }
 }

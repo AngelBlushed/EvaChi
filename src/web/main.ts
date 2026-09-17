@@ -1268,13 +1268,15 @@ function montrerIncident(
  * aurait relancé la boucle sur un cœur mort.
  */
 async function signalerArret(raison: string): Promise<void> {
-  const tombe = raison.includes(COEUR_TOMBE);
+  const tombe = raison.startsWith(COEUR_TOMBE);
+  // La marque sert au code, pas à l'utilisateur : elle sort du journal.
+  const dire = tombe ? raison.slice(COEUR_TOMBE.length).replace(/^\s*:\s*/, '') : raison;
   // Relevés avant de ranger : `stopPlaying` efface tout cela.
   const coeur = entry?.id ?? '';
   const nom = entry?.label ?? '';
   const jeu = contentName;
 
-  log(dit('arrêt — {0}', raison), 'err');
+  log(dit('arrêt — {0}', dire), 'err');
   // Ce que le cœur a dit juste avant de tomber explique souvent pourquoi. On le
   // relève tant qu'on sait encore à qui il appartient : `stopPlaying` oublie le
   // cœur, et la relève se taira ensuite.
