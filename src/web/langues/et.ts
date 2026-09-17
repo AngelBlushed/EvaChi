@@ -6,9 +6,8 @@
  * de rang en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const et: readonly string[] = [
-  /* 1 */ "Mängupuldiga",
-  /* 2 */ "A käivita · X lemmik · L1/R1 konsoolid · L2/R2 täht · B tagasi · Start",
+export const et: readonly string[] = [  /* 1 */ "Mängupuldiga",
+  /* 2 */ "A käivita · X lemmik · Y kärbi · L1/R1 konsoolid · L2/R2 täht · B tagasi",
   /* 3 */ "EvaChist",
   /* 4 */ "EvaChist…",
   /* 5 */ "Tulekul: kineskoobifiltrid, pikslivõre, realaotus. Koht on valmis, filtrid jõuavad siia.",
@@ -342,4 +341,14 @@ export const et: readonly string[] = [
   /* 333 */ "Ühelt algustähelt järgmisele",
   /* 334 */ "Animeeritud menüüs viis mängu korraga",
   /* 335 */ "Mängu kiirus",
+  /* 336 */ "Loobu",
+  /* 337 */ "Lohista raami või tõmba nurgast. Nooleklahvid liigutavad seda, Shift kitsendab. Puldil liigutavad suunaklahvid ja päästikud kitsendavad või laiendavad.",
+  /* 338 */ "Kärbi",
+  /* 339 */ "Kärbi kaanepilti",
+  /* 340 */ "Kogu pilt",
+  /* 341 */ "{0} — kaanepilt kärbitud",
+  /* 342 */ "{0} — pole kaanepilti, mida kärpida",
+  /* 343 */ "loetamatu kaanepilt — {0}",
+  /* 344 */ "kärpimine ebaõnnestus — {0}",
+  /* 345 */ "Kärbi kaanepilti…",
 ];

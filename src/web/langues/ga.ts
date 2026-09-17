@@ -7,9 +7,8 @@
  * vérifier à l'œil.
  */
 
-export const ga: readonly string[] = [
-  /* 1 */ "Leis an rialtóir",
-  /* 2 */ "A tosú · X ceanán · L1/R1 consóil · L2/R2 litir · B ar ais · Start",
+export const ga: readonly string[] = [  /* 1 */ "Leis an rialtóir",
+  /* 2 */ "A tosaigh · X ceanán · Y bearr · L1/R1 consóil · L2/R2 litir · B siar",
   /* 3 */ "Maidir le EvaChi",
   /* 4 */ "Maidir leis…",
   /* 5 */ "Le teacht: scagairí feadán cathóideach, greille picteilíní, línte scanta. Tá an áit ullamh, tiocfaidh na scagairí anseo.",
@@ -343,4 +342,14 @@ export const ga: readonly string[] = [
   /* 333 */ "Go dtí an chéad litir eile",
   /* 334 */ "Sa roghchlár beoite, cúig chluiche san am",
   /* 335 */ "Luas an chluiche",
+  /* 336 */ "Cealaigh",
+  /* 337 */ "Tarraing an fráma, nó coirnéal de. Bogann na saigheada é; le Shift, cúngaíonn siad é. Ar an rialtán, bogann na treonna é agus cúngaíonn nó leathnaíonn na truicir é.",
+  /* 338 */ "Bearr",
+  /* 339 */ "Bearr an clúdach",
+  /* 340 */ "An íomhá iomlán",
+  /* 341 */ "{0} — clúdach bearrtha",
+  /* 342 */ "{0} — níl clúdach ann le bearradh",
+  /* 343 */ "clúdach doléite — {0}",
+  /* 344 */ "níorbh fhéidir bearradh — {0}",
+  /* 345 */ "Bearr an clúdach…",
 ];

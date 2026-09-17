@@ -6,9 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const is: readonly string[] = [
-  /* 1 */ "Með leikjastýringu",
-  /* 2 */ "A ræsa · X uppáhald · L1/R1 tölvur · L2/R2 stafur · B til baka · Start",
+export const is: readonly string[] = [  /* 1 */ "Með leikjastýringu",
+  /* 2 */ "A spila · X uppáhald · Y sníða · L1/R1 leikjatölvur · L2/R2 stafur · B til baka",
   /* 3 */ "Um EvaChi",
   /* 4 */ "Um forritið…",
   /* 5 */ "Væntanlegt: túbuskjássíur, dílanet, skannlínur. Plássið er tilbúið, síurnar koma hingað.",
@@ -342,4 +341,14 @@ export const is: readonly string[] = [
   /* 333 */ "Frá einum upphafsstaf til næsta",
   /* 334 */ "Í hreyfivalmyndinni, fimm leikir í einu",
   /* 335 */ "Leikhraði",
+  /* 336 */ "Hætta við",
+  /* 337 */ "Dragðu rammann til, eða gríptu í horn hans. Örvarnar færa hann, með Shift þrengist hann. Á leikjastýringu færa áttirnar hann og gikkirnir þrengja eða víkka.",
+  /* 338 */ "Sníða",
+  /* 339 */ "Sníða kápuna",
+  /* 340 */ "Öll myndin",
+  /* 341 */ "{0} — kápan sniðin",
+  /* 342 */ "{0} — engin kápa til að sníða",
+  /* 343 */ "ólæsileg kápa — {0}",
+  /* 344 */ "tókst ekki að sníða — {0}",
+  /* 345 */ "Sníða kápuna…",
 ];

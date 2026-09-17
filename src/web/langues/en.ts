@@ -7,9 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const en: readonly string[] = [
-  /* 1 */ "On the gamepad",
-  /* 2 */ "A play · X favorite · L1/R1 consoles · L2/R2 letter · B back · Start",
+export const en: readonly string[] = [  /* 1 */ "On the gamepad",
+  /* 2 */ "A play · X favorite · Y crop · L1/R1 consoles · L2/R2 letter · B back",
   /* 3 */ "About EvaChi",
   /* 4 */ "About…",
   /* 5 */ "Coming soon: CRT filters, pixel grid, scanlines. The room is made, the filters will land here.",
@@ -343,4 +342,14 @@ export const en: readonly string[] = [
   /* 333 */ "From one letter to the next",
   /* 334 */ "In the animated menu, five games at a time",
   /* 335 */ "Game speed",
+  /* 336 */ "Cancel",
+  /* 337 */ "Drag the frame, or pull a corner. The arrow keys move it, Shift tightens it. On the controller, the directions move it and the triggers tighten or widen it.",
+  /* 338 */ "Crop",
+  /* 339 */ "Crop the cover",
+  /* 340 */ "Whole image",
+  /* 341 */ "{0} — cover cropped",
+  /* 342 */ "{0} — no cover to crop",
+  /* 343 */ "cover unreadable — {0}",
+  /* 344 */ "crop failed — {0}",
+  /* 345 */ "Crop the cover…",
 ];

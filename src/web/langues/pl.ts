@@ -7,9 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const pl: readonly string[] = [
-  /* 1 */ "Na padzie",
-  /* 2 */ "A uruchom · X ulubione · L1/R1 konsole · L2/R2 litera · B powrót · Start",
+export const pl: readonly string[] = [  /* 1 */ "Na padzie",
+  /* 2 */ "A uruchom · X ulubione · Y przytnij · L1/R1 konsole · L2/R2 litera · B powrót",
   /* 3 */ "O programie EvaChi",
   /* 4 */ "O programie…",
   /* 5 */ "Wkrótce: filtry kineskopowe, siatka maski, linie obrazu. Miejsce jest gotowe, filtry trafią tutaj.",
@@ -343,4 +342,14 @@ export const pl: readonly string[] = [
   /* 333 */ "Od jednej litery do następnej",
   /* 334 */ "W animowanym menu pięć gier naraz",
   /* 335 */ "Prędkość gry",
+  /* 336 */ "Anuluj",
+  /* 337 */ "Przeciągnij ramkę albo pociągnij za róg. Strzałki ją przesuwają, a z Shiftem ją zwężają. Na padzie kierunki przesuwają, a spusty zwężają lub poszerzają.",
+  /* 338 */ "Przytnij",
+  /* 339 */ "Przytnij okładkę",
+  /* 340 */ "Cały obraz",
+  /* 341 */ "{0} — okładka przycięta",
+  /* 342 */ "{0} — brak okładki do przycięcia",
+  /* 343 */ "okładka nie do odczytu — {0}",
+  /* 344 */ "nie udało się przyciąć — {0}",
+  /* 345 */ "Przytnij okładkę…",
 ];

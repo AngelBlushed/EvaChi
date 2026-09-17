@@ -7,9 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const nb: readonly string[] = [
-  /* 1 */ "Med kontroller",
-  /* 2 */ "A start · X favoritt · L1/R1 konsoller · L2/R2 bokstav · B tilbake · Start",
+export const nb: readonly string[] = [  /* 1 */ "Med kontroller",
+  /* 2 */ "A start · X favoritt · Y beskjær · L1/R1 konsoller · L2/R2 bokstav · B tilbake",
   /* 3 */ "Om EvaChi",
   /* 4 */ "Om…",
   /* 5 */ "På vei: filtre for billedrør, pikselrutenett og skannelinjer. Plassen er klar, filtrene lander her.",
@@ -343,4 +342,14 @@ export const nb: readonly string[] = [
   /* 333 */ "Fra én forbokstav til den neste",
   /* 334 */ "I den animerte menyen, fem spill om gangen",
   /* 335 */ "Spillfart",
+  /* 336 */ "Avbryt",
+  /* 337 */ "Dra i rammen, eller trekk i et hjørne. Med piltastene flytter du den, med Shift strammer du den inn. På kontrolleren flytter retningene, og triggerne strammer inn eller utvider.",
+  /* 338 */ "Beskjær",
+  /* 339 */ "Beskjær omslaget",
+  /* 340 */ "Hele bildet",
+  /* 341 */ "{0} — omslaget beskåret",
+  /* 342 */ "{0} — ikke noe omslag å beskjære",
+  /* 343 */ "uleselig omslag — {0}",
+  /* 344 */ "kunne ikke beskjære — {0}",
+  /* 345 */ "Beskjær omslaget…",
 ];

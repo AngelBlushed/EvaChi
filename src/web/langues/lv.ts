@@ -6,9 +6,8 @@
  * de rang en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const lv: readonly string[] = [
-  /* 1 */ "Ar spēļu pulti",
-  /* 2 */ "A palaiž · X favorīts · L1/R1 konsoles · L2/R2 burts · B atpakaļ · Start",
+export const lv: readonly string[] = [  /* 1 */ "Ar spēļu pulti",
+  /* 2 */ "A palaist · X izlase · Y apgriezt · L1/R1 konsoles · L2/R2 burts · B atpakaļ",
   /* 3 */ "Par EvaChi",
   /* 4 */ "Par programmu…",
   /* 5 */ "Drīzumā: kineskopa filtri, pikseļu režģis, rindu līnijas. Vieta ir gatava, filtri parādīsies šeit.",
@@ -342,4 +341,14 @@ export const lv: readonly string[] = [
   /* 333 */ "No viena sākuma burta uz nākamo",
   /* 334 */ "Animētajā izvēlnē piecas spēles uzreiz",
   /* 335 */ "Spēles ātrums",
+  /* 336 */ "Atcelt",
+  /* 337 */ "Velciet rāmi vai pavelciet kādu stūri. Ar bultiņām to pārvieto, ar Shift sašaurina. Ar kontrolieri virzieni to pārvieto, bet mēlītes sašaurina vai paplašina.",
+  /* 338 */ "Apgriezt",
+  /* 339 */ "Apgriezt vāku",
+  /* 340 */ "Viss attēls",
+  /* 341 */ "{0} — vāks apgriezts",
+  /* 342 */ "{0} — nav vāka, ko apgriezt",
+  /* 343 */ "vāks nav nolasāms — {0}",
+  /* 344 */ "apgriezt neizdevās — {0}",
+  /* 345 */ "Apgriezt vāku…",
 ];

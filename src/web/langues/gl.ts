@@ -6,9 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const gl: readonly string[] = [
-  /* 1 */ "Co mando",
-  /* 2 */ "A iniciar · X favorito · L1/R1 consolas · L2/R2 letra · B volver · Start",
+export const gl: readonly string[] = [  /* 1 */ "Co mando",
+  /* 2 */ "A iniciar · X favorito · Y recortar · L1/R1 consolas · L2/R2 letra · B volver",
   /* 3 */ "Sobre EvaChi",
   /* 4 */ "Sobre…",
   /* 5 */ "Aínda por chegar: filtros de tubo de raios catódicos, reixa, varrido. O sitio xa está preparado, os filtros virán aquí.",
@@ -342,4 +341,14 @@ export const gl: readonly string[] = [
   /* 333 */ "Dunha inicial á seguinte",
   /* 334 */ "No menú animado, cinco xogos de cada vez",
   /* 335 */ "Velocidade do xogo",
+  /* 336 */ "Cancelar",
+  /* 337 */ "Arrastra o marco, ou tira dun canto. Coas frechas móvese, e con Maiús estréitase. No mando, as direccións móveno e os gatillos estréitano ou alárgano.",
+  /* 338 */ "Recortar",
+  /* 339 */ "Recortar a portada",
+  /* 340 */ "Imaxe enteira",
+  /* 341 */ "{0} — portada recortada",
+  /* 342 */ "{0} — non hai portada que recortar",
+  /* 343 */ "portada ilexible — {0}",
+  /* 344 */ "non se puido recortar — {0}",
+  /* 345 */ "Recortar a portada…",
 ];

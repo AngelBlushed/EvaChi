@@ -6,9 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const fi: readonly string[] = [
-  /* 1 */ "Ohjaimella",
-  /* 2 */ "A käynnistä · X suosikki · L1/R1 konsolit · L2/R2 kirjain · B takaisin · Start",
+export const fi: readonly string[] = [  /* 1 */ "Ohjaimella",
+  /* 2 */ "A käynnistä · X suosikki · Y rajaa · L1/R1 konsolit · L2/R2 kirjain · B takaisin",
   /* 3 */ "Tietoja EvaChista",
   /* 4 */ "Tietoja…",
   /* 5 */ "Tulossa: kuvaputkisuotimet, pikseliruudukko, juovitus. Paikka on valmis, suotimet saapuvat tänne.",
@@ -342,4 +341,14 @@ export const fi: readonly string[] = [
   /* 333 */ "Alkukirjaimesta seuraavaan",
   /* 334 */ "Animoidussa valikossa viisi peliä kerrallaan",
   /* 335 */ "Pelin nopeus",
+  /* 336 */ "Peruuta",
+  /* 337 */ "Vedä kehystä tai tartu sen kulmaan. Nuolinäppäimet siirtävät sitä, ja Vaihto-näppäimen kanssa ne kaventavat sitä. Ohjaimessa suunnat siirtävät ja liipaisimet kaventavat tai laajentavat.",
+  /* 338 */ "Rajaa",
+  /* 339 */ "Rajaa kansikuva",
+  /* 340 */ "Koko kuva",
+  /* 341 */ "{0} — kansikuva rajattu",
+  /* 342 */ "{0} — ei kansikuvaa rajattavaksi",
+  /* 343 */ "kansikuvaa ei voi lukea — {0}",
+  /* 344 */ "rajaus ei onnistunut — {0}",
+  /* 345 */ "Rajaa kansikuva…",
 ];

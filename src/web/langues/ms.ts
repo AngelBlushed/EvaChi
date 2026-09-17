@@ -6,9 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const ms: readonly string[] = [
-  /* 1 */ "Pada pad kawalan",
-  /* 2 */ "A main · X kegemaran · L1/R1 konsol · L2/R2 huruf · B undur · Start",
+export const ms: readonly string[] = [  /* 1 */ "Pada pad kawalan",
+  /* 2 */ "A main · X kegemaran · Y pangkas · L1/R1 konsol · L2/R2 huruf · B kembali",
   /* 3 */ "Tentang EvaChi",
   /* 4 */ "Tentang…",
   /* 5 */ "Akan datang: penapis tiub sinar katod, kisi piksel, garis imbasan. Tempatnya sudah sedia, penapis akan muncul di sini.",
@@ -342,4 +341,14 @@ export const ms: readonly string[] = [
   /* 333 */ "Dari satu huruf awal ke huruf seterusnya",
   /* 334 */ "Dalam menu animasi, lima permainan serentak",
   /* 335 */ "Kelajuan permainan",
+  /* 336 */ "Batal",
+  /* 337 */ "Seret bingkai itu, atau tarik salah satu bucunya. Anak panah menggerakkannya, Shift pula mengecilkannya. Pada pad kawalan, arah menggerakkannya manakala picu mengecilkan atau membesarkannya.",
+  /* 338 */ "Pangkas",
+  /* 339 */ "Pangkas kulit permainan",
+  /* 340 */ "Ambil semua",
+  /* 341 */ "{0} — kulit dipangkas",
+  /* 342 */ "{0} — tiada kulit untuk dipangkas",
+  /* 343 */ "kulit tidak terbaca — {0}",
+  /* 344 */ "gagal memangkas — {0}",
+  /* 345 */ "Pangkas kulit permainan…",
 ];

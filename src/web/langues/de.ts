@@ -7,9 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const de: readonly string[] = [
-  /* 1 */ "Mit dem Controller",
-  /* 2 */ "A starten · X Favorit · L1/R1 Konsolen · L2/R2 Buchstabe · B zurück · Start",
+export const de: readonly string[] = [  /* 1 */ "Mit dem Controller",
+  /* 2 */ "A starten · X Favorit · Y zuschneiden · L1/R1 Konsolen · L2/R2 Buchstabe · B zurück",
   /* 3 */ "Über EvaChi",
   /* 4 */ "Über…",
   /* 5 */ "Demnächst: Filter für Röhrenbildschirme, Pixelgitter, Zeilenraster. Der Platz ist bereit, hierher kommen die Filter.",
@@ -343,4 +342,14 @@ export const de: readonly string[] = [
   /* 333 */ "Zum nächsten Anfangsbuchstaben",
   /* 334 */ "Im animierten Menü fünf Spiele auf einmal",
   /* 335 */ "Spielgeschwindigkeit",
+  /* 336 */ "Abbrechen",
+  /* 337 */ "Ziehen Sie den Rahmen, oder greifen Sie eine Ecke. Mit den Pfeiltasten verschieben Sie ihn, mit Umschalt wird er enger. Am Controller verschieben die Richtungstasten, und die Trigger machen ihn enger oder weiter.",
+  /* 338 */ "Zuschneiden",
+  /* 339 */ "Cover zuschneiden",
+  /* 340 */ "Ganzes Bild",
+  /* 341 */ "{0} — Cover zugeschnitten",
+  /* 342 */ "{0} — kein Cover zum Zuschneiden",
+  /* 343 */ "Cover nicht lesbar — {0}",
+  /* 344 */ "Zuschneiden nicht möglich — {0}",
+  /* 345 */ "Cover zuschneiden…",
 ];

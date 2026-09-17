@@ -25,6 +25,7 @@ import {
   adoptSystemFolder,
   beginSession,
   clearManualCover,
+  coverImage,
   coverIndex,
   crashReport,
   dismissCrash,
@@ -45,6 +46,7 @@ import {
   setCoreUsable,
   saveShot,
   saveStateSlot,
+  setCroppedCover,
   setManualCover,
   note,
   takeMessages,
@@ -113,6 +115,8 @@ import {
 import type { AllOverrides } from './bindings.ts';
 import { chooseCover, coverUrl, index as indexCovers, thumbnailFolders } from './covers.ts';
 import type { Candidate } from './covers.ts';
+import { TOUT, change, deplacer, etirer, tirer, zoomer } from './recadre.ts';
+import type { Cadre, Coin } from './recadre.ts';
 import {
   Held,
   cranSuivant,
@@ -232,6 +236,7 @@ const dialogs = {
   gallery: $<HTMLDialogElement>('gallery-dialog'),
   states: $<HTMLDialogElement>('states-dialog'),
   crash: $<HTMLDialogElement>('crash-dialog'),
+  crop: $<HTMLDialogElement>('crop-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -576,6 +581,7 @@ function ouvrirContextuel(event: MouseEvent, item: Playable): void {
       () => basculerFavori(item.rom.path),
     ],
     ['▶', t('Lancer'), () => void jouerItem(item)],
+    ['⛶', t('Recadrer la jaquette…'), () => void ouvrirRecadrage(item)],
     [
       '🖼',
       posee ? t('Changer la jaquette…') : t('Choisir une jaquette…'),
@@ -638,6 +644,214 @@ async function enleverJaquette(item: Playable): Promise<void> {
     log(`jaquette — ${reason(error)}`, 'err');
   }
 }
+
+// --- Recadrage d'une jaquette -----------------------------------------------
+
+const recadreBoite = $<HTMLElement>('recadre');
+const recadreImage = $<HTMLImageElement>('recadre-image');
+const recadreCadre = $<HTMLElement>('recadre-cadre');
+
+/** Le jeu dont on recadre la jaquette, et le cadre en cours. */
+let recadreJeu: Playable | null = null;
+let cadre: Cadre = TOUT;
+
+/**
+ * L'adresse de la jaquette d'un jeu, telle qu'on la montrerait.
+ *
+ * La posée d'abord : elle est déjà entre nos mains. Sinon celle du serveur de
+ * vignettes, qu'on retrouve par le même chemin que la bibliothèque.
+ */
+async function adresseJaquette(item: Playable): Promise<string | null> {
+  const posee = jaquettesPosees[item.rom.path];
+  if (posee) return posee;
+  try {
+    const trouve = chooseCover(await inventaire(item.rom.folder), item.rom.name);
+    return trouve ? coverUrl(trouve.folder, trouve.name, trouve.kind) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ouvre le recadrage sur la jaquette d'un jeu.
+ *
+ * Une image du serveur est rapportée par le code natif plutôt que prise telle
+ * qu'elle s'affiche : redessinée dans un canevas, elle le souille, et l'export
+ * échoue au moment d'enregistrer. Une jaquette posée à la main est déjà une
+ * adresse `data:`, et n'a pas ce détour à faire.
+ */
+async function ouvrirRecadrage(item: Playable): Promise<void> {
+  const adresse = await adresseJaquette(item);
+  if (!adresse) {
+    log(dit('{0} — pas de jaquette à recadrer', item.rom.name), 'err');
+    return;
+  }
+
+  let source = adresse;
+  if (!adresse.startsWith('data:')) {
+    try {
+      source = await coverImage(adresse);
+    } catch (error) {
+      log(dit('jaquette illisible — {0}', reason(error)), 'err');
+      return;
+    }
+  }
+
+  recadreJeu = item;
+  cadre = TOUT;
+  recadreImage.src = source;
+  if (!recadreImage.complete) {
+    await new Promise((fini) => {
+      recadreImage.addEventListener('load', fini, { once: true });
+      recadreImage.addEventListener('error', fini, { once: true });
+    });
+  }
+
+  openDialog(dialogs.crop);
+  placerCadre();
+  recadreBoite.focus();
+}
+
+/** Pose le cadre sur l'image, là où l'image est réellement dessinée. */
+function placerCadre(): void {
+  const image = recadreImage.getBoundingClientRect();
+  const hote = recadreBoite.getBoundingClientRect();
+  if (image.width === 0) return;
+
+  recadreCadre.style.left = `${image.left - hote.left + cadre.x * image.width}px`;
+  recadreCadre.style.top = `${image.top - hote.top + cadre.y * image.height}px`;
+  recadreCadre.style.width = `${cadre.w * image.width}px`;
+  recadreCadre.style.height = `${cadre.h * image.height}px`;
+}
+
+/**
+ * Pose un nouveau cadre, avec un cran si le geste l'a vraiment déplacé.
+ *
+ * Un tic par pixel parcouru ferait une mitraillette à la souris : on ne le fait
+ * entendre qu'au centième d'image franchi, ce qui donne au geste le grain d'un
+ * cran qu'on sent passer.
+ */
+function poserCadre(neuf: Cadre): void {
+  const bouge = change(cadre, neuf);
+  cadre = neuf;
+  placerCadre();
+  if (bouge && sonsVoulus()) ticDeplacement();
+}
+
+/** Où se trouve un point de l'écran, en fraction de l'image. */
+function surImage(x: number, y: number): { x: number; y: number } {
+  const image = recadreImage.getBoundingClientRect();
+  return { x: (x - image.left) / image.width, y: (y - image.top) / image.height };
+}
+
+recadreBoite.addEventListener('pointerdown', (event) => {
+  const image = recadreImage.getBoundingClientRect();
+  if (image.width === 0) return;
+  event.preventDefault();
+  recadreBoite.focus();
+
+  const coin = (event.target as HTMLElement).dataset?.coin as Coin | undefined;
+  const depart = surImage(event.clientX, event.clientY);
+  const origine = cadre;
+
+  const bouger = (suite: PointerEvent) => {
+    const ici = surImage(suite.clientX, suite.clientY);
+    poserCadre(
+      coin
+        ? tirer(origine, coin, ici.x, ici.y)
+        : deplacer(origine, ici.x - depart.x, ici.y - depart.y),
+    );
+  };
+
+  const lacher = () => {
+    window.removeEventListener('pointermove', bouger);
+    window.removeEventListener('pointerup', lacher);
+  };
+
+  window.addEventListener('pointermove', bouger);
+  window.addEventListener('pointerup', lacher);
+});
+
+/** Le pas des flèches : fin, mais qui se voit. */
+const PAS_CADRE = 0.01;
+
+recadreBoite.addEventListener('keydown', (event) => {
+  const sens: Record<string, [number, number]> = {
+    ArrowLeft: [-1, 0],
+    ArrowRight: [1, 0],
+    ArrowUp: [0, -1],
+    ArrowDown: [0, 1],
+  };
+  const pousse = sens[event.key];
+  if (!pousse) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const [dx, dy] = pousse;
+  // Avec Maj, les flèches ne déplacent plus mais resserrent : gauche et droite
+  // sur la largeur, haut et bas sur la hauteur.
+  poserCadre(
+    event.shiftKey
+      ? etirer(cadre, dx * PAS_CADRE * 2, dy * PAS_CADRE * 2)
+      : deplacer(cadre, dx * PAS_CADRE, dy * PAS_CADRE),
+  );
+});
+
+$('recadre-tout').addEventListener('click', () => {
+  poserCadre(TOUT);
+  recadreBoite.focus();
+});
+
+/**
+ * Découpe l'image et l'enregistre comme jaquette du jeu.
+ *
+ * Découpée à la taille d'origine et non à celle de l'aperçu : on garde tout le
+ * détail de l'image, quelle que soit la fenêtre où on l'a choisie.
+ */
+async function appliquerRecadrage(): Promise<void> {
+  const item = recadreJeu;
+  if (!item) return;
+
+  const largeur = Math.max(1, Math.round(recadreImage.naturalWidth * cadre.w));
+  const hauteur = Math.max(1, Math.round(recadreImage.naturalHeight * cadre.h));
+
+  const canevas = document.createElement('canvas');
+  canevas.width = largeur;
+  canevas.height = hauteur;
+  const pinceau = canevas.getContext('2d');
+  if (!pinceau) return;
+
+  pinceau.drawImage(
+    recadreImage,
+    cadre.x * recadreImage.naturalWidth,
+    cadre.y * recadreImage.naturalHeight,
+    cadre.w * recadreImage.naturalWidth,
+    cadre.h * recadreImage.naturalHeight,
+    0,
+    0,
+    largeur,
+    hauteur,
+  );
+
+  try {
+    const adresse = await setCroppedCover(item.rom.path, canevas.toDataURL('image/png'));
+    jaquettesPosees = { ...jaquettesPosees, [item.rom.path]: adresse };
+    if (sonsVoulus()) ticValidation();
+    dialogs.crop.close();
+    renderGames();
+    log(dit('{0} — jaquette recadrée', item.rom.name), 'ok');
+  } catch (error) {
+    log(dit('recadrage impossible — {0}', reason(error)), 'err');
+  }
+}
+
+$('recadre-poser').addEventListener('click', () => void appliquerRecadrage());
+
+// La fenêtre peut changer de taille pendant qu'on recadre : le cadre est tenu
+// en fractions de l'image, mais sa place à l'écran, elle, est en pixels.
+window.addEventListener('resize', () => {
+  if (dialogs.crop.open) placerCadre();
+});
 
 // --- Captures d'écran -------------------------------------------------------
 
@@ -2217,7 +2431,11 @@ const boutons = {
   start: new Held(1000, 1000),
   retour: new Held(1000, 1000),
   favori: new Held(1000, 1000),
+  recadre: new Held(1000, 1000),
   capture: new Held(1200, 1200),
+  // Dans le recadrage, les gâchettes se tiennent pour resserrer d'un trait.
+  serrer: new Held(320, 90),
+  elargir: new Held(320, 90),
   // Les gâchettes hautes se tiennent pour traverser vite : elles répètent.
   lettreAvant: new Held(380, 200),
   lettreArriere: new Held(380, 200),
@@ -2327,6 +2545,12 @@ function naviguerMenu(): void {
   }
 
   const fenetre = document.querySelector<HTMLDialogElement>('dialog[open]');
+  if (fenetre === dialogs.crop) {
+    // Le recadrage ne se parcourt pas comme une fenêtre de réglages : les
+    // directions n'y changent pas de champ, elles déplacent le cadre.
+    conduireRecadrage({ pas, a, b }, appuye, maintenant, tic);
+    return;
+  }
   if (fenetre) {
     conduireFenetre(fenetre, { pas, a, b }, tic);
     return;
@@ -2384,6 +2608,53 @@ function naviguerMenu(): void {
       );
     }
   }
+
+  // Y ouvre le recadrage de la jaquette visée — le geste que la souris fait
+  // d'un clic droit, et le menu animé d'un clic sur la grande image.
+  if (boutons.recadre.update(appuye(BOUTON.y), maintenant).pressed) {
+    const item = jeuVise();
+    if (item) {
+      tic();
+      void ouvrirRecadrage(item);
+    }
+  }
+}
+
+/**
+ * Conduit le recadrage à la manette.
+ *
+ * Les directions déplacent le cadre, les gâchettes basses le resserrent ou
+ * l'élargissent, A l'applique et B renonce. Les directions ne changent pas de
+ * bouton comme ailleurs : dans cette fenêtre il n'y a qu'une chose à faire, et
+ * c'est déplacer le cadre.
+ */
+function conduireRecadrage(
+  entree: { pas: Direction[]; a: boolean; b: boolean },
+  appuye: (index: number) => boolean,
+  maintenant: number,
+  tic: (lance?: boolean) => void,
+): void {
+  if (entree.b) {
+    tic();
+    dialogs.crop.close();
+    return;
+  }
+  if (entree.a) {
+    tic(true);
+    void appliquerRecadrage();
+    return;
+  }
+
+  for (const sens of entree.pas) {
+    const dx = sens === 'droite' ? 1 : sens === 'gauche' ? -1 : 0;
+    const dy = sens === 'bas' ? 1 : sens === 'haut' ? -1 : 0;
+    poserCadre(deplacer(cadre, dx * PAS_CADRE * 2, dy * PAS_CADRE * 2));
+  }
+
+  const serrer = boutons.serrer.update(appuye(6), maintenant);
+  const elargir = boutons.elargir.update(appuye(7), maintenant);
+  if (serrer.pressed || serrer.repeat) poserCadre(zoomer(cadre, 0.96));
+  if (elargir.pressed || elargir.repeat) poserCadre(zoomer(cadre, 1 / 0.96));
 }
 
 // --- Barre de menus à la manette --------------------------------------------
@@ -3106,6 +3377,15 @@ function poserAffiche(item: Playable | undefined): void {
     }
   }, 140);
 }
+
+// Un clic sur la grande jaquette ouvre son recadrage : c'est là qu'on voit
+// qu'elle est mal cadrée, et c'est donc là qu'on veut pouvoir la reprendre.
+// La galerie est exclue : ce qu'on y montre est une capture, pas une jaquette.
+xmbAfficheImage.addEventListener('click', () => {
+  if (voletsXmb[colonneXmb]?.key === GALERIE) return;
+  const item = voletsXmb[colonneXmb]?.games[entreeXmb];
+  if (item) void ouvrirRecadrage(item);
+});
 
 xmbAfficheImage.addEventListener('load', () => {
   xmbAfficheImage.classList.add('vue');

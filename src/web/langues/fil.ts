@@ -6,9 +6,8 @@
  * sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const fil: readonly string[] = [
-  /* 1 */ "Sa controller",
-  /* 2 */ "A simulan · X paborito · L1/R1 console · L2/R2 titik · B balik · Start",
+export const fil: readonly string[] = [  /* 1 */ "Sa controller",
+  /* 2 */ "A simulan · X paborito · Y i-crop · L1/R1 konsola · L2/R2 letra · B balik",
   /* 3 */ "Tungkol sa EvaChi",
   /* 4 */ "Tungkol dito…",
   /* 5 */ "Paparating: mga filter na CRT, grid, at scanline. Handa na ang puwang, dito lilitaw ang mga filter.",
@@ -342,4 +341,14 @@ export const fil: readonly string[] = [
   /* 333 */ "Sa susunod na unang titik",
   /* 334 */ "Sa animadong menu, lima-limang laro",
   /* 335 */ "Bilis ng laro",
+  /* 336 */ "Kanselahin",
+  /* 337 */ "Hilahin ang kuwadro, o ang isang sulok nito. Inililipat ito ng mga arrow key, at pinaliliit kapag may Shift. Sa controller, naglilipat ang mga direksyon at nagpapaliit o nagpapalaki ang mga trigger.",
+  /* 338 */ "I-crop",
+  /* 339 */ "I-crop ang cover",
+  /* 340 */ "Buong larawan",
+  /* 341 */ "{0} — na-crop ang cover",
+  /* 342 */ "{0} — walang cover na i-crop",
+  /* 343 */ "hindi mabasa ang cover — {0}",
+  /* 344 */ "hindi ma-crop — {0}",
+  /* 345 */ "I-crop ang cover…",
 ];

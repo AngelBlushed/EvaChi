@@ -9,9 +9,8 @@
  * « 3 oyunlar » : les six catégories de pluriel portent donc la même forme.
  */
 
-export const tr: readonly string[] = [
-  /* 1 */ "Kumandayla",
-  /* 2 */ "A başlat · X favori · L1/R1 konsollar · L2/R2 harf · B geri · Start",
+export const tr: readonly string[] = [  /* 1 */ "Kumandayla",
+  /* 2 */ "A başlat · X favori · Y kırp · L1/R1 konsollar · L2/R2 harf · B geri",
   /* 3 */ "EvaChi hakkında",
   /* 4 */ "Hakkında…",
   /* 5 */ "Yakında: tüplü ekran filtreleri, piksel ızgarası, tarama çizgileri. Yer hazır, filtreler buraya gelecek.",
@@ -345,4 +344,14 @@ export const tr: readonly string[] = [
   /* 333 */ "Bir baş harften diğerine",
   /* 334 */ "Hareketli menüde bir seferde beş oyun",
   /* 335 */ "Oyun hızı",
+  /* 336 */ "Vazgeç",
+  /* 337 */ "Çerçeveyi sürükleyin ya da bir köşesinden çekin. Ok tuşları çerçeveyi kaydırır, Shift ile birlikte daraltır. Kumandada yönler kaydırır, tetikler daraltır ya da genişletir.",
+  /* 338 */ "Kırp",
+  /* 339 */ "Kapağı kırp",
+  /* 340 */ "Tümünü al",
+  /* 341 */ "{0} — kapak kırpıldı",
+  /* 342 */ "{0} — kırpılacak kapak yok",
+  /* 343 */ "kapak okunamadı — {0}",
+  /* 344 */ "kırpma yapılamadı — {0}",
+  /* 345 */ "Kapağı kırp…",
 ];

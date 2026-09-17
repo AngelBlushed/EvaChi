@@ -16,6 +16,58 @@ use std::path::Path;
 /// Le plus gros — la NES et ses treize mille jeux — tient sous deux mégaoctets.
 const MAX_INDEX: u64 = 8 * 1024 * 1024;
 
+/// Taille au-delà de laquelle on refuse une jaquette.
+///
+/// Une image de boîte fait quelques centaines de kilooctets. Le plafond est
+/// celui des jaquettes posées à la main, pour qu'une image acceptée ici ne soit
+/// pas refusée à l'enregistrement.
+const MAX_IMAGE: u64 = 8 * 1024 * 1024;
+
+/// Le seul serveur dont on accepte de rapporter une image.
+const SERVEUR: &str = "https://thumbnails.libretro.com/";
+
+/// Rapporte une jaquette du serveur, sous forme d'adresse `data:`.
+///
+/// La fenêtre affiche très bien l'image elle-même — une balise `img` n'est pas
+/// soumise à la règle d'origine. Mais la redessiner dans un canevas pour la
+/// recadrer souille celui-ci, et l'export échoue. On repasse donc par ici, où
+/// la règle d'origine n'existe pas.
+///
+/// L'adresse est vérifiée : ce serveur-là et pas un autre. Sans quoi la fenêtre
+/// disposerait, par cette porte, d'un moyen d'aller lire n'importe où sur le
+/// réseau depuis la machine.
+pub fn image(url: &str) -> Result<String, String> {
+    use std::io::Read;
+
+    if !url.starts_with(SERVEUR) {
+        return Err(format!("adresse hors du serveur de vignettes : {url}"));
+    }
+
+    let mut octets = Vec::new();
+    ureq::get(url)
+        .set("User-Agent", "EvaChi")
+        .call()
+        .map_err(|error| format!("{url} : {error}"))?
+        .into_reader()
+        .take(MAX_IMAGE)
+        .read_to_end(&mut octets)
+        .map_err(|error| format!("{url} : {error}"))?;
+
+    if octets.is_empty() {
+        return Err(format!("{url} : image vide"));
+    }
+
+    let type_mime = if url.to_ascii_lowercase().ends_with(".jpg") {
+        "image/jpeg"
+    } else {
+        "image/png"
+    };
+    Ok(format!(
+        "data:{type_mime};base64,{}",
+        crate::b64::encode(&octets)
+    ))
+}
+
 /// Décode les échappements `%xx` d'une adresse.
 ///
 /// Les noms de fichiers portent des espaces, des apostrophes et des virgules,

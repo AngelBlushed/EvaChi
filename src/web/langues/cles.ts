@@ -22,7 +22,7 @@
 
 export const CLES: readonly string[] = [
   "À la manette",
-  "A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start",
+  "A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour",
   "À propos d'EvaChi",
   "À propos…",
   "À venir : filtres de tube cathodique, quadrillage, balayage. La place est prête, les filtres arriveront ici.",
@@ -356,6 +356,16 @@ export const CLES: readonly string[] = [
   "D'une initiale à la suivante",
   "Dans le menu animé, cinq jeux à la fois",
   "Vitesse du jeu",
+  "Annuler",
+  "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on le resserre. À la manette, les directions déplacent et les gâchettes resserrent ou élargissent.",
+  "Recadrer",
+  "Recadrer la jaquette",
+  "Tout prendre",
+  "{0} — jaquette recadrée",
+  "{0} — pas de jaquette à recadrer",
+  "jaquette illisible — {0}",
+  "recadrage impossible — {0}",
+  "Recadrer la jaquette…",
 ];
 
 /**

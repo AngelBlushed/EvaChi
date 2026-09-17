@@ -160,11 +160,30 @@ pub fn poser(covers: &Path, rom_path: &str, image: &Path) -> Result<String, Stri
         return Err("image trop lourde (plus de 8 Mo)".into());
     }
 
+    let octets = std::fs::read(image).map_err(|error| format!("image illisible : {error}"))?;
+    ranger(covers, rom_path, &extension, &octets)
+}
+
+/// Enregistre une image qu'on a déjà en main, plutôt qu'un fichier à recopier.
+///
+/// C'est par là que passe le recadrage : la fenêtre a redessiné la jaquette
+/// dans un canevas et n'en rend qu'une adresse `data:`. Écrire d'abord un
+/// fichier temporaire pour le recopier aussitôt ne servirait à rien.
+pub fn poser_donnees(covers: &Path, rom_path: &str, adresse: &str) -> Result<String, String> {
+    let octets = crate::b64::depuis_data(adresse, MAX_IMAGE as usize)?;
+    if octets.is_empty() {
+        return Err("image vide".into());
+    }
+    ranger(covers, rom_path, "png", &octets)
+}
+
+/// Écrit l'image, la rattache au jeu, et rend l'adresse à afficher.
+fn ranger(covers: &Path, rom_path: &str, extension: &str, octets: &[u8]) -> Result<String, String> {
     let base = dossier(covers);
     std::fs::create_dir_all(&base).map_err(|error| format!("dossier : {error}"))?;
 
-    let nom = nom_de_fichier(rom_path, &extension);
-    std::fs::copy(image, base.join(&nom)).map_err(|error| format!("copie : {error}"))?;
+    let nom = nom_de_fichier(rom_path, extension);
+    std::fs::write(base.join(&nom), octets).map_err(|error| format!("écriture : {error}"))?;
 
     // L'ancienne image est retirée : garder les deux remplirait le dossier de
     // jaquettes que plus rien ne désigne.
@@ -242,6 +261,38 @@ mod tests {
         assert_eq!(table.get(jeu), Some(&adresse));
 
         retirer(&base, jeu).expect("retrait");
+        assert!(toutes(&base).is_empty());
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn pose_une_jaquette_recadree_sans_passer_par_un_fichier() {
+        // Le recadrage rend une adresse `data:` : elle doit se ranger comme une
+        // image désignée au sélecteur, et remplacer celle qui était là.
+        let base = bac("recadre");
+        let jeu = "D:/roms/Nes/Zelda.nes";
+
+        let adresse = format!("data:image/png;base64,{}", crate::b64::encode(PIXEL));
+        let rendue = poser_donnees(&base, jeu, &adresse).expect("pose");
+        assert!(rendue.starts_with("data:image/png;base64,"));
+        assert_eq!(toutes(&base).get(jeu), Some(&rendue));
+
+        let restants = std::fs::read_dir(dossier(&base))
+            .expect("lecture")
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name() != INDEX)
+            .count();
+        assert_eq!(restants, 1);
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn refuse_une_image_vide_ou_sans_en_tete() {
+        let base = bac("vide");
+        let jeu = "D:/roms/Nes/Zelda.nes";
+
+        assert!(poser_donnees(&base, jeu, "data:image/png;base64,").is_err());
+        assert!(poser_donnees(&base, jeu, "pas une adresse").is_err());
         assert!(toutes(&base).is_empty());
         let _ = std::fs::remove_dir_all(&base);
     }

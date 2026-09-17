@@ -6,9 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const vi: readonly string[] = [
-  /* 1 */ "Trên tay cầm",
-  /* 2 */ "A chơi · X yêu thích · L1/R1 hệ máy · L2/R2 chữ cái · B quay lại · Start",
+export const vi: readonly string[] = [  /* 1 */ "Trên tay cầm",
+  /* 2 */ "A chạy · X yêu thích · Y cắt ảnh · L1/R1 máy · L2/R2 chữ cái · B quay lại",
   /* 3 */ "Giới thiệu về EvaChi",
   /* 4 */ "Giới thiệu…",
   /* 5 */ "Sắp có: bộ lọc màn hình tia âm cực, lưới điểm ảnh, vạch quét. Chỗ đã dọn sẵn, các bộ lọc sẽ đến đây.",
@@ -342,4 +341,14 @@ export const vi: readonly string[] = [
   /* 333 */ "Từ chữ cái đầu này sang chữ kế tiếp",
   /* 334 */ "Trong menu động, mỗi lần năm game",
   /* 335 */ "Tốc độ game",
+  /* 336 */ "Hủy",
+  /* 337 */ "Kéo cả khung, hoặc kéo một góc. Phím mũi tên dời khung, giữ thêm Shift thì thu hẹp. Trên tay cầm, các hướng dời khung, còn nút cò thu hẹp hoặc mở rộng.",
+  /* 338 */ "Cắt ảnh",
+  /* 339 */ "Cắt lại ảnh bìa",
+  /* 340 */ "Lấy cả ảnh",
+  /* 341 */ "{0} — đã cắt lại ảnh bìa",
+  /* 342 */ "{0} — không có ảnh bìa để cắt",
+  /* 343 */ "không đọc được ảnh bìa — {0}",
+  /* 344 */ "không cắt được — {0}",
+  /* 345 */ "Cắt lại ảnh bìa…",
 ];

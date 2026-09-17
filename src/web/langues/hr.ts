@@ -7,9 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const hr: readonly string[] = [
-  /* 1 */ "Na kontroleru",
-  /* 2 */ "A pokreni · X favorit · L1/R1 konzole · L2/R2 slovo · B natrag · Start",
+export const hr: readonly string[] = [  /* 1 */ "Na kontroleru",
+  /* 2 */ "A pokreni · X favorit · Y obreži · L1/R1 konzole · L2/R2 slovo · B natrag",
   /* 3 */ "O EvaChi",
   /* 4 */ "O programu…",
   /* 5 */ "Uskoro: filtri katodne cijevi, rešetka, crte skeniranja. Mjesto je spremno, filtri stižu ovamo.",
@@ -343,4 +342,14 @@ export const hr: readonly string[] = [
   /* 333 */ "Na sljedeće početno slovo",
   /* 334 */ "U animiranom izborniku, pet igara odjednom",
   /* 335 */ "Brzina igre",
+  /* 336 */ "Odustani",
+  /* 337 */ "Povucite okvir ili uhvatite njegov kut. Strelice ga pomiču, a uz Shift ga sužavaju. Na upravljaču smjerovi pomiču, a okidači sužavaju ili šire okvir.",
+  /* 338 */ "Obreži",
+  /* 339 */ "Obreži omot",
+  /* 340 */ "Cijela slika",
+  /* 341 */ "{0} — omot obrezan",
+  /* 342 */ "{0} — nema omota za obrezivanje",
+  /* 343 */ "omot nečitljiv — {0}",
+  /* 344 */ "obrezivanje nije uspjelo — {0}",
+  /* 345 */ "Obreži omot…",
 ];

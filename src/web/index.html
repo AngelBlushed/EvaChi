@@ -1086,6 +1086,58 @@
       #xmb-entrees,
       .xmb-touches { unicode-bidi: plaintext; }
 
+      /* --- Recadrage d'une jaquette --- */
+
+      /* Sobre à dessein : l'image en grand, ce qu'on garde en clair, le reste
+         assombri. Rien d'autre à regarder que le cadre qu'on déplace. */
+      .recadre {
+        position: relative;
+        display: grid;
+        place-items: center;
+        width: 100%;
+        max-height: 56vh;
+        background: var(--bg);
+        border: 1px solid var(--edge);
+        border-radius: 6px;
+        overflow: hidden;
+        touch-action: none;
+        user-select: none;
+      }
+      .recadre img {
+        display: block;
+        max-width: 100%;
+        max-height: 56vh;
+        object-fit: contain;
+      }
+      /* L'ombre portée assombrit tout l'extérieur d'un seul trait, sans
+         quatre voiles à placer et à tenir d'accord entre eux. */
+      .recadre .cadre {
+        position: absolute;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.58);
+        outline: 1px solid rgba(255, 255, 255, 0.9);
+        cursor: move;
+      }
+      .recadre .cadre i {
+        position: absolute;
+        width: 9px;
+        height: 9px;
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.9);
+      }
+      .recadre .cadre i[data-coin='hg'] { top: -5px; left: -5px; cursor: nwse-resize; }
+      .recadre .cadre i[data-coin='hd'] { top: -5px; right: -5px; cursor: nesw-resize; }
+      .recadre .cadre i[data-coin='bg'] { bottom: -5px; left: -5px; cursor: nesw-resize; }
+      .recadre .cadre i[data-coin='bd'] { bottom: -5px; right: -5px; cursor: nwse-resize; }
+      /* Le cadre se pilote aussi au clavier : il lui faut donc se voir quand il
+         a la main, sans pour autant se couvrir d'un halo qui masquerait
+         l'image. */
+      .recadre:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+      .recadre:focus-visible .cadre { outline-color: var(--accent); }
+      #crop-dialog .dialog-body { display: grid; gap: 10px; }
+      /* La grande jaquette du menu animé s'ouvre au clic sur son recadrage :
+         le curseur doit le dire, sinon personne ne l'essaiera. */
+      #xmb-affiche-image.vue { cursor: pointer; }
+
       /* Tant qu'on n'a rien rangé, cette ligne n'existe pas. */
       #bios-adopted:empty { display: none; }
       /* Un fichier obligatoire qui manque est la seule chose vraiment rouge de
@@ -1380,7 +1432,7 @@
             <div class="lettre" id="xmb-lettre" hidden></div>
             <div class="xmb-pied">
               <span id="xmb-pied"></span>
-              <span class="xmb-touches">A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start</span>
+              <span class="xmb-touches">A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour</span>
             </div>
           </div>
 
@@ -1764,6 +1816,32 @@
       </div>
     </dialog>
 
+    <dialog id="crop-dialog">
+      <h2>Recadrer la jaquette</h2>
+      <div class="dialog-body">
+        <!-- `tabindex` : la zone se pilote aux flèches, il lui faut donc
+             pouvoir prendre la main comme un champ ordinaire. -->
+        <div class="recadre" id="recadre" tabindex="0">
+          <img id="recadre-image" alt="" />
+          <div class="cadre" id="recadre-cadre">
+            <i data-coin="hg"></i><i data-coin="hd"></i><i data-coin="bg"></i><i
+              data-coin="bd"
+            ></i>
+          </div>
+        </div>
+        <p class="hint-text" id="recadre-mot">
+          Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec
+          Maj on le resserre. À la manette, les directions déplacent et les
+          gâchettes resserrent ou élargissent.
+        </p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="recadre-tout">Tout prendre</button>
+        <button type="button" id="recadre-poser">Recadrer</button>
+        <button type="button" data-close>Annuler</button>
+      </div>
+    </dialog>
+
     <dialog id="log-dialog">
       <h2>Journal</h2>
       <div class="dialog-body"><div class="log" id="log"></div></div>
@@ -1789,6 +1867,8 @@
           <dd>Lancer le jeu, valider</dd>
           <dt>X</dt>
           <dd>Mettre le jeu en favori, ou l'en retirer</dd>
+          <dt>Y</dt>
+          <dd>Recadrer la jaquette</dd>
           <dt>B</dt>
           <dd>Revenir en arrière, refermer</dd>
           <dt>Start</dt>

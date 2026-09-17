@@ -971,6 +971,33 @@ pub async fn set_manual_cover(
         .map(Some)
 }
 
+/// Rapporte une jaquette du serveur de vignettes, pour pouvoir la recadrer.
+///
+/// La fenêtre l'affiche très bien elle-même, mais la redessiner dans un canevas
+/// souille celui-ci et l'export échoue. Le détour par ici n'existe que pour
+/// cela.
+#[tauri::command]
+pub async fn cover_image(url: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::covers::image(&url))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))?
+}
+
+/// Enregistre une jaquette recadrée, rendue par la fenêtre.
+#[tauri::command]
+pub async fn set_cropped_cover(
+    rom_path: String,
+    data: String,
+    paths: State<'_, Paths>,
+) -> Result<String, String> {
+    let dossier = paths.covers.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::manual::poser_donnees(&dossier, &rom_path, &data)
+    })
+    .await
+    .map_err(|error| format!("enregistrement interrompu : {error}"))?
+}
+
 /// Détache la jaquette posée sur un jeu.
 #[tauri::command]
 pub async fn clear_manual_cover(

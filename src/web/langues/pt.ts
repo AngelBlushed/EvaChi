@@ -6,9 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const pt: readonly string[] = [
-  /* 1 */ "No comando",
-  /* 2 */ "A iniciar · X favorito · L1/R1 consolas · L2/R2 letra · B voltar · Start",
+export const pt: readonly string[] = [  /* 1 */ "No comando",
+  /* 2 */ "A jogar · X favorito · Y recortar · L1/R1 consolas · L2/R2 letra · B voltar",
   /* 3 */ "Acerca do EvaChi",
   /* 4 */ "Acerca…",
   /* 5 */ "Ainda por chegar: filtros de tubo de raios catódicos, grelha, varrimento. O lugar está pronto, os filtros virão para aqui.",
@@ -342,4 +341,14 @@ export const pt: readonly string[] = [
   /* 333 */ "De uma inicial para a seguinte",
   /* 334 */ "No menu animado, cinco jogos de uma vez",
   /* 335 */ "Velocidade do jogo",
+  /* 336 */ "Cancelar",
+  /* 337 */ "Arraste a moldura, ou puxe por um canto. As setas deslocam-na e o Shift aperta-a. No comando, as direções deslocam e os gatilhos apertam ou alargam.",
+  /* 338 */ "Recortar",
+  /* 339 */ "Recortar a capa",
+  /* 340 */ "Imagem inteira",
+  /* 341 */ "{0} — capa recortada",
+  /* 342 */ "{0} — sem capa para recortar",
+  /* 343 */ "capa ilegível — {0}",
+  /* 344 */ "não foi possível recortar — {0}",
+  /* 345 */ "Recortar a capa…",
 ];

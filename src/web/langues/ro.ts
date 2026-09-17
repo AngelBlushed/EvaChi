@@ -6,9 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const ro: readonly string[] = [
-  /* 1 */ "Cu controlerul",
-  /* 2 */ "A pornește · X favorit · L1/R1 console · L2/R2 literă · B înapoi · Start",
+export const ro: readonly string[] = [  /* 1 */ "Cu controlerul",
+  /* 2 */ "A pornește · X favorit · Y reîncadrează · L1/R1 console · L2/R2 literă · B înapoi",
   /* 3 */ "Despre EvaChi",
   /* 4 */ "Despre…",
   /* 5 */ "În curând: filtre de tub catodic, grilaj, linii de scanare. Locul e pregătit, filtrele vor veni aici.",
@@ -342,4 +341,14 @@ export const ro: readonly string[] = [
   /* 333 */ "De la o inițială la următoarea",
   /* 334 */ "În meniul animat, cinci jocuri deodată",
   /* 335 */ "Viteza jocului",
+  /* 336 */ "Anulează",
+  /* 337 */ "Trageți cadrul sau apucați-l de un colț. Cu săgețile îl mutați, cu Shift îl strângeți. La controller, direcțiile îl mută, iar trăgacele îl strâng sau îl lărgesc.",
+  /* 338 */ "Reîncadrează",
+  /* 339 */ "Reîncadrează coperta",
+  /* 340 */ "Toată imaginea",
+  /* 341 */ "{0} — copertă reîncadrată",
+  /* 342 */ "{0} — nicio copertă de reîncadrat",
+  /* 343 */ "copertă ilizibilă — {0}",
+  /* 344 */ "reîncadrare imposibilă — {0}",
+  /* 345 */ "Reîncadrează coperta…",
 ];

@@ -7,9 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const ca: readonly string[] = [
-  /* 1 */ "Amb el comandament",
-  /* 2 */ "A iniciar · X preferit · L1/R1 consoles · L2/R2 lletra · B tornar · Start",
+export const ca: readonly string[] = [  /* 1 */ "Amb el comandament",
+  /* 2 */ "A engegar · X preferit · Y retallar · L1/R1 consoles · L2/R2 lletra · B enrere",
   /* 3 */ "Quant a EvaChi",
   /* 4 */ "Quant a…",
   /* 5 */ "Aviat: filtres de tub catòdic, quadrícula, escombratge. L'espai ja hi és, els filtres arribaran aquí.",
@@ -343,4 +342,14 @@ export const ca: readonly string[] = [
   /* 333 */ "D'una inicial a la següent",
   /* 334 */ "Al menú animat, cinc jocs alhora",
   /* 335 */ "Velocitat del joc",
+  /* 336 */ "Cancel·la",
+  /* 337 */ "Arrossegueu el marc o estireu-ne un cantó. Amb les fletxes es mou, i amb Maj s'estreny. Al comandament, les direccions el mouen i els gallets l'estrenyen o l'eixamplen.",
+  /* 338 */ "Retalla",
+  /* 339 */ "Retalla la caràtula",
+  /* 340 */ "Tota la imatge",
+  /* 341 */ "{0} — caràtula retallada",
+  /* 342 */ "{0} — cap caràtula per retallar",
+  /* 343 */ "caràtula il·legible — {0}",
+  /* 344 */ "no s'ha pogut retallar — {0}",
+  /* 345 */ "Retalla la caràtula…",
 ];

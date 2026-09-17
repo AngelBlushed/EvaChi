@@ -6,9 +6,8 @@
  * numérotées en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const es: readonly string[] = [
-  /* 1 */ "Con el mando",
-  /* 2 */ "A iniciar · X favorito · L1/R1 consolas · L2/R2 letra · B volver · Start",
+export const es: readonly string[] = [  /* 1 */ "Con el mando",
+  /* 2 */ "A jugar · X favorito · Y recortar · L1/R1 consolas · L2/R2 letra · B volver",
   /* 3 */ "Acerca de EvaChi",
   /* 4 */ "Acerca de…",
   /* 5 */ "Próximamente: filtros de tubo catódico, rejilla, barrido. El sitio está listo, los filtros llegarán aquí.",
@@ -342,4 +341,14 @@ export const es: readonly string[] = [
   /* 333 */ "De una inicial a la siguiente",
   /* 334 */ "En el menú animado, cinco juegos a la vez",
   /* 335 */ "Velocidad del juego",
+  /* 336 */ "Cancelar",
+  /* 337 */ "Arrastra el marco o tira de una esquina. Con las flechas lo mueves y con Mayús lo estrechas. En el mando, las direcciones lo mueven y los gatillos lo estrechan o lo ensanchan.",
+  /* 338 */ "Recortar",
+  /* 339 */ "Recortar la carátula",
+  /* 340 */ "Toda la imagen",
+  /* 341 */ "{0} — carátula recortada",
+  /* 342 */ "{0} — no hay carátula que recortar",
+  /* 343 */ "carátula ilegible — {0}",
+  /* 344 */ "no se pudo recortar — {0}",
+  /* 345 */ "Recortar la carátula…",
 ];

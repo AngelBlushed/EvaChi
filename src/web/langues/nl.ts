@@ -7,9 +7,8 @@
  * vérifier à l'œil.
  */
 
-export const nl: readonly string[] = [
-  /* 1 */ "Met de controller",
-  /* 2 */ "A starten · X favoriet · L1/R1 consoles · L2/R2 letter · B terug · Start",
+export const nl: readonly string[] = [  /* 1 */ "Met de controller",
+  /* 2 */ "A starten · X favoriet · Y bijsnijden · L1/R1 consoles · L2/R2 letter · B terug",
   /* 3 */ "Over EvaChi",
   /* 4 */ "Over…",
   /* 5 */ "Binnenkort: beeldbuisfilters, rasters, scanlijnen. De plek is klaar, de filters komen hier.",
@@ -343,4 +342,14 @@ export const nl: readonly string[] = [
   /* 333 */ "Van de ene beginletter naar de volgende",
   /* 334 */ "In het geanimeerde menu, vijf spellen tegelijk",
   /* 335 */ "Spelsnelheid",
+  /* 336 */ "Annuleren",
+  /* 337 */ "Sleep het kader, of trek aan een hoek. Met de pijltjes verplaats je het, met Shift maak je het kleiner. Op de controller verplaatsen de richtingsknoppen het en maken de triggers het kleiner of groter.",
+  /* 338 */ "Bijsnijden",
+  /* 339 */ "Hoes bijsnijden",
+  /* 340 */ "Hele afbeelding",
+  /* 341 */ "{0} — hoes bijgesneden",
+  /* 342 */ "{0} — geen hoes om bij te snijden",
+  /* 343 */ "hoes onleesbaar — {0}",
+  /* 344 */ "bijsnijden mislukt — {0}",
+  /* 345 */ "Hoes bijsnijden…",
 ];

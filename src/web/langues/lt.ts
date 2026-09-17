@@ -6,9 +6,8 @@
  * de rang en commentaire sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const lt: readonly string[] = [
-  /* 1 */ "Pulteliu",
-  /* 2 */ "A paleisti · X mėgstamas · L1/R1 konsolės · L2/R2 raidė · B atgal · Start",
+export const lt: readonly string[] = [  /* 1 */ "Pulteliu",
+  /* 2 */ "A paleisti · X mėgstamas · Y apkirpti · L1/R1 konsolės · L2/R2 raidė · B atgal",
   /* 3 */ "Apie EvaChi",
   /* 4 */ "Apie…",
   /* 5 */ "Netrukus: kineskopo filtrai, pikselių tinklelis, eilučių skleistinė. Vieta paruošta, filtrai atsiras čia.",
@@ -342,4 +341,14 @@ export const lt: readonly string[] = [
   /* 333 */ "Iš vienos pradinės raidės į kitą",
   /* 334 */ "Animuotame meniu – penki žaidimai iš karto",
   /* 335 */ "Žaidimo greitis",
+  /* 336 */ "Atšaukti",
+  /* 337 */ "Tempkite rėmelį arba patraukite už kampo. Rodyklėmis jį pastumsite, su Shift – susiaurinsite. Pultelyje kryptys stumia, o gaidukai siaurina arba platina.",
+  /* 338 */ "Apkirpti",
+  /* 339 */ "Apkirpti viršelį",
+  /* 340 */ "Visas vaizdas",
+  /* 341 */ "{0} — viršelis apkirptas",
+  /* 342 */ "{0} — nėra viršelio, kurį apkirpti",
+  /* 343 */ "viršelis neįskaitomas — {0}",
+  /* 344 */ "apkirpti nepavyko — {0}",
+  /* 345 */ "Apkirpti viršelį…",
 ];

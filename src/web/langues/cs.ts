@@ -7,9 +7,8 @@
  * l'œil, ligne à ligne.
  */
 
-export const cs: readonly string[] = [
-  /* 1 */ "Na ovladači",
-  /* 2 */ "A spustit · X oblíbené · L1/R1 konzole · L2/R2 písmeno · B zpět · Start",
+export const cs: readonly string[] = [  /* 1 */ "Na ovladači",
+  /* 2 */ "A spustit · X oblíbená · Y oříznout · L1/R1 konzole · L2/R2 písmeno · B zpět",
   /* 3 */ "O aplikaci EvaChi",
   /* 4 */ "O aplikaci…",
   /* 5 */ "Chystá se: filtry katodové obrazovky, mřížka, řádkování. Místo je připravené, filtry přibudou sem.",
@@ -343,4 +342,14 @@ export const cs: readonly string[] = [
   /* 333 */ "Z jednoho počátečního písmene na další",
   /* 334 */ "V animované nabídce pět her najednou",
   /* 335 */ "Rychlost hry",
+  /* 336 */ "Zrušit",
+  /* 337 */ "Přetáhněte rámeček nebo zatáhněte za roh. Šipky s ním pohybují, se Shiftem se zužuje. Na ovladači jím pohybují směry a spouště ho zužují nebo rozšiřují.",
+  /* 338 */ "Oříznout",
+  /* 339 */ "Oříznout obal",
+  /* 340 */ "Celý obrázek",
+  /* 341 */ "{0} — obal oříznut",
+  /* 342 */ "{0} — žádný obal k oříznutí",
+  /* 343 */ "obal nečitelný — {0}",
+  /* 344 */ "oříznutí se nezdařilo — {0}",
+  /* 345 */ "Oříznout obal…",
 ];

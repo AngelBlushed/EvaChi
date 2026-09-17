@@ -62,6 +62,8 @@ const HORS = new Set([
   'L2 / R2',
   'Fichier → Émulateurs',
   'SUPER-CHIP',
+  // Le pied du menu animé se traduit, lui : il nomme des gestes, pas des
+  // boutons. Il n'est donc plus tenu hors du relevé.
   'XO-CHIP',
   'Xbox 360',
 ]);
@@ -193,6 +195,23 @@ if (fs.existsSync(cheminCles)) {
       .map((ligne) => JSON.parse(ligne.replace(/,$/, '')));
   }
 }
+
+/**
+ * Les phrases réécrites, et non retirées.
+ *
+ * Une clé qui disparaît décale tout ce qui la suit. Quand une phrase est
+ * seulement corrigée — une virgule, un bouton de plus à nommer — on le dit ici :
+ * la nouvelle prend le rang de l'ancienne, les cinquante fichiers restent
+ * alignés, et il n'y a qu'une ligne à retraduire au lieu de tout.
+ */
+const RENOMMEES = new Map([
+  [
+    'A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start',
+    'A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour',
+  ],
+]);
+
+ancien = ancien.map((clef) => RENOMMEES.get(clef) ?? clef);
 
 const encore = new Set(relevees);
 const gardees = ancien.filter((clef) => encore.has(clef));

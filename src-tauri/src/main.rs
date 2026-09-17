@@ -170,6 +170,8 @@ fn main() {
             commands::reveal_shots_dir,
             commands::manual_covers,
             commands::set_manual_cover,
+            commands::set_cropped_cover,
+            commands::cover_image,
             commands::clear_manual_cover,
             commands::note,
         ])

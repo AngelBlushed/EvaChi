@@ -6,9 +6,8 @@
  * marques numérotées sont là pour qu'on puisse le vérifier à l'œil.
  */
 
-export const id: readonly string[] = [
-  /* 1 */ "Dengan gamepad",
-  /* 2 */ "A main · X favorit · L1/R1 konsol · L2/R2 huruf · B kembali · Start",
+export const id: readonly string[] = [  /* 1 */ "Dengan gamepad",
+  /* 2 */ "A mainkan · X favorit · Y pangkas · L1/R1 konsol · L2/R2 huruf · B kembali",
   /* 3 */ "Tentang EvaChi",
   /* 4 */ "Tentang…",
   /* 5 */ "Segera hadir: filter tabung katoda, kisi piksel, garis pindai. Tempatnya sudah siap, filternya akan muncul di sini.",
@@ -342,4 +341,14 @@ export const id: readonly string[] = [
   /* 333 */ "Dari satu huruf awal ke berikutnya",
   /* 334 */ "Di menu beranimasi, lima game sekaligus",
   /* 335 */ "Kecepatan game",
+  /* 336 */ "Batal",
+  /* 337 */ "Geser bingkainya, atau tarik salah satu sudutnya. Tombol panah menggesernya, dengan Shift bingkai menyempit. Di gamepad, arah menggeser dan trigger menyempitkan atau melebarkan.",
+  /* 338 */ "Pangkas",
+  /* 339 */ "Pangkas sampul",
+  /* 340 */ "Seluruh gambar",
+  /* 341 */ "{0} — sampul dipangkas",
+  /* 342 */ "{0} — tidak ada sampul untuk dipangkas",
+  /* 343 */ "sampul tidak terbaca — {0}",
+  /* 344 */ "gagal memangkas — {0}",
+  /* 345 */ "Pangkas sampul…",
 ];

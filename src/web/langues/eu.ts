@@ -7,9 +7,8 @@
  * le vérifier à l'œil.
  */
 
-export const eu: readonly string[] = [
-  /* 1 */ "Kontrolagailuarekin",
-  /* 2 */ "A abiarazi · X gogokoa · L1/R1 kontsolak · L2/R2 letra · B atzera · Start",
+export const eu: readonly string[] = [  /* 1 */ "Kontrolagailuarekin",
+  /* 2 */ "A abiarazi · X gogokoa · Y moztu · L1/R1 kontsolak · L2/R2 letra · B atzera",
   /* 3 */ "EvaChi-ri buruz",
   /* 4 */ "Honi buruz…",
   /* 5 */ "Laster: izpi-hodiaren iragazkiak, lauki-sarea, eskaneo-lerroak. Lekua prest dago, iragazkiak hona etorriko dira.",
@@ -343,4 +342,14 @@ export const eu: readonly string[] = [
   /* 333 */ "Hasierako letra batetik hurrengora",
   /* 334 */ "Menu animatuan, bost joko aldi berean",
   /* 335 */ "Jokoaren abiadura",
+  /* 336 */ "Utzi",
+  /* 337 */ "Arrastatu markoa, edo tira ertz batetik. Gezi-teklek mugitu egiten dute, eta Maius teklarekin estutu. Kontrolagailuan, norabideek mugitzen dute eta gatiluek estutu edo zabaldu.",
+  /* 338 */ "Moztu",
+  /* 339 */ "Moztu azala",
+  /* 340 */ "Irudi osoa",
+  /* 341 */ "{0} — azala moztuta",
+  /* 342 */ "{0} — ez dago azalik mozteko",
+  /* 343 */ "azala ezin irakurri — {0}",
+  /* 344 */ "ezin izan da moztu — {0}",
+  /* 345 */ "Moztu azala…",
 ];

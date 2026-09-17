@@ -340,6 +340,22 @@ export async function setManualCover(romPath: string): Promise<string | null> {
   return invoke<string | null>('set_manual_cover', { romPath });
 }
 
+/**
+ * Rapporte une jaquette du serveur, sous forme d'adresse `data:`.
+ *
+ * La page l'affiche très bien elle-même ; c'est la redessiner dans un canevas
+ * pour la recadrer qui échoue, faute d'autorisation d'origine. Le détour par le
+ * code natif n'existe que pour cela.
+ */
+export async function coverImage(url: string): Promise<string> {
+  return invoke<string>('cover_image', { url });
+}
+
+/** Enregistre une jaquette recadrée. Rend l'adresse à afficher. */
+export async function setCroppedCover(romPath: string, data: string): Promise<string> {
+  return invoke<string>('set_cropped_cover', { romPath, data });
+}
+
 /** Détache la jaquette posée sur un jeu. */
 export async function clearManualCover(romPath: string): Promise<void> {
   return invoke<void>('clear_manual_cover', { romPath });
