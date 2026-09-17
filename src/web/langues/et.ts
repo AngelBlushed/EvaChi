@@ -358,4 +358,6 @@ export const et: readonly string[] = [
   /* 349 */ "Emulaator {0} jäi seisma.",
   /* 350 */ "Emulaator jäi seisma",
   /* 351 */ "kõrvale panek ei õnnestunud — {0}",
+  /* 352 */ "pange siia: {0}",
+  /* 353 */ "süsteemifail on puudu: {0}",
 ];

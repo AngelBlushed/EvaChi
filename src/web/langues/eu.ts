@@ -359,4 +359,6 @@ export const eu: readonly string[] = [
   /* 349 */ "{0} emulagailua gelditu egin da.",
   /* 350 */ "Emulagailua gelditu egin da",
   /* 351 */ "ezin izan da baztertu — {0}",
+  /* 352 */ "hemen utzi: {0}",
+  /* 353 */ "sistema-fitxategi bat falta da: {0}",
 ];

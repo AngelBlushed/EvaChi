@@ -359,4 +359,6 @@ export const da: readonly string[] = [
   /* 349 */ "Emulatoren {0} stoppede.",
   /* 350 */ "Emulatoren er stoppet",
   /* 351 */ "kunne ikke fravælge — {0}",
+  /* 352 */ "lægges her: {0}",
+  /* 353 */ "der mangler en systemfil: {0}",
 ];

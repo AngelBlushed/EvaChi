@@ -358,4 +358,6 @@ export const id: readonly string[] = [
   /* 349 */ "Emulator {0} berhenti.",
   /* 350 */ "Emulator berhenti",
   /* 351 */ "gagal menyingkirkan — {0}",
+  /* 352 */ "letakkan di sini: {0}",
+  /* 353 */ "ada berkas sistem yang kurang: {0}",
 ];

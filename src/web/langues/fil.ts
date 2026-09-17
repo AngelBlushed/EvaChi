@@ -358,4 +358,6 @@ export const fil: readonly string[] = [
   /* 349 */ "Huminto ang emulator na {0}.",
   /* 350 */ "Huminto ang emulator",
   /* 351 */ "hindi maisantabi — {0}",
+  /* 352 */ "ilagay dito: {0}",
+  /* 353 */ "may kulang na system file: {0}",
 ];

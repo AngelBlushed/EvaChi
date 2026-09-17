@@ -288,6 +288,139 @@ pub fn destinations() -> Vec<(&'static str, &'static str, &'static str)> {
         .collect()
 }
 
+/// Ce qu'un cœur réclame quand il se plaint.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Reclamation {
+    /// Le nom du fichier, tel que le cœur l'a écrit.
+    pub fichier: String,
+    /// Le chemin où le déposer, quand EvaChi connaît ce fichier.
+    pub ou: Option<String>,
+    /// La console concernée, si on la connaît.
+    pub systeme: Option<String>,
+}
+
+/// Les mots par lesquels un cœur dit qu'il lui manque quelque chose.
+///
+/// En anglais : les cœurs libretro ne parlent pas français, et ce qu'ils
+/// écrivent n'est pas traduit. En minuscules, la comparaison l'étant aussi.
+const PLAINTES: &[&str] = &[
+    "bios",
+    "firmware",
+    "boot rom",
+    "bootrom",
+    "boot image",
+    "system file",
+    "ipl",
+];
+
+/// Et les mots par lesquels ils disent que ça ne s'est pas bien passé.
+const ENNUIS: &[&str] = &[
+    "missing",
+    "not found",
+    "cannot find",
+    "can't find",
+    "could not find",
+    "couldn't find",
+    "failed to",
+    "unable to",
+    "no such file",
+    "required",
+    "error",
+];
+
+/// Les extensions qu'un micrologiciel porte.
+///
+/// Elles ne servent qu'au repli, pour les fichiers qu'EvaChi ne connaît pas :
+/// ceux du tableau se reconnaissent à leur nom, ce qui vaut mieux. Plusieurs y
+/// échapperaient — `7800 BIOS (U).rom` porte des espaces, `Machines` est un
+/// dossier, `neogeo.zip` une archive.
+const EXTENSIONS: &[&str] = &[".bin", ".img", ".rom", ".bios", ".dat", ".nds", ".fd", ".e32"];
+
+/// Reconnaît, dans une ligne de journal, un cœur qui réclame un fichier système.
+///
+/// C'est le pendant de ce que ce module fait déjà par la liste : celle-ci sait
+/// d'avance ce que réclament les trente cœurs qu'on connaît, mais elle ne peut
+/// rien dire des autres — ni des cas particuliers, un jeu japonais qui veut un
+/// BIOS japonais. Le cœur, lui, le dit. Encore fallait-il l'écouter : jusqu'à ce
+/// que son journal traverse pour de bon, sa plainte se perdait.
+///
+/// On ne devine pas : il faut à la fois le mot du fichier et le mot de l'ennui.
+/// Un cœur qui annonce paisiblement « Loading boot image: … » ne réclame rien.
+pub fn reclame(ligne: &str) -> Option<Reclamation> {
+    let bas = ligne.to_lowercase();
+
+    // Sans mot d'ennui, rien n'est réclamé. C'est le garde-fou qui compte : un
+    // cœur annonce paisiblement « Loading boot image: … » à chaque partie, et
+    // le prendre pour une plainte ferait crier au loup à chaque lancement.
+    if !ENNUIS.iter().any(|mot| bas.contains(mot)) {
+        return None;
+    }
+
+    // Ce qu'on connaît d'abord, par son nom entier : le nom fait la preuve à lui
+    // seul. Découper la ligne en mots perdrait « 7800 BIOS (U).rom », qui en
+    // contient trois, et `Machines` n'est même pas un fichier.
+    if let Some((base, chemin, systeme)) = destinations()
+        .into_iter()
+        .find(|(base, _, _)| cite(&bas, &base.to_lowercase()))
+    {
+        return Some(Reclamation {
+            fichier: base.to_owned(),
+            ou: Some(chemin.to_owned()),
+            systeme: Some(systeme.to_owned()),
+        });
+    }
+
+    // Puis le repli, pour les cœurs qu'EvaChi ne connaît pas encore. Là, le nom
+    // ne prouve rien : il faut en plus le mot du genre — « bios », « firmware ».
+    // On ne saura pas où le ranger, mais dire lequel manque vaut mieux que se
+    // taire.
+    if !PLAINTES.iter().any(|mot| bas.contains(mot)) {
+        return None;
+    }
+    Some(Reclamation {
+        fichier: nom_de_fichier(ligne)?,
+        ou: None,
+        systeme: None,
+    })
+}
+
+/// Vrai si la ligne cite ce nom sans qu'il soit noyé dans un mot plus long.
+///
+/// `Machines` est un nom de dossier très ordinaire : le chercher au milieu des
+/// lettres ferait reconnaître `submachines` ou `machinesX`. Les deux chaînes
+/// sont déjà en minuscules.
+fn cite(ligne: &str, nom: &str) -> bool {
+    let mot = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric());
+    let mut depuis = 0usize;
+    while let Some(trouve) = ligne[depuis..].find(nom) {
+        let debut = depuis + trouve;
+        let fin = debut + nom.len();
+        let avant = ligne[..debut].chars().next_back();
+        let apres = ligne[fin..].chars().next();
+        if !mot(avant) && !mot(apres) {
+            return true;
+        }
+        depuis = debut + nom.chars().next().map_or(1, char::len_utf8);
+    }
+    false
+}
+
+/// Tire d'une ligne le premier mot qui ressemble à un nom de fichier.
+fn nom_de_fichier(ligne: &str) -> Option<String> {
+    ligne
+        .split(|c: char| c.is_whitespace() || "\"'`(),;:[]<>".contains(c))
+        .map(|mot| mot.trim_matches(|c: char| c == '.' || c == '!'))
+        // Un chemin complet se réduit à son dernier segment : c'est sous ce
+        // nom-là qu'on saura où le ranger.
+        .map(|mot| mot.rsplit(['/', '\\']).next().unwrap_or(mot))
+        .find(|mot| {
+            let bas = mot.to_lowercase();
+            EXTENSIONS.iter().any(|fin| bas.ends_with(fin)) && bas.len() > 4
+        })
+        .map(|mot| mot.to_owned())
+}
+
 /// Fait le tour des fichiers système attendus, et dit lesquels sont là.
 ///
 /// `installed` porte les identifiants des cœurs présents : un fichier réclamé
@@ -417,6 +550,101 @@ mod tests {
                 "{} n'est pas au catalogue des cœurs",
                 expected.core
             );
+        }
+    }
+
+    // --- Ce qu'un cœur dit quand il lui manque un fichier -------------------
+
+    #[test]
+    fn une_plainte_ordinaire_est_reconnue_et_situee() {
+        // La phrase vient d'un vrai cœur : c'est ainsi que Beetle PSX la dit.
+        let vu = reclame("error: Missing BIOS file: scph5501.bin").expect("plainte reconnue");
+        assert_eq!(vu.fichier, "scph5501.bin");
+        assert_eq!(vu.systeme.as_deref(), Some("PlayStation"));
+        assert!(vu.ou.is_some(), "EvaChi connaît ce fichier, elle doit dire où");
+    }
+
+    #[test]
+    fn un_chemin_complet_se_reduit_a_son_nom() {
+        // Certains cœurs citent le chemin entier, qui ne veut rien dire chez
+        // l'utilisateur : c'est le nom du fichier qui sait où il va.
+        let vu = reclame("Could not find BIOS at /usr/share/dc/dc_boot.bin").expect("plainte");
+        assert_eq!(vu.fichier, "dc_boot.bin");
+        assert_eq!(vu.systeme.as_deref(), Some("Dreamcast"));
+    }
+
+    #[test]
+    fn un_fichier_inconnu_est_quand_meme_rapporte() {
+        // EvaChi ne connaît pas tous les micrologiciels du monde. Ne rien dire
+        // parce qu'on ne sait pas où le ranger, ce serait le pire des deux.
+        let vu = reclame("Failed to load firmware: mystere_v2.rom").expect("plainte");
+        assert_eq!(vu.fichier, "mystere_v2.rom");
+        assert_eq!(vu.ou, None);
+        assert_eq!(vu.systeme, None);
+    }
+
+    #[test]
+    fn une_annonce_paisible_n_est_pas_une_plainte() {
+        // Gambatte écrit cette ligne à chaque partie, et tout va bien. La
+        // prendre pour une plainte ferait crier au loup à chaque lancement.
+        assert_eq!(
+            reclame("Loading boot image: C:\\Users\\Eve\\AppData\\Roaming\\app.evachi\\system\\dmg_boot.bin"),
+            None
+        );
+        assert_eq!(reclame("[Gambatte] Plain ROM loaded."), None);
+        assert_eq!(reclame("sram: 200000 - 203fff; eeprom: 0"), None);
+    }
+
+    #[test]
+    fn un_ennui_sans_fichier_ne_dit_rien() {
+        // Le mot « error » ne suffit pas : sans nom de fichier, on n'aurait
+        // rien à montrer ni rien à proposer.
+        assert_eq!(reclame("error: BIOS checksum mismatch"), None);
+        assert_eq!(reclame("could not find anything at all"), None);
+    }
+
+    #[test]
+    fn la_casse_ne_change_rien() {
+        assert!(reclame("ERROR: MISSING BIOS FILE: SCPH5501.BIN").is_some());
+        assert!(reclame("Cannot find Firmware.nds").is_some());
+    }
+
+    #[test]
+    fn un_nom_a_espaces_ne_se_perd_pas_en_route() {
+        // Découper la ligne en mots perdrait celui-là, qui en contient trois.
+        // C'est ce qui a fait reprendre la reconnaissance par le bon bout.
+        let vu = reclame("error: could not find \"7800 BIOS (U).rom\"").expect("plainte");
+        assert_eq!(vu.fichier, "7800 BIOS (U).rom");
+        assert!(vu.ou.is_some());
+    }
+
+    #[test]
+    fn un_dossier_reclame_est_reconnu_comme_les_autres() {
+        // blueMSX ne réclame pas un fichier mais un dossier entier. Il n'a donc
+        // pas d'extension, et aucune heuristique de nom ne l'attraperait.
+        let vu = reclame("bluemsx: Machines directory missing").expect("plainte");
+        assert_eq!(vu.fichier, "Machines");
+        assert_eq!(vu.systeme.as_deref(), Some("MSX · ColecoVision"));
+    }
+
+    #[test]
+    fn un_nom_noye_dans_un_mot_plus_long_ne_compte_pas() {
+        // « Machines » est un mot très ordinaire : le chercher au milieu des
+        // lettres ferait crier au loup sur n'importe quelle phrase.
+        assert_eq!(reclame("bios error: submachines not found"), None);
+    }
+
+    #[test]
+    fn tout_fichier_du_tableau_se_retrouve_par_son_nom() {
+        // La reconnaissance s'appuie sur `destinations` : si un fichier du
+        // tableau portait une extension que la reconnaissance ignore, il ne
+        // serait jamais situé, et personne ne s'en apercevrait.
+        for (base, _, systeme) in destinations() {
+            let plainte = format!("error: missing bios file {base}");
+            let vu = reclame(&plainte)
+                .unwrap_or_else(|| panic!("{base} n'est pas reconnu comme nom de fichier"));
+            assert_eq!(vu.fichier, base);
+            assert_eq!(vu.systeme.as_deref(), Some(systeme));
         }
     }
 }

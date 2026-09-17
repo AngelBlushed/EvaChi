@@ -28,6 +28,7 @@ import {
   coverImage,
   coverIndex,
   COEUR_TOMBE,
+  claimedSystemFile,
   coverOriginal,
   decodeBase64,
   encodeBase64,
@@ -1280,7 +1281,7 @@ async function signalerArret(raison: string): Promise<void> {
   // Ce que le cœur a dit juste avant de tomber explique souvent pourquoi. On le
   // relève tant qu'on sait encore à qui il appartient : `stopPlaying` oublie le
   // cœur, et la relève se taira ensuite.
-  await drainMessages();
+  await signalerFichierSysteme(await drainMessages());
   await stopPlaying();
 
   if (!tombe || !coeur) return;
@@ -2077,14 +2078,43 @@ async function runLoop(): Promise<void> {
   }
 }
 
-/** Remonte ce que le cœur a voulu dire : BIOS manquant, avertissements. */
-async function drainMessages(): Promise<void> {
-  if (!inShell || entry?.kind !== 'libretro') return;
+/**
+ * Remonte ce que le cœur a voulu dire : BIOS manquant, avertissements.
+ *
+ * Rend les lignes relevées, pour qui veut les relire de plus près.
+ */
+async function drainMessages(): Promise<string[]> {
+  if (!inShell || entry?.kind !== 'libretro') return [];
   try {
-    for (const message of await takeMessages()) log(dit('cœur : {0}', message));
+    const dits = await takeMessages();
+    for (const message of dits) log(dit('cœur : {0}', message));
+    return dits;
   } catch {
     // Un échec de relève ne doit pas interrompre la partie.
+    return [];
   }
+}
+
+/**
+ * Dit ce qu'il manque, quand un cœur a refusé un jeu faute d'un micrologiciel.
+ *
+ * C'est le pire des refus, parce qu'il est muet : le cœur écrit sa plainte dans
+ * son journal, au milieu de cinquante lignes de démarrage, et l'écran n'affiche
+ * que « contenu refusé ». Personne ne va lire le journal. Ici, on le lit pour
+ * lui — et quand EvaChi connaît ce fichier-là, elle dit aussi où le déposer.
+ */
+async function signalerFichierSysteme(dits: readonly string[]): Promise<void> {
+  if (!inShell || dits.length === 0) return;
+  let manque = null;
+  try {
+    manque = await claimedSystemFile(dits);
+  } catch {
+    return;
+  }
+  if (!manque) return;
+
+  log(dit('il manque un fichier système : {0}', manque.fichier), 'err');
+  if (manque.ou) log(dit('à déposer ici : {0}', manque.ou));
 }
 
 // --- Cœurs et contenus ------------------------------------------------------
@@ -2154,7 +2184,7 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
     // Le cœur a presque toujours dit pourquoi avant de refuser. Sans cette
     // relève, son explication attendait le jeu suivant, où elle n'éclairait
     // plus rien.
-    await drainMessages();
+    await signalerFichierSysteme(await drainMessages());
     return;
   }
 
@@ -2162,6 +2192,12 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
   contentBytes = bytes;
   contentPath = path ?? null;
   savedState = null;
+
+  // Un cœur qui démarre sans son micrologiciel ne refuse pas toujours : il
+  // tourne, produit du son, et n'affiche qu'un écran noir. C'est le pire des
+  // cas, parce que rien ne le dit. On regarde donc aussi quand tout s'est bien
+  // passé — une fois, ici, et pas à chaque seconde de la partie.
+  await signalerFichierSysteme(await drainMessages());
 
   nowPlaying.textContent = `${name} — ${core.info.name || entry?.label || ''}`;
   showLibrary(false);

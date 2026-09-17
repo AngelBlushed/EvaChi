@@ -359,4 +359,6 @@ export const ga: readonly string[] = [
   /* 349 */ "Stop an t-aithriseoir {0}.",
   /* 350 */ "Tá an t-aithriseoir stoptha",
   /* 351 */ "níorbh fhéidir é a chur i leataobh — {0}",
+  /* 352 */ "le cur anseo: {0}",
+  /* 353 */ "tá comhad córais in easnamh: {0}",
 ];

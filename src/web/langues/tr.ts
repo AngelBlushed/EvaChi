@@ -361,4 +361,6 @@ export const tr: readonly string[] = [
   /* 349 */ "{0} emülatörü kapandı.",
   /* 350 */ "Emülatör kapandı",
   /* 351 */ "kenara alınamadı — {0}",
+  /* 352 */ "buraya konacak: {0}",
+  /* 353 */ "bir sistem dosyası eksik: {0}",
 ];

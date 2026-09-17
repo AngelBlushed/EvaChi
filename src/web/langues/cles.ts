@@ -372,6 +372,8 @@ export const CLES: readonly string[] = [
   "L'émulateur {0} s'est arrêté.",
   "L'émulateur s'est arrêté",
   "mise à l'écart impossible — {0}",
+  "à déposer ici : {0}",
+  "il manque un fichier système : {0}",
 ];
 
 /**

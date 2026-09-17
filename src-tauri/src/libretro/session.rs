@@ -412,7 +412,20 @@ impl Session {
         // sauvegardes, c'est une carte mémoire abîmée.
         chantier.voisin = None;
 
-        let mut voisin = Distante::demarrer(&chantier.exe, save_dir)?;
+        // Une seconde chance, et une seule. Lancer un processus échoue parfois
+        // pour des raisons passagères — un antivirus qui inspecte un exécutable
+        // qui se relance vingt fois par session, une ressource système prise à
+        // l'instant. Réessayer une fois coûte un dixième de seconde et évite de
+        // renvoyer l'utilisateur à la bibliothèque pour une contrariété qui
+        // aurait disparu d'elle-même.
+        let mut voisin = match Distante::demarrer(&chantier.exe, save_dir) {
+            Ok(voisin) => voisin,
+            Err(premiere) => {
+                eprintln!("[session] {premiere} — on réessaie une fois");
+                std::thread::sleep(std::time::Duration::from_millis(150));
+                Distante::demarrer(&chantier.exe, save_dir)?
+            }
+        };
         let charge = parent::ouverture(path, system_dir, save_dir)?;
 
         let (dits, brut) = match voisin.demander(Demande::ChargerCoeur, &charge) {

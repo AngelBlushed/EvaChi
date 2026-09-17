@@ -358,4 +358,6 @@ export const lt: readonly string[] = [
   /* 349 */ "Emuliatorius {0} sustojo.",
   /* 350 */ "Emuliatorius sustojo",
   /* 351 */ "nepavyko atidėti — {0}",
+  /* 352 */ "dėkite čia: {0}",
+  /* 353 */ "trūksta sisteminio failo: {0}",
 ];

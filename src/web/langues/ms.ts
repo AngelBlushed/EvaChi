@@ -358,4 +358,6 @@ export const ms: readonly string[] = [
   /* 349 */ "Emulator {0} terhenti.",
   /* 350 */ "Emulator terhenti",
   /* 351 */ "gagal mengetepikan — {0}",
+  /* 352 */ "letakkan di sini: {0}",
+  /* 353 */ "fail sistem hilang: {0}",
 ];

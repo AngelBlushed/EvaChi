@@ -1122,6 +1122,21 @@ pub fn system_files(paths: State<'_, Paths>) -> Vec<crate::bios::SystemFile> {
     crate::bios::survey(&paths.system, &installed)
 }
 
+/// Cherche, dans ce que le cœur vient de dire, un fichier système réclamé.
+///
+/// La liste des fichiers attendus sait d'avance ce que réclament les trente
+/// cœurs qu'EvaChi connaît. Elle ne peut rien dire des autres, ni des cas
+/// particuliers — un jeu japonais qui veut un BIOS japonais. Le cœur, lui, le
+/// dit ; il fallait seulement l'écouter.
+///
+/// Rend le premier fichier réclamé, ou rien. Les lignes viennent de la fenêtre,
+/// qui les a relevées : l'analyse se fait ici parce que c'est ici que vit la
+/// table des destinations.
+#[tauri::command]
+pub fn claimed_system_file(lines: Vec<String>) -> Option<crate::bios::Reclamation> {
+    lines.iter().find_map(|ligne| crate::bios::reclame(ligne))
+}
+
 /// Ouvre le dossier des fichiers système dans l'explorateur.
 ///
 /// Dire où déposer un fichier ne suffit pas : encore faut-il y arriver. Le

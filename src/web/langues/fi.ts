@@ -358,4 +358,6 @@ export const fi: readonly string[] = [
   /* 349 */ "Emulaattori {0} pysähtyi.",
   /* 350 */ "Emulaattori pysähtyi",
   /* 351 */ "käytöstä poistaminen ei onnistu — {0}",
+  /* 352 */ "pantava tähän: {0}",
+  /* 353 */ "järjestelmätiedosto puuttuu: {0}",
 ];

@@ -358,4 +358,6 @@ export const ptBR: readonly string[] = [
   /* 349 */ "O emulador {0} parou.",
   /* 350 */ "O emulador parou",
   /* 351 */ "não deu para dispensar — {0}",
+  /* 352 */ "colocar aqui: {0}",
+  /* 353 */ "falta um arquivo de sistema: {0}",
 ];

@@ -358,4 +358,6 @@ export const is: readonly string[] = [
   /* 349 */ "Hermirinn {0} stöðvaðist.",
   /* 350 */ "Hermirinn stöðvaðist",
   /* 351 */ "tókst ekki að leggja til hliðar — {0}",
+  /* 352 */ "leggist hér: {0}",
+  /* 353 */ "vantar kerfisskrá: {0}",
 ];

@@ -184,6 +184,27 @@ export async function systemFiles(): Promise<SystemFile[]> {
   return invoke<SystemFile[]>('system_files');
 }
 
+/** Un fichier système qu'un cœur vient de réclamer dans son journal. */
+export interface Reclamation {
+  /** Le nom du fichier, tel qu'EvaChi le connaît ou tel que le cœur l'a écrit. */
+  readonly fichier: string;
+  /** Où le déposer, quand EvaChi connaît ce fichier-là. */
+  readonly ou: string | null;
+  readonly systeme: string | null;
+}
+
+/**
+ * Cherche, dans ce que le cœur vient de dire, un fichier système réclamé.
+ *
+ * La liste des fichiers attendus sait d'avance ce que réclament les cœurs
+ * qu'EvaChi connaît. Elle ne peut rien dire des autres, ni des cas particuliers.
+ * Le cœur, lui, le dit — et depuis que son journal traverse pour de bon, on peut
+ * enfin l'écouter.
+ */
+export async function claimedSystemFile(lignes: readonly string[]): Promise<Reclamation | null> {
+  return invoke<Reclamation | null>('claimed_system_file', { lines: lignes });
+}
+
 /** Ouvre le dossier des fichiers système dans l'explorateur. */
 export async function revealSystemDir(): Promise<string> {
   return invoke<string>('reveal_system_dir');

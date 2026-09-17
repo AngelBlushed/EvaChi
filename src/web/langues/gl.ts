@@ -358,4 +358,6 @@ export const gl: readonly string[] = [
   /* 349 */ "O emulador {0} detívose.",
   /* 350 */ "O emulador detívose",
   /* 351 */ "non se puido apartar — {0}",
+  /* 352 */ "hai que poñelo aquí: {0}",
+  /* 353 */ "falta un ficheiro de sistema: {0}",
 ];

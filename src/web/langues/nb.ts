@@ -359,4 +359,6 @@ export const nb: readonly string[] = [
   /* 349 */ "Emulatoren {0} stoppet.",
   /* 350 */ "Emulatoren stoppet",
   /* 351 */ "kunne ikke settes til side — {0}",
+  /* 352 */ "legges her: {0}",
+  /* 353 */ "det mangler en systemfil: {0}",
 ];

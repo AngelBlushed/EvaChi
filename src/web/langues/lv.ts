@@ -358,4 +358,6 @@ export const lv: readonly string[] = [
   /* 349 */ "Emulators {0} apstājās.",
   /* 350 */ "Emulators apstājās",
   /* 351 */ "nolikt malā neizdevās — {0}",
+  /* 352 */ "jāliek šeit: {0}",
+  /* 353 */ "trūkst sistēmas faila: {0}",
 ];

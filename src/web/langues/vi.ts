@@ -358,4 +358,6 @@ export const vi: readonly string[] = [
   /* 349 */ "Trình giả lập {0} đã dừng.",
   /* 350 */ "Trình giả lập đã dừng",
   /* 351 */ "không ngưng dùng được — {0}",
+  /* 352 */ "đặt vào đây: {0}",
+  /* 353 */ "thiếu một tệp hệ thống: {0}",
 ];

@@ -359,4 +359,6 @@ export const pl: readonly string[] = [
   /* 349 */ "Emulator {0} zatrzymał się.",
   /* 350 */ "Emulator się zatrzymał",
   /* 351 */ "nie udało się odstawić — {0}",
+  /* 352 */ "połóż tutaj: {0}",
+  /* 353 */ "brakuje pliku systemowego: {0}",
 ];

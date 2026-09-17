@@ -359,4 +359,6 @@ export const hr: readonly string[] = [
   /* 349 */ "Emulator {0} se zaustavio.",
   /* 350 */ "Emulator se zaustavio",
   /* 351 */ "isključivanje nije uspjelo — {0}",
+  /* 352 */ "stavlja se ovamo: {0}",
+  /* 353 */ "nedostaje sistemska datoteka: {0}",
 ];

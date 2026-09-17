@@ -358,4 +358,6 @@ export const ro: readonly string[] = [
   /* 349 */ "Emulatorul {0} s-a oprit.",
   /* 350 */ "Emulatorul s-a oprit",
   /* 351 */ "nu s-a putut lăsa deoparte — {0}",
+  /* 352 */ "de pus aici: {0}",
+  /* 353 */ "lipsește un fișier de sistem: {0}",
 ];

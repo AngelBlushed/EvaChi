@@ -358,4 +358,6 @@ export const pt: readonly string[] = [
   /* 349 */ "O emulador {0} parou.",
   /* 350 */ "O emulador parou",
   /* 351 */ "não foi possível pôr de parte — {0}",
+  /* 352 */ "a pôr aqui: {0}",
+  /* 353 */ "falta um ficheiro de sistema: {0}",
 ];

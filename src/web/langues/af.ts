@@ -358,4 +358,6 @@ export const af: readonly string[] = [
   /* 349 */ "Die emulator {0} het gaan staan.",
   /* 350 */ "Die emulator het gaan staan",
   /* 351 */ "kon nie opsy sit nie — {0}",
+  /* 352 */ "sit dit hier neer: {0}",
+  /* 353 */ "'n stelsellêer ontbreek: {0}",
 ];

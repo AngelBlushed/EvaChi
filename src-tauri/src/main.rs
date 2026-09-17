@@ -180,6 +180,7 @@ fn main() {
             commands::installable_cores,
             commands::install_core,
             commands::system_files,
+            commands::claimed_system_file,
             commands::reveal_system_dir,
             commands::pick_system_file,
             commands::adopt_system_file,

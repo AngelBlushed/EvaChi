@@ -358,4 +358,6 @@ export const es: readonly string[] = [
   /* 349 */ "El emulador {0} se ha detenido.",
   /* 350 */ "El emulador se ha detenido",
   /* 351 */ "no se pudo apartar — {0}",
+  /* 352 */ "a poner aquí: {0}",
+  /* 353 */ "falta un archivo de sistema: {0}",
 ];

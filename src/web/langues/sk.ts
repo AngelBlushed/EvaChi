@@ -359,4 +359,6 @@ export const sk: readonly string[] = [
   /* 349 */ "Emulátor {0} sa zastavil.",
   /* 350 */ "Emulátor sa zastavil",
   /* 351 */ "nedá sa vyradiť — {0}",
+  /* 352 */ "položte sem: {0}",
+  /* 353 */ "chýba systémový súbor: {0}",
 ];

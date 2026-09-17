@@ -359,4 +359,6 @@ export const nl: readonly string[] = [
   /* 349 */ "De emulator {0} is gestopt.",
   /* 350 */ "De emulator is gestopt",
   /* 351 */ "opzijzetten mislukt — {0}",
+  /* 352 */ "hier neerzetten: {0}",
+  /* 353 */ "er ontbreekt een systeembestand: {0}",
 ];

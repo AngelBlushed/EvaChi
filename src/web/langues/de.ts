@@ -359,4 +359,6 @@ export const de: readonly string[] = [
   /* 349 */ "Der Emulator {0} ist abgestürzt.",
   /* 350 */ "Der Emulator ist abgestürzt",
   /* 351 */ "Beiseitelegen nicht möglich — {0}",
+  /* 352 */ "hier ablegen: {0}",
+  /* 353 */ "es fehlt eine Systemdatei: {0}",
 ];

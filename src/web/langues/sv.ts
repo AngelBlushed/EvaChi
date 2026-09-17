@@ -359,4 +359,6 @@ export const sv: readonly string[] = [
   /* 349 */ "Emulatorn {0} stannade.",
   /* 350 */ "Emulatorn stannade",
   /* 351 */ "gick inte att ställa undan — {0}",
+  /* 352 */ "läggs här: {0}",
+  /* 353 */ "en systemfil saknas: {0}",
 ];

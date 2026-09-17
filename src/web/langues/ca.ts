@@ -359,4 +359,6 @@ export const ca: readonly string[] = [
   /* 349 */ "L'emulador {0} s'ha aturat.",
   /* 350 */ "L'emulador s'ha aturat",
   /* 351 */ "no s'ha pogut apartar — {0}",
+  /* 352 */ "s'ha de deixar aquí: {0}",
+  /* 353 */ "falta un fitxer de sistema: {0}",
 ];

@@ -358,4 +358,6 @@ export const sw: readonly string[] = [
   /* 349 */ "Emulata {0} imesimama.",
   /* 350 */ "Emulata imesimama",
   /* 351 */ "kuweka kando kumeshindikana — {0}",
+  /* 352 */ "iwekwe hapa: {0}",
+  /* 353 */ "faili ya mfumo haipo: {0}",
 ];

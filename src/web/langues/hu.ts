@@ -361,4 +361,6 @@ export const hu: readonly string[] = [
   /* 349 */ "A(z) {0} emulátor leállt.",
   /* 350 */ "Az emulátor leállt",
   /* 351 */ "nem sikerült a félretétel — {0}",
+  /* 352 */ "ide kell tenni: {0}",
+  /* 353 */ "hiányzik egy rendszerfájl: {0}",
 ];
