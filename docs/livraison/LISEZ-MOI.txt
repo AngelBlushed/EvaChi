@@ -1,4 +1,4 @@
-EvaChi 0.2.0
+EvaChi 0.3.0
 ============
 
 Un hôte d'émulation multi-systèmes : une bibliothèque, un lanceur, et les
@@ -21,6 +21,23 @@ Pour démarrer
 
 Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
 sert pas peuvent être supprimés.
+
+
+Ce qui est nouveau depuis la 0.2.0
+----------------------------------
+
+- Cinquante langues, chacune écrite dans son alphabet. Les accords de pluriel,
+  les dates, les heures et les tailles de fichier suivent les règles de la
+  langue choisie.
+- Un menu « Langue » à droite de « Aide ».
+- Une jauge de vitesse du jeu, de 50 à 900 %, dans « Paramètres du cœur ».
+  Le son suit, plus grave ou plus aigu.
+- Le recadrage des jaquettes : celle qui tombe mal se reprend à la souris, au
+  clavier ou à la manette. L'image d'origine est gardée, rien n'est perdu.
+- Le plein écran a trois temps : plein écran, plein écran dépouillé — plus une
+  seule barre, comme sur une console de salon — puis retour à la fenêtre.
+- Select + X passe en plein écran à la manette ; Y recadre la jaquette visée.
+- La grille ne bloque plus quand on tient une flèche.
 
 
 La langue
