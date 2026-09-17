@@ -27,6 +27,53 @@ const ENV_SET_PIXEL_FORMAT: c_uint = 10;
 const PIXEL_FORMAT_XRGB8888: c_uint = 1;
 const RETRO_DEVICE_JOYPAD: c_uint = 1;
 
+// --- Mal tourner sur commande -----------------------------------------------
+
+/// Les quatre boutons qui, tenus ensemble, demandent au cœur de mal tourner.
+///
+/// L2, R2, L3 et R3 à la fois, dans la numérotation de libretro : aucun jeu ne
+/// le demande, aucune autre épreuve ne les emploie, et il faut vraiment le
+/// vouloir.
+///
+/// Un cœur qui plante à la demande est le seul moyen d'éprouver qu'un cœur qui
+/// plante n'emporte plus l'application. L'épreuve était littéralement
+/// inécrivable tant que le cœur vivait dans le processus du programme de test :
+/// c'est lui qui serait mort.
+pub const SABOTAGE: u16 = 1 << 12 | 1 << 13 | 1 << 14 | 1 << 15;
+/// Avec A en plus, le cœur ne rend plus la main. C'est le cas Dolphin.
+pub const SABOTAGE_FIGE: u16 = 1 << 8;
+/// Avec X en plus, le cœur abandonne de lui-même.
+pub const SABOTAGE_ABANDON: u16 = 1 << 9;
+
+/// Se conduit comme un cœur défaillant, à la demande.
+///
+/// # Safety
+/// Ne rend jamais la main : ou le processus meurt, ou il s'arrête de tourner.
+unsafe fn saboter(buttons: u16) -> ! {
+    if buttons & SABOTAGE_FIGE != 0 {
+        // On dort plutôt que de brûler un cœur du processeur : ce que l'hôte
+        // observe est le même — sa trame ne vient pas — et la machine d'en face
+        // reste utilisable pendant l'épreuve.
+        loop {
+            std::thread::sleep(std::time::Duration::from_secs(3600));
+        }
+    }
+
+    if buttons & SABOTAGE_ABANDON != 0 {
+        std::process::abort();
+    }
+
+    // Une écriture hors de la mémoire du cœur : le cas Flycast. Windows tue le
+    // processus sur-le-champ, sans déroulement de pile ni message.
+    //
+    // `black_box` empêche le compilateur de reconnaître l'écriture à l'adresse
+    // nulle et de la remplacer par une instruction illégale : on veut une vraie
+    // violation d'accès, avec le code de sortie qui va avec.
+    let egare = std::hint::black_box(std::ptr::null_mut::<u8>());
+    std::ptr::write_volatile(egare, 42);
+    unreachable!("l'écriture hors mémoire n'a pas tué le processus");
+}
+
 // --- Structures de l'ABI ----------------------------------------------------
 
 #[repr(C)]
@@ -317,6 +364,12 @@ pub unsafe extern "C" fn retro_run() {
                 buttons |= 1 << id;
             }
         }
+    }
+
+    // Avant toute chose : si on nous demande de mal tourner, on ne rend pas la
+    // main. Rien de ce qui suit n'a alors lieu, pas même une trame.
+    if buttons & SABOTAGE == SABOTAGE {
+        saboter(buttons);
     }
 
     let frame = FRAME.load(Ordering::SeqCst);

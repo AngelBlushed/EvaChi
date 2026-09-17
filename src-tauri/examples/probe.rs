@@ -78,16 +78,7 @@ fn main() {
         return;
     };
 
-    let bytes = match std::fs::read(&content) {
-        Ok(bytes) => bytes,
-        Err(error) => {
-            // Même raison : le cœur est déjà chargé à ce stade.
-            eprintln!("{} : {error}", content.display());
-            return;
-        }
-    };
-
-    let av = match session.load_content(&content, bytes) {
+    let av = match session.load_content(&content) {
         Ok(av) => av,
         Err(error) => {
             eprintln!("contenu refusé : {error}");

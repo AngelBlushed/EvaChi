@@ -9,7 +9,7 @@ use std::os::raw::{c_uint, c_void};
 use std::path::Path;
 
 use libloading::{Library, Symbol};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::abi::*;
 use super::host::{self, with_host, VideoFrame};
@@ -45,7 +45,7 @@ pub enum CoreError {
 }
 
 /// Identité d'un cœur, telle qu'il la déclare avant tout chargement.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CoreInfo {
     pub name: String,
@@ -57,7 +57,7 @@ pub struct CoreInfo {
 }
 
 /// Caractéristiques audiovisuelles du contenu chargé.
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AvInfo {
     pub width: u32,
@@ -220,11 +220,23 @@ impl Core {
         &self.info
     }
 
-    /// Charge un contenu. `path` est requis quand le cœur réclame un fichier
-    /// sur disque ; `data` sert dans le cas contraire.
-    pub fn load_content(&mut self, path: &Path, data: &[u8]) -> Result<AvInfo, CoreError> {
+    /// Charge un contenu désigné par son chemin.
+    ///
+    /// Le fichier n'est lu que si le cœur veut les octets. Un cœur qui réclame
+    /// un chemin sur disque — tous les gros : PS2, GameCube, PSP — n'en reçoit
+    /// aucun, et les lire quand même se payait comptant : une image de quatre
+    /// gigaoctets sur un disque externe coûtait deux minutes de lecture pure,
+    /// pour un tampon aussitôt jeté.
+    pub fn load_content(&mut self, path: &Path) -> Result<AvInfo, CoreError> {
         let c_path = CString::new(path.to_string_lossy().as_bytes())
             .map_err(|_| CoreError::BadPath(path.display().to_string()))?;
+
+        let data = if self.info.need_fullpath {
+            Vec::new()
+        } else {
+            std::fs::read(path)
+                .map_err(|error| CoreError::BadPath(format!("{} : {error}", path.display())))?
+        };
 
         let game = GameInfo {
             path: c_path.as_ptr(),

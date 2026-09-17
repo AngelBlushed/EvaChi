@@ -117,7 +117,7 @@ fn main() {
 
             app.manage(paths);
             // Le thread d'émulation vit aussi longtemps que l'application.
-            app.manage(Session::spawn());
+            app.manage(std::sync::Arc::new(Session::spawn()));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

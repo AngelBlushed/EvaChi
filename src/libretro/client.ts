@@ -503,6 +503,30 @@ export interface DecodedFrame {
 }
 
 /**
+ * Encode et décode les octets qui traversent le pont.
+ *
+ * Le pont vers la coque native ne transporte que du texte dans ce sens-là ; un
+ * tableau de plusieurs mégaoctets converti en JSON coûterait dix fois plus cher
+ * que ces deux fonctions réunies.
+ */
+export function encodeBase64(octets: Uint8Array): string {
+  let texte = '';
+  // Par tranches : passer un million d'octets d'un coup à `fromCharCode`
+  // dépasse la taille d'appel que le moteur accepte.
+  for (let debut = 0; debut < octets.length; debut += 0x8000) {
+    texte += String.fromCharCode(...octets.subarray(debut, debut + 0x8000));
+  }
+  return btoa(texte);
+}
+
+export function decodeBase64(texte: string): Uint8Array {
+  const brut = atob(texte);
+  const octets = new Uint8Array(brut.length);
+  for (let rang = 0; rang < brut.length; rang += 1) octets[rang] = brut.charCodeAt(rang);
+  return octets;
+}
+
+/**
  * Découpe le bloc binaire renvoyé par la coque native.
  *
  * Fonction pure, exportée pour être testée : elle est l'autre moitié du format
@@ -693,7 +717,12 @@ export class LibretroCore implements AsyncEmulatorCore {
   }
 
   async loadState(state: Uint8Array): Promise<void> {
-    await invoke('load_state', { state: Array.from(state) });
+    // En base64, et non en tableau de nombres. Un état de GameCube pèse
+    // quatre-vingt-dix mégaoctets : `Array.from` en faisait quatre-vingt-dix
+    // millions de nombres JavaScript, que le pont sérialisait ensuite en une
+    // chaîne JSON de deux cent cinquante mégaoctets. La fenêtre s'arrêtait
+    // plusieurs secondes — le temps que l'autre bout relise entier par entier.
+    await invoke('load_state', { state: encodeBase64(state) });
   }
 
   /** Décharge le cœur et libère sa bibliothèque. */

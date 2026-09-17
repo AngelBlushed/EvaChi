@@ -101,7 +101,7 @@ fn session_with_content() -> (MutexGuard<'static, ()>, Session, tempdir::TempDir
     std::fs::write(&content, b"contenu sans importance").expect("écriture du contenu");
 
     session
-        .load_content(&content, b"contenu sans importance".to_vec())
+        .load_content(&content)
         .expect("chargement du contenu");
 
     (guard, session, scratch)

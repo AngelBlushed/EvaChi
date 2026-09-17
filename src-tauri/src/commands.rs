@@ -6,12 +6,20 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
 use tauri::{Manager, State};
 
 use evachi::libretro::{AvInfo, CoreInfo, Session, VideoFrame, JOYPAD_BUTTONS};
+
+/// Au-delà, un état de jeu n'en est plus un.
+///
+/// Les plus gros connus sont ceux de la GameCube, autour de quatre-vingt-dix
+/// mégaoctets. Deux cent cinquante-six laissent de la marge sans permettre
+/// qu'une entrée abîmée fasse enfler la mémoire avant qu'on s'en aperçoive.
+const MAX_ETAT: usize = 256 * 1024 * 1024;
 
 /// Dossiers de travail, créés au premier lancement.
 #[derive(Clone)]
@@ -2363,21 +2371,42 @@ fn list_roms_now(paths: &Paths) -> Vec<RomEntry> {
     found
 }
 
-#[tauri::command]
-pub fn load_core(
-    path: String,
-    session: State<'_, Session>,
-    paths: State<'_, Paths>,
-) -> Result<CoreInfo, String> {
-    session.load_core(Path::new(&path), &paths.system, &paths.saves)
+/// Fait tourner un travail du cœur hors du fil de la fenêtre.
+///
+/// Toutes les commandes du cœur passent par là, et c'est une correction, pas un
+/// embellissement. Une commande Tauri déclarée `fn` s'exécute sur le fil
+/// principal — celui qui fait vivre la fenêtre —, ce que `list_cores` a déjà
+/// payé une fois. Tant qu'une trame coûtait seize millisecondes, cela passait
+/// inaperçu ; dès qu'un cœur se fige, ce fil est retenu le temps de l'échéance,
+/// la fenêtre blanchit, et Windows propose de la fermer. On aurait déplacé le
+/// figement du cœur vers la fenêtre.
+async fn au_travail<T: Send + 'static>(
+    ouvrage: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tauri::async_runtime::spawn_blocking(ouvrage)
+        .await
+        .map_err(|error| format!("le cœur n'a pas rendu la main : {error}"))?
 }
 
 #[tauri::command]
-pub fn load_content(path: String, session: State<'_, Session>) -> Result<AvInfo, String> {
-    // Le contenu est lu ici même quand le cœur réclame un chemin : il en a
-    // besoin pour déduire le format, et la lecture est de toute façon faite.
-    let data = fs::read(&path).map_err(|error| format!("{path} : {error}"))?;
-    session.load_content(Path::new(&path), data)
+pub async fn load_core(
+    path: String,
+    session: State<'_, Arc<Session>>,
+    paths: State<'_, Paths>,
+) -> Result<CoreInfo, String> {
+    let session = Arc::clone(&session);
+    let system = paths.system.clone();
+    let saves = paths.saves.clone();
+    au_travail(move || session.load_core(Path::new(&path), &system, &saves)).await
+}
+
+#[tauri::command]
+pub async fn load_content(
+    path: String,
+    session: State<'_, Arc<Session>>,
+) -> Result<AvInfo, String> {
+    let session = Arc::clone(&session);
+    au_travail(move || session.load_content(Path::new(&path))).await
 }
 
 /// Note qu'une partie commence, pour qu'un arrêt brutal laisse une trace.
@@ -2446,48 +2475,79 @@ fn pack_frame(video: Option<&VideoFrame>, audio: &[i16], shutdown: bool) -> Vec<
 
 /// Émule une trame et renvoie image et son au format décrit sur [`pack_frame`].
 #[tauri::command]
-pub fn run_frame(input: Vec<i16>, session: State<'_, Session>) -> Result<Response, String> {
+pub async fn run_frame(
+    input: Vec<i16>,
+    session: State<'_, Arc<Session>>,
+) -> Result<Response, String> {
     let mut buttons = [0i16; JOYPAD_BUTTONS];
     for (slot, value) in buttons.iter_mut().zip(input) {
         *slot = value;
     }
 
-    let frame = session.run_frame(buttons)?;
-    Ok(Response::new(pack_frame(
-        frame.video.as_ref(),
-        &frame.audio,
-        frame.shutdown,
-    )))
+    let session = Arc::clone(&session);
+    let bloc = au_travail(move || {
+        let frame = session.run_frame(buttons)?;
+        Ok(pack_frame(
+            frame.video.as_ref(),
+            &frame.audio,
+            frame.shutdown,
+        ))
+    })
+    .await?;
+    Ok(Response::new(bloc))
 }
 
 #[tauri::command]
-pub fn reset(session: State<'_, Session>) -> Result<(), String> {
-    session.reset()
+pub async fn reset(session: State<'_, Arc<Session>>) -> Result<(), String> {
+    let session = Arc::clone(&session);
+    au_travail(move || session.reset()).await
 }
 
 /// Relève les messages que le cœur a émis depuis le dernier appel, et vide la
 /// file. C'est par là qu'arrive un « BIOS introuvable » ou un avertissement de
 /// compatibilité, que l'interface doit montrer plutôt que d'avaler.
 #[tauri::command]
-pub fn take_messages(session: State<'_, Session>) -> Vec<String> {
-    session.take_messages()
+pub async fn take_messages(session: State<'_, Arc<Session>>) -> Result<Vec<String>, String> {
+    let session = Arc::clone(&session);
+    au_travail(move || Ok(session.take_messages())).await
 }
 
 #[tauri::command]
-pub fn save_state(session: State<'_, Session>) -> Result<Response, String> {
-    session.save_state().map(Response::new)
+pub async fn save_state(session: State<'_, Arc<Session>>) -> Result<Response, String> {
+    let session = Arc::clone(&session);
+    let etat = au_travail(move || session.save_state()).await?;
+    Ok(Response::new(etat))
+}
+
+/// Reprend un état de jeu.
+///
+/// L'état arrive en base64 plutôt qu'en tableau de nombres. Ce n'est pas une
+/// coquetterie : un état de GameCube pèse quatre-vingt-dix mégaoctets, et
+/// `Array.from` en faisait quatre-vingt-dix millions de nombres JavaScript,
+/// sérialisés en une chaîne JSON de deux cent cinquante mégaoctets que l'autre
+/// bout réanalysait entier par entier. La fenêtre s'arrêtait plusieurs secondes,
+/// exactement le gel qu'on s'emploie à faire disparaître.
+#[tauri::command]
+pub async fn load_state(state: String, session: State<'_, Arc<Session>>) -> Result<(), String> {
+    let session = Arc::clone(&session);
+    au_travail(move || {
+        // Le plafond est celui d'un état de console de salon, large : c'est un
+        // garde-fou contre une entrée aberrante, pas une limite de travail.
+        let octets = crate::b64::decode(&state, MAX_ETAT)?;
+        session.load_state(octets)
+    })
+    .await
 }
 
 #[tauri::command]
-pub fn load_state(state: Vec<u8>, session: State<'_, Session>) -> Result<(), String> {
-    session.load_state(state)
-}
-
-#[tauri::command]
-pub fn unload(session: State<'_, Session>, paths: State<'_, Paths>) -> Result<(), String> {
+pub async fn unload(
+    session: State<'_, Arc<Session>>,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
     // Déchargé proprement : il n'y a plus d'incident à signaler.
     crate::sentinel::fermer(&racine(&paths));
-    session.unload()
+    let session = Arc::clone(&session);
+    au_travail(move || session.unload()).await
 }
 
 /// Ouvre une boîte de dialogue native et renvoie le chemin choisi.

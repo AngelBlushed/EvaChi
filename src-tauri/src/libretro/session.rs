@@ -58,7 +58,6 @@ enum Request {
     },
     LoadContent {
         path: PathBuf,
-        data: Vec<u8>,
         reply: Reply<AvInfo>,
     },
     RunFrame {
@@ -137,11 +136,11 @@ impl Session {
                             });
                         }
 
-                        Request::LoadContent { path, data, reply } => {
+                        Request::LoadContent { path, reply } => {
                             let _ = reply.send(match core.as_mut() {
-                                Some(core) => core
-                                    .load_content(&path, &data)
-                                    .map_err(|error| error.to_string()),
+                                Some(core) => {
+                                    core.load_content(&path).map_err(|error| error.to_string())
+                                }
                                 None => Err("aucun cœur chargé".into()),
                             });
                         }
@@ -229,10 +228,9 @@ impl Session {
         })
     }
 
-    pub fn load_content(&self, path: &Path, data: Vec<u8>) -> Result<AvInfo, String> {
+    pub fn load_content(&self, path: &Path) -> Result<AvInfo, String> {
         self.call(|reply| Request::LoadContent {
             path: path.to_path_buf(),
-            data,
             reply,
         })
     }

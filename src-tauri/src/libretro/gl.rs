@@ -525,7 +525,9 @@ impl GlContext {
         let height = height.min(self.height);
         let taille = width as usize * height as usize * 4;
 
-        out.clear();
+        // Pas de `clear()` avant : `glReadPixels` réécrit tout le tampon, et le
+        // mettre à zéro d'abord coûte un memset de huit mégaoctets par trame en
+        // 1080p. Un tampon déjà à la bonne taille n'est alors pas touché du tout.
         out.resize(taille, 0);
         if taille == 0 {
             return;

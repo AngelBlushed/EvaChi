@@ -28,6 +28,8 @@ import {
   coverImage,
   coverIndex,
   coverOriginal,
+  decodeBase64,
+  encodeBase64,
   croppedCovers,
   crashReport,
   dismissCrash,
@@ -1274,30 +1276,6 @@ async function chargerEmplacement(slot: number): Promise<void> {
   } catch (error) {
     log(`reprise impossible — ${reason(error)}`, 'err');
   }
-}
-
-/**
- * Encode et décode les octets d'un état.
- *
- * Le pont vers la coque native ne transporte que du texte ; un tableau de
- * plusieurs mégaoctets converti en JSON coûterait dix fois plus cher que ces
- * deux fonctions réunies.
- */
-function encodeBase64(octets: Uint8Array): string {
-  let texte = '';
-  // Par tranches : passer un million d'octets d'un coup à `fromCharCode`
-  // dépasse la taille d'appel que le moteur accepte.
-  for (let debut = 0; debut < octets.length; debut += 0x8000) {
-    texte += String.fromCharCode(...octets.subarray(debut, debut + 0x8000));
-  }
-  return btoa(texte);
-}
-
-function decodeBase64(texte: string): Uint8Array {
-  const brut = atob(texte);
-  const octets = new Uint8Array(brut.length);
-  for (let rang = 0; rang < brut.length; rang += 1) octets[rang] = brut.charCodeAt(rang);
-  return octets;
 }
 
 /** Dessine les quatre emplacements du jeu en cours. */

@@ -148,7 +148,10 @@ unsafe fn convert(
     out: &mut Vec<u8>,
 ) {
     let (w, h) = (width as usize, height as usize);
-    out.clear();
+    // Pas de `clear()` avant : il forcerait le `resize` à remplir de zéros une
+    // zone que la boucle qui suit réécrit entièrement. Sur une image de 1080p
+    // c'est huit mégaoctets de mise à zéro pure, soixante fois par seconde,
+    // pour rien. Sans lui, un tampon déjà à la bonne taille n'est pas touché.
     out.resize(w * h * 4, 0);
 
     match format {
@@ -429,20 +432,27 @@ pub unsafe extern "C" fn evachi_log_line(level: c_uint, text: *const c_char) {
         return;
     }
 
+    // Le débogage est jeté tout de suite, avant même d'être écrit nulle part :
+    // ce sont des milliers de lignes par partie, et elles n'apprennent rien à
+    // qui n'a pas le code sous les yeux.
+    //
+    // Ce `return` était naguère placé après l'écriture sur la sortie d'erreur,
+    // ce qui ne coûtait rien tant que cette sortie ne menait nulle part. Elle
+    // mène désormais quelque part — le cœur tourne dans un processus à part, et
+    // sa sortie d'erreur est lue — et un tuyau qu'on remplit sans le vider
+    // bloque l'écrivain : le cœur se serait figé au milieu d'une trame, à cause
+    // de son propre bavardage.
+    if level == 0 {
+        return;
+    }
+
     let severity = match level {
-        0 => "debug",
         1 => "info",
         2 => "attention",
         _ => "erreur",
     };
     eprintln!("[cœur/{severity}] {text}");
 
-    // Le débogage reste sur la sortie d'erreur : ce sont des milliers de lignes
-    // par partie, et elles n'apprennent rien à qui n'a pas le code sous les
-    // yeux. Le reste remonte jusqu'au journal de l'application.
-    if level == 0 {
-        return;
-    }
     let mut file = CORE_LOG.lock().unwrap_or_else(|poison| poison.into_inner());
     if file.len() < CORE_LOG_MAX {
         file.push(format!("{severity} · {text}"));
