@@ -372,7 +372,14 @@ function choisirLangue(code: string): void {
   refreshMenus();
 }
 
-/** Dessine le choix de langue, à côté des thèmes. */
+/**
+ * Dessine le menu des langues, le dernier de la barre.
+ *
+ * Un menu à soi plutôt qu'une ligne dans les thèmes : on cherche sa langue
+ * tout de suite, et sans savoir lire ce qui est écrit autour. Le nom de chaque
+ * langue y est écrit dans cette langue-là — c'est ainsi qu'on reconnaît la
+ * sienne dans une liste qu'on ne sait pas lire.
+ */
 function renderLangues(): void {
   langueList.replaceChildren();
   const courante = retenu(RETENU.langue) ?? langueRetenue().code;
@@ -380,22 +387,27 @@ function renderLangues(): void {
   for (const langue of LANGUES) {
     const choix = document.createElement('button');
     choix.type = 'button';
-    choix.className = 'menu-choix';
-    choix.setAttribute('aria-pressed', String(langue.code === courante));
-    // Le nom est écrit dans sa propre langue : c'est ainsi qu'on reconnaît la
-    // sienne dans une liste qu'on ne sait pas lire.
+    const active = langue.code === courante;
+    choix.setAttribute('aria-pressed', String(active));
     choix.lang = langue.code;
     if (langue.rtl) choix.dir = 'rtl';
 
-    const nom = document.createElement('strong');
+    // Un point, et non une coche ou le mot « actif » : c'est la seule marque
+    // qui se lise dans les cinquante alphabets.
+    const coche = document.createElement('span');
+    coche.className = 'coche';
+    coche.textContent = active ? '●' : '';
+
+    const nom = document.createElement('span');
     nom.textContent = langue.nom;
-    choix.append(nom);
+
+    choix.append(coche, nom);
     choix.addEventListener('click', () => choisirLangue(langue.code));
     langueList.append(choix);
   }
 
-  // Cinquante entrées dans une boîte qui défile : sans cela, ouvrir la fenêtre
-  // en tamoul montrait le haut de la liste, et la langue en cours restait
+  // Cinquante entrées dans un volet qui défile : sans cela, ouvrir le menu en
+  // tamoul montrait le haut de la liste, et la langue en cours restait
   // invisible douze rangées plus bas.
   const choisie = langueList.querySelector<HTMLElement>('[aria-pressed="true"]');
   if (choisie) {
@@ -2346,16 +2358,51 @@ function conduireBarre(
     return;
   }
 
+  const cote = (sens: Direction) =>
+    ouvrirBarre(tourne(ouvert, menus.length, sens === 'droite' ? 1 : -1));
+
   for (const sens of entree.pas) {
-    if (sens === 'gauche' || sens === 'droite') {
-      tic();
-      ouvrirBarre(tourne(ouvert, menus.length, sens === 'droite' ? 1 : -1));
+    const items = [
+      ...(menus[ouvert]?.querySelectorAll<HTMLButtonElement>(
+        '.menu-items button:not([disabled])',
+      ) ?? []),
+    ];
+
+    // Un volet sur plusieurs colonnes — celui des langues — se parcourt à la
+    // géométrie. En file indienne, atteindre le tamoul demanderait quarante
+    // appuis, et gauche-droite n'y servirait à rien. On reconnaît la grille à
+    // ce que deux entrées partagent une rangée.
+    const enGrille = items.some((item, rang) => rang > 0 && item.offsetTop === items[0].offsetTop);
+
+    if (enGrille) {
+      const boites: Boite[] = items.map((item) => ({
+        x: item.offsetLeft,
+        y: item.offsetTop,
+        w: item.offsetWidth,
+        h: item.offsetHeight,
+      }));
+      const depart = Math.max(0, items.indexOf(document.activeElement as HTMLButtonElement));
+      const vise = voisin(depart, boites, sens);
+      if (vise !== depart) {
+        tic();
+        items[vise].focus();
+        continue;
+      }
+      // Rien de ce côté : on sort du menu comme dans une barre ordinaire.
+      // Sans cela, la première colonne serait un cul-de-sac.
+      if (sens === 'gauche' || sens === 'droite') {
+        tic();
+        cote(sens);
+      }
       continue;
     }
 
-    const items = [...menus[ouvert].querySelectorAll<HTMLButtonElement>(
-      '.menu-items button:not([disabled])',
-    )];
+    if (sens === 'gauche' || sens === 'droite') {
+      tic();
+      cote(sens);
+      continue;
+    }
+
     const courant = items.indexOf(document.activeElement as HTMLButtonElement);
     const suivant = items[tourne(courant < 0 ? 0 : courant, items.length, sens === 'bas' ? 1 : -1)];
     if (suivant) {
@@ -4138,7 +4185,6 @@ const actions: Record<string, () => void | Promise<void>> = {
   install: openInstall,
   external: () => openDialog(dialogs.external),
   themes: () => {
-    renderLangues();
     renderThemes();
     renderMenus();
     jaquettesCase.checked = jaquettesVoulues();
@@ -4607,6 +4653,9 @@ async function start(): Promise<void> {
   document.documentElement.lang = langue.code;
   document.documentElement.dir = langue.rtl ? 'rtl' : 'ltr';
   traduireDocument(document);
+  // Le menu des langues est dans la barre, et non plus dans une fenêtre : il
+  // doit donc être rempli au démarrage, et non à l'ouverture d'un dialogue.
+  renderLangues();
 
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.

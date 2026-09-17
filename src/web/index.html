@@ -63,6 +63,9 @@
         background: var(--panel);
         border-bottom: 1px solid var(--edge);
         user-select: none;
+        /* Pour que le volet des langues puisse s'ancrer sur la barre entière,
+           et donc sur le bord droit de la fenêtre. Voir `#menu-langue`. */
+        position: relative;
       }
 
       .menu { position: relative; }
@@ -81,7 +84,9 @@
         display: none;
         position: absolute;
         top: 100%;
-        left: 0;
+        /* Le bord de départ, et non la gauche : en arabe la barre se retourne,
+           et un volet collé à gauche s'ouvrait à l'autre bout de son titre. */
+        inset-inline-start: 0;
         z-index: 20;
         min-width: 236px;
         padding: 4px;
@@ -1038,23 +1043,35 @@
       .menu-choix[aria-pressed="true"] { border-color: var(--accent); }
       .menu-choix span { color: var(--muted); font-size: 11px; line-height: 1.4; }
 
-      /* Cinquante langues ne tiennent pas en pavés : des pastilles serrées
-         dans une boîte qui défile, sinon la fenêtre fait deux écrans de haut.
+      /* Cinquante langues ne tiennent pas en une colonne : quatre de front,
+         dans un volet qui défile. Ancré à droite parce que c'est le dernier
+         menu de la barre — ouvert à gauche, il sortait de la fenêtre.
          Chaque nom est écrit dans sa propre langue, d'où les alphabets mêlés. */
-      #langue-list {
-        grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
-        gap: 6px;
-        max-height: 172px;
+      .menu[data-open] .menu-items.langues { display: grid; }
+      /* Le dernier menu ne se positionne pas lui-même : son volet s'ancre alors
+         sur la barre, et son bord droit tombe sur celui de la fenêtre. Ancré
+         sur le menu, large de quatre colonnes, il sortait par la gauche. */
+      #menu-langue { position: static; }
+      .menu-items.langues {
+        inset-inline-start: auto;
+        inset-inline-end: 0;
+        /* Quatre colonnes quand la place est là, moins quand la fenêtre est
+           étroite : à 430 px de large, un volet fixe sortait par la gauche. */
+        width: min(468px, calc(100vw - 12px));
+        grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+        gap: 1px;
+        max-height: min(328px, calc(100vh - 48px));
         overflow-y: auto;
-        padding: 2px;
       }
-      #langue-list .menu-choix {
-        padding: 6px 9px;
-        border-width: 1px;
+      .menu-items.langues button {
+        gap: 6px;
+        padding: 5px 8px;
         font-size: 12px;
-        line-height: 1.3;
       }
-      #langue-list .menu-choix strong { font-weight: 500; }
+      /* La langue en cours porte un point, seule marque qui se lise dans les
+         cinquante alphabets. */
+      .menu-items.langues button[aria-pressed='true'] { color: var(--accent); }
+      .menu-items.langues .coche { width: 8px; color: var(--accent); }
 
       /* Le menu animé est une géométrie, pas un texte : ses rangées, ses rails
          et ses translations sont calculés en pixels depuis la gauche. Le
@@ -1305,6 +1322,14 @@
           </div>
         </div>
 
+        <!-- La langue a son propre menu, et non une ligne dans les thèmes : on la
+             cherche là, tout de suite, sans savoir lire ce qui est écrit autour.
+             Le contenu est dessiné par `renderLangues`. -->
+        <div class="menu" data-menu id="menu-langue">
+          <button class="menu-title" type="button">Langue</button>
+          <div class="menu-items langues" id="langue-list"></div>
+        </div>
+
         <span class="title" id="now-playing">EvaChi</span>
       </nav>
 
@@ -1515,9 +1540,6 @@
           lisible : le texte garde partout un contraste suffisant sur son fond.
         </p>
         <div class="themes" id="theme-list"></div>
-
-        <h3 class="section">Langue</h3>
-        <div class="menus" id="langue-list"></div>
 
         <h3 class="section">Présentation</h3>
         <div class="menus" id="menu-list"></div>
