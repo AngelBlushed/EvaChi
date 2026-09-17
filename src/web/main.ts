@@ -88,10 +88,13 @@ import {
   HEX_KEYPAD,
   choosePad,
   PAD_DOWN,
+  PAD_L3,
   PAD_LEFT,
+  PAD_R3,
   PAD_RIGHT,
   PAD_UP,
   STICK_DEADZONE,
+  vitesseAvance,
 } from './input.ts';
 import type { ButtonLayout } from './input.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
@@ -1649,6 +1652,14 @@ let entry: CatalogEntry | null = null;
 let core: AsyncEmulatorCore | null = null;
 let layout: ButtonLayout = HEX_KEYPAD;
 let running = false;
+/**
+ * Vrai tant que les deux manches sont enfoncés pendant une partie.
+ *
+ * Un maintien, pas une bascule : la manette n'est lue que lorsqu'elle répond,
+ * et une bascule restée armée sur une manette débranchée laisserait le jeu
+ * emballé sans plus aucun moyen de le calmer.
+ */
+let avanceRapide = false;
 let contentName = '';
 /** Derniers octets chargés, pour recharger après un changement de réglage. */
 let contentBytes: Uint8Array | null = null;
@@ -1872,6 +1883,9 @@ window.addEventListener('resize', () => fitScreen());
 
 function setRunning(next: boolean): void {
   running = next;
+  // Une partie qu'on quitte les manches enfoncés ne doit pas armer l'avance
+  // rapide de la suivante.
+  if (!next) avanceRapide = false;
   refreshMenus();
   if (next) void runLoop();
 }
@@ -1894,16 +1908,31 @@ function tempoJeu(): number {
   return garde / 100;
 }
 
+/**
+ * Une part écrite en pourcentage, dans la langue en cours.
+ *
+ * `Intl` sait où va le signe et s'il prend une espace : « 100 % » en français,
+ * « 100% » en anglais et en japonais. Le format est gardé d'un appel à l'autre :
+ * la boucle l'emploie une fois par seconde, et en construire un à chaque fois
+ * pour cinq caractères coûterait plus que de les écrire.
+ */
+const formatsPourcent = new Map<string, Intl.NumberFormat>();
+
+function pourcentage(part: number): string {
+  const langue = localeCourante();
+  let format = formatsPourcent.get(langue);
+  if (!format) {
+    format = new Intl.NumberFormat(langue, { style: 'percent', maximumFractionDigits: 0 });
+    formatsPourcent.set(langue, format);
+  }
+  return format.format(part);
+}
+
 /** Écrit le pourcentage à côté de la jauge, dans la langue en cours. */
 function renderTempo(): void {
   const pourcent = Math.round(tempoJeu() * 100);
   tempoInput.value = String(pourcent);
-  // `Intl` sait où va le signe et s'il prend une espace : « 100 % » en
-  // français, « 100% » en anglais et en japonais.
-  tempoValue.textContent = new Intl.NumberFormat(localeCourante(), {
-    style: 'percent',
-    maximumFractionDigits: 0,
-  }).format(pourcent / 100);
+  tempoValue.textContent = pourcentage(pourcent / 100);
 }
 
 tempoInput.addEventListener('input', () => {
@@ -1933,8 +1962,9 @@ async function runLoop(): Promise<void> {
 
   while (running && core && token === loopToken) {
     // Relue à chaque trame : la jauge se glisse en cours de partie, et la
-    // vitesse doit suivre le doigt.
-    const tempo = tempoJeu();
+    // vitesse doit suivre le doigt. L'avance rapide se pose par-dessus, le
+    // temps qu'on tienne les deux manches.
+    const tempo = vitesseAvance(tempoJeu(), avanceRapide);
     const frameMs = 1000 / (core.info.fps || 60) / tempo;
 
     sampleInput();
@@ -1974,10 +2004,10 @@ async function runLoop(): Promise<void> {
     if (now - lastReport >= 1000) {
       // La vitesse s'affiche dès qu'elle n'est plus celle de la console : sans
       // cela, une jauge oubliée à 400 % d'un lancement à l'autre passerait pour
-      // un jeu détraqué. Le pourcentage est déjà écrit à côté de la jauge, on
-      // le reprend tel quel.
+      // un jeu détraqué. On l'écrit à partir de la vitesse réellement tenue, et
+      // non de la jauge : l'avance rapide ne la déplace pas.
       const images = dit('{0} im/s', framesThisSecond);
-      fpsOut.textContent = tempo === 1 ? images : `${images} · ${tempoValue.textContent}`;
+      fpsOut.textContent = tempo === 1 ? images : `${images} · ${pourcentage(tempo)}`;
       framesThisSecond = 0;
       lastReport = now;
       void drainMessages();
@@ -2584,7 +2614,12 @@ function naviguerMenu(): void {
   // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
   // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
   const pad = currentPad();
-  if (!pad) return;
+  // Plus de manette, plus d'avance rapide : elle ne tient que par un appui
+  // qu'on voit, et rien ne relâcherait un maintien devenu invisible.
+  if (!pad) {
+    avanceRapide = false;
+    return;
+  }
 
   const [x = 0, y = 0] = pad.axes;
   const maintenant = performance.now();
@@ -2611,6 +2646,10 @@ function naviguerMenu(): void {
 
   const appuye = (index: number) => pad.buttons[index]?.pressed ?? false;
   const select0 = appuye(BOUTON.select);
+  // Un état continu, pas un geste : on le relit à chaque trame plutôt que d'en
+  // guetter le front. Hors partie il retombe de lui-même, si bien qu'un retour
+  // à la bibliothèque les manches enfoncés ne laisse rien d'armé.
+  avanceRapide = libraryView.hidden && appuye(PAD_L3) && appuye(PAD_R3);
   /** Le petit bruit, partagé par toutes les branches manette. */
   const tic = (lance = false) => bruit(lance);
   const a = valider.update(appuye(BOUTON.a), maintenant).pressed;

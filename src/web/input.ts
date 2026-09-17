@@ -36,6 +36,30 @@ export const PAD_LEFT = 14;
 export const PAD_RIGHT = 15;
 
 /**
+ * Les clics de manche, dans cette même disposition.
+ *
+ * Ils portent l'avance rapide : aucun geste de jeu ne les demande tous les
+ * deux à la fois, et un pouce ne les enfonce pas par mégarde.
+ */
+export const PAD_L3 = 10;
+export const PAD_R3 = 11;
+
+/** L'allure de l'avance rapide, en multiple de la vitesse de la console. */
+export const AVANCE_RAPIDE = 3;
+
+/**
+ * La vitesse à appliquer, avance rapide comprise.
+ *
+ * L'avance rapide vise une allure absolue plutôt que de multiplier la jauge :
+ * elle sert à passer un dialogue ou un couloir, et on veut la même allure qu'on
+ * ait ralenti le jeu ou non. Elle ne ralentit jamais — une jauge déjà poussée
+ * plus haut reste la plus rapide des deux.
+ */
+export function vitesseAvance(tempo: number, tenue: boolean): number {
+  return tenue ? Math.max(tempo, AVANCE_RAPIDE) : tempo;
+}
+
+/**
  * En deçà, un manche analogique au repos est considéré comme centré.
  *
  * Les manches ne reviennent jamais exactement à zéro : sans ce seuil, une

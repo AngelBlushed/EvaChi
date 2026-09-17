@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { choosePad } from './input.ts';
+import { AVANCE_RAPIDE, choosePad, vitesseAvance } from './input.ts';
 
 /** Un emplacement rempli, comme le navigateur en présente. */
 const branchée = { connected: true };
@@ -49,5 +49,27 @@ describe('choix de la manette', () => {
     // rien : le lire sans vérifier rendrait `undefined` à chaque trame.
     assert.equal(choosePad([], 3), -1);
     assert.equal(choosePad([branchée], 7), 0);
+  });
+});
+
+describe('avance rapide', () => {
+  it('ne change rien tant que les manches ne sont pas enfoncés', () => {
+    assert.equal(vitesseAvance(1, false), 1);
+    assert.equal(vitesseAvance(0.5, false), 0.5);
+    assert.equal(vitesseAvance(9, false), 9);
+  });
+
+  it('vise une allure absolue, quelle que soit la jauge', () => {
+    // Au ralenti comme à vitesse normale, l'avance rapide donne la même allure :
+    // c'est ce qu'on attend d'un bouton qui sert à passer un dialogue.
+    assert.equal(vitesseAvance(1, true), AVANCE_RAPIDE);
+    assert.equal(vitesseAvance(0.5, true), AVANCE_RAPIDE);
+  });
+
+  it('ne ralentit jamais un jeu déjà plus rapide qu’elle', () => {
+    // Une jauge poussée à 900 % ne doit pas retomber à 300 % parce qu'un pouce
+    // traîne sur les manches.
+    assert.equal(vitesseAvance(9, true), 9);
+    assert.equal(vitesseAvance(AVANCE_RAPIDE, true), AVANCE_RAPIDE);
   });
 });
