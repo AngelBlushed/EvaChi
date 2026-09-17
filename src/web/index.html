@@ -55,6 +55,15 @@
       main { grid-row: 3; }
       .statusbar { grid-row: 4; }
 
+      /* Le second temps du plein écran : il ne reste que l'affichage, comme sur
+         une console de salon. Les rangées gardent leur numéro — masquées, elles
+         se réduisent à rien, et la scène prend toute la place. */
+      .app.depouille .menubar,
+      .app.depouille .toolbar,
+      .app.depouille .statusbar {
+        display: none;
+      }
+
       /* --- Barre de menus --- */
 
       .menubar {
@@ -1322,7 +1331,7 @@
     </style>
   </head>
   <body>
-    <div class="app">
+    <div class="app" id="app">
       <nav class="menubar" id="menubar">
         <div class="menu" data-menu>
           <button class="menu-title" type="button">Fichier</button>
@@ -1891,6 +1900,8 @@
           <dd>Revenir en arrière, refermer</dd>
           <dt>Start</dt>
           <dd>Ouvrir la barre de menus</dd>
+          <dt>Select + X</dt>
+          <dd>Plein écran</dd>
           <dt>Select + Y</dt>
           <dd>Prendre une capture</dd>
           <dt>Select + Start</dt>

@@ -151,6 +151,7 @@ const menubar = $<HTMLElement>('menubar');
 const toolbar = $<HTMLDivElement>('toolbar');
 const libraryView = $<HTMLDivElement>('library');
 const playerView = $<HTMLDivElement>('player');
+const appView = $<HTMLDivElement>('app');
 const shelvesBox = $<HTMLDivElement>('games');
 const grilleView = $<HTMLDivElement>('grille');
 const grilleTuiles = $<HTMLDivElement>('grille-tuiles');
@@ -1856,7 +1857,17 @@ new ResizeObserver((entries) => {
   fitScreen(rect ? { width: rect.width, height: rect.height } : undefined);
 }).observe(playerView);
 
-document.addEventListener('fullscreenchange', () => fitScreen());
+document.addEventListener('fullscreenchange', () => {
+  // On peut sortir du plein écran sans passer par nous — Échap, ou la fenêtre
+  // qui rend la main. Le compte des trois temps doit le suivre, faute de quoi
+  // le prochain appui sur P dépouillerait une fenêtre qui n'est plus en plein
+  // écran.
+  if (!document.fullscreenElement && tempsPleinEcran !== PLEIN.fenetre) {
+    poserPleinEcran(PLEIN.fenetre);
+    return;
+  }
+  fitScreen();
+});
 window.addEventListener('resize', () => fitScreen());
 
 function setRunning(next: boolean): void {
@@ -2552,6 +2563,7 @@ const boutons = {
   retour: new Held(1000, 1000),
   favori: new Held(1000, 1000),
   recadre: new Held(1000, 1000),
+  plein: new Held(1000, 1000),
   capture: new Held(1200, 1200),
   // Dans le recadrage, les gâchettes se tiennent pour resserrer d'un trait.
   serrer: new Held(320, 90),
@@ -2656,6 +2668,11 @@ function naviguerMenu(): void {
     if (boutons.capture.update(appuye(BOUTON.select) && appuye(BOUTON.y), maintenant).pressed) {
       void prendreCapture();
     }
+    // Le même raccourci qu'au menu : en pleine partie, X seul sert au jeu, d'où
+    // les deux boutons.
+    if (boutons.plein.update(select0 && appuye(BOUTON.x), maintenant).pressed) {
+      void toggleFullscreen();
+    }
     const ensemble = appuye(BOUTON.select) && appuye(BOUTON.start);
     if (boutons.retour.update(ensemble, maintenant).pressed) {
       tic(true);
@@ -2683,7 +2700,11 @@ function naviguerMenu(): void {
 
   if (start) {
     tic();
-    ouvrirBarre(0);
+    // Dépouillée, la barre de menus n'existe plus : Start la rend plutôt que de
+    // ne rien faire. Sans cela, le plein écran de salon serait un cul-de-sac
+    // pour qui n'a qu'une manette en main.
+    if (tempsPleinEcran === PLEIN.depouille) poserPleinEcran(PLEIN.ecran);
+    else ouvrirBarre(0);
     return;
   }
 
@@ -2715,7 +2736,15 @@ function naviguerMenu(): void {
     sauterLettre(vue, -1);
   }
 
-  if (boutons.favori.update(appuye(BOUTON.x), maintenant).pressed) {
+  // Select tenu, X ne met plus en favori : c'est le plein écran. Sans cette
+  // réserve, le raccourci ferait les deux d'un coup.
+  if (boutons.plein.update(select0 && appuye(BOUTON.x), maintenant).pressed) {
+    tic();
+    void toggleFullscreen();
+    return;
+  }
+
+  if (boutons.favori.update(!select0 && appuye(BOUTON.x), maintenant).pressed) {
     const item = jeuVise();
     if (item) {
       tic();
@@ -4689,10 +4718,54 @@ fileInput.addEventListener('change', async () => {
 });
 
 /** Bascule le plein écran sur la zone de jeu, pas sur toute la page. */
+/**
+ * Les trois temps du plein écran, dans le menu.
+ *
+ * Fenêtré, plein écran, puis plein écran dépouillé : la barre de menus, la
+ * barre d'outils et la barre d'état s'en vont, et il ne reste que la
+ * bibliothèque. C'est ce que montre une console de salon — rien que ce qu'on
+ * regarde.
+ */
+const PLEIN = { fenetre: 0, ecran: 1, depouille: 2 } as const;
+let tempsPleinEcran: number = PLEIN.fenetre;
+
+/** Pose un temps et redonne aux vues la place qu'elles ont désormais. */
+function poserPleinEcran(temps: number): void {
+  tempsPleinEcran = temps;
+  appView.classList.toggle('depouille', temps === PLEIN.depouille);
+  // La scène et le menu animé se dimensionnent sur la place disponible, qui
+  // vient de changer sans qu'aucune fenêtre ne soit redimensionnée.
+  fitScreen();
+  poserEchelle();
+}
+
+/**
+ * Bascule le plein écran.
+ *
+ * En partie, il ne concerne que l'image : il n'y a ni barre d'outils ni rien
+ * d'autre à retirer, et c'est l'affichage seul qui prend l'écran.
+ *
+ * Dans le menu, c'est toute la fenêtre qui passe en plein écran, et non la
+ * zone de jeu — celle-ci y est masquée, et la demander revenait à demander le
+ * plein écran d'un élément qui n'a pas de surface : refusé, ou noir.
+ */
 async function toggleFullscreen(): Promise<void> {
   try {
-    if (document.fullscreenElement) await document.exitFullscreen();
-    else await playerView.requestFullscreen();
+    if (libraryView.hidden) {
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else await playerView.requestFullscreen();
+      return;
+    }
+
+    if (tempsPleinEcran === PLEIN.fenetre) {
+      await appView.requestFullscreen();
+      poserPleinEcran(PLEIN.ecran);
+    } else if (tempsPleinEcran === PLEIN.ecran) {
+      poserPleinEcran(PLEIN.depouille);
+    } else {
+      poserPleinEcran(PLEIN.fenetre);
+      if (document.fullscreenElement) await document.exitFullscreen();
+    }
   } catch (error) {
     log(dit('plein écran refusé — {0}', reason(error)), 'err');
   }

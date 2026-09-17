@@ -57,6 +57,7 @@ const HORS = new Set([
   'Select + L1',
   'Select + R1',
   'Select + Start',
+  'Select + X',
   'Select + Y',
   'L1 / R1',
   'L2 / R2',
