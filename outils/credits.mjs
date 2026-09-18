@@ -7,8 +7,12 @@
 //
 //     node outils/credits.mjs
 import fs from 'node:fs';
+import path from 'node:path';
 
-const RACINE = 'C:/Users/Eve/projets/EvaChi';
+// Le dépôt se déduit de l'emplacement de cet outil : un chemin écrit en dur
+// ne marcherait que sur la machine où il a été écrit, et nommerait au passage
+// qui s'en sert.
+const RACINE = path.resolve(import.meta.dirname, '..');
 const SOURCE = 'https://raw.githubusercontent.com/libretro/libretro-super/master/dist/info';
 
 /** Les cœurs qu'EvaChi propose d'installer, lus dans le catalogue lui-même. */
@@ -23,9 +27,16 @@ function catalogue() {
   }));
 }
 
-/** Et ceux qui sont réellement posés sur cette machine. */
+/**
+ * Et ceux qui sont réellement posés sur cette machine.
+ *
+ * Ils sont crédités aussi : quelqu'un qui installe un cœur hors du catalogue
+ * mérite de savoir à qui il le doit, comme les autres.
+ */
 function installes() {
-  const dossier = 'C:/Users/Eve/AppData/Roaming/app.evachi/cores';
+  const donnees = process.env.APPDATA;
+  if (!donnees) return [];
+  const dossier = path.join(donnees, 'app.evachi', 'cores');
   if (!fs.existsSync(dossier)) return [];
   return fs
     .readdirSync(dossier)
@@ -76,7 +87,7 @@ for (const [id, fiche] of connus) {
 rendu.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
 const coeurs = rendu;
 
-const CIBLE = 'C:/Users/Eve/projets/EvaChi/src-tauri/src/credits.rs';
+const CIBLE = path.join(RACINE, 'src-tauri/src/credits.rs');
 
 const guillemets = (texte) => JSON.stringify(texte ?? '');
 
