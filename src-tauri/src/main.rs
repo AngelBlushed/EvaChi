@@ -27,6 +27,7 @@ mod sentinel;
 mod shots;
 mod skeleton;
 mod states;
+mod triches;
 
 use evachi::libretro::Session;
 use tauri::Manager;
@@ -157,6 +158,13 @@ fn main() {
             commands::list_cores,
             commands::load_core,
             commands::load_content,
+            commands::triches_catalogue,
+            commands::triches_installer,
+            commands::triches_posees,
+            commands::triches_contenu,
+            commands::triches_retirer,
+            commands::poser_triches,
+            commands::lire_memoire,
             commands::run_frame,
             commands::reset,
             commands::take_messages,

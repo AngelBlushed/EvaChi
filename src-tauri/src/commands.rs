@@ -39,6 +39,8 @@ pub struct Paths {
     pub emulators: PathBuf,
     /// Inventaires de jaquettes, un fichier par console.
     pub covers: PathBuf,
+    /// Fiches de triche : l'inventaire du dépôt, et celles qu'on a posées.
+    pub triches: PathBuf,
     /// Réglages conservés entre deux lancements.
     pub config: PathBuf,
 }
@@ -57,6 +59,7 @@ impl Paths {
             roms: library_root(roms_beside_exe(), &base),
             emulators: base.join("emulators"),
             covers: base.join("covers"),
+            triches: base.join("triches"),
             config: base.join("config.json"),
         };
 
@@ -1941,6 +1944,7 @@ fn headless_paths() -> Option<Paths> {
         roms: library_root(roms_beside_exe(), &base),
         emulators: base.join("emulators"),
         covers: base.join("covers"),
+        triches: base.join("triches"),
         config: base.join("config.json"),
     })
 }
@@ -2553,6 +2557,91 @@ pub async fn load_core(
     au_travail(move || session.load_core(Path::new(&path), &system, &saves, &langue)).await
 }
 
+/// Ce que le dépôt publie comme fiches, pour ces consoles-là.
+///
+/// L'inventaire descend une fois puis reste sur le disque : une bibliothèque
+/// entière ne coûte qu'une demande au réseau, et les fois suivantes aucune.
+/// `rafraichir` le redemande — le dépôt s'enrichit, et on doit pouvoir y
+/// retourner sans avoir à effacer quoi que ce soit à la main.
+#[tauri::command]
+pub async fn triches_catalogue(
+    systemes: Vec<String>,
+    rafraichir: Option<bool>,
+    paths: State<'_, Paths>,
+) -> Result<std::collections::BTreeMap<String, Vec<String>>, String> {
+    let dossier = paths.triches.clone();
+    let neuf = rafraichir.unwrap_or(false);
+    au_travail(move || crate::triches::catalogue(&dossier, &systemes, neuf)).await
+}
+
+/// Va chercher des fiches et les pose sur le disque.
+///
+/// Rend ce qui n'a pas pu être posé, avec sa raison. Une fiche manquante
+/// n'emporte pas les autres : on en installe plusieurs d'un coup, et une seule
+/// absente ne doit pas annuler la fournée.
+#[tauri::command]
+pub async fn triches_installer(
+    systeme: String,
+    noms: Vec<String>,
+    paths: State<'_, Paths>,
+) -> Result<Vec<String>, String> {
+    let dossier = paths.triches.clone();
+    au_travail(move || crate::triches::installer(&dossier, &systeme, &noms)).await
+}
+
+/// Les fiches déjà posées, console par console.
+#[tauri::command]
+pub fn triches_posees(
+    paths: State<'_, Paths>,
+) -> std::collections::BTreeMap<String, Vec<String>> {
+    crate::triches::posees(&paths.triches)
+}
+
+/// Le contenu d'une fiche posée. C'est la fenêtre qui la découpe.
+#[tauri::command]
+pub fn triches_contenu(
+    systeme: String,
+    nom: String,
+    paths: State<'_, Paths>,
+) -> Result<String, String> {
+    crate::triches::contenu(&paths.triches, &systeme, &nom)
+}
+
+/// Retire une fiche du disque.
+#[tauri::command]
+pub fn triches_retirer(
+    systeme: String,
+    nom: String,
+    paths: State<'_, Paths>,
+) -> Result<(), String> {
+    crate::triches::retirer(&paths.triches, &systeme, &nom)
+}
+
+/// Pose les triches actives sur le cœur en cours.
+///
+/// Tout part d'un coup, à chaque changement : le cœur oublie les précédentes
+/// puis reprend les nouvelles. Décocher arrête donc l'écriture à l'instant.
+#[tauri::command]
+pub async fn poser_triches(
+    consignes: evachi::libretro::Consignes,
+    session: State<'_, Arc<Session>>,
+) -> Result<evachi::libretro::triches::Etat, String> {
+    let session = Arc::clone(&session);
+    au_travail(move || session.poser_triches(consignes)).await
+}
+
+/// Une tranche de la RAM de travail, pour la recherche de valeurs.
+#[tauri::command]
+pub async fn lire_memoire(
+    debut: u32,
+    longueur: u32,
+    session: State<'_, Arc<Session>>,
+) -> Result<Response, String> {
+    let session = Arc::clone(&session);
+    let octets = au_travail(move || session.lire_memoire(debut, longueur)).await?;
+    Ok(Response::new(octets))
+}
+
 #[tauri::command]
 pub async fn load_content(
     path: String,
@@ -2884,6 +2973,7 @@ mod config_tests {
             roms: base.join("roms"),
             emulators: base.join("emulators"),
             covers: base.join("covers"),
+            triches: base.join("triches"),
             config: base.join("config.json"),
         };
         (base, paths)
@@ -3217,6 +3307,7 @@ mod preset_args_tests {
             roms: base.join("roms"),
             emulators: base.join("emulators"),
             covers: base.join("covers"),
+            triches: base.join("triches"),
             config: base.join("config.json"),
         };
         (base, paths)
