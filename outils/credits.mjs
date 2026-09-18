@@ -216,3 +216,69 @@ console.log(`${coeurs.length} cœurs écrits dans ${CIBLE}`);
 if (manquants.length) {
   console.log(`sans fiche chez libretro : ${manquants.join(', ')}`);
 }
+
+// --- Et la même chose sur la page d'accueil ---------------------------------
+//
+// Écrite entre deux marques plutôt que tenue à la main : une liste de crédits
+// recopiée dans deux endroits finit par différer, et c'est toujours celle qu'on
+// lit en premier qui a tort.
+
+const LISEZ = path.join(RACINE, 'README.md');
+const DEBUT = '<!-- credits:debut -->';
+const FIN = '<!-- credits:fin -->';
+
+const echapper = (texte) => texte.replaceAll('|', '\\|');
+const restreint = (licence) => /non.?commercial|^MAME$/i.test(licence);
+
+const rangee = (nom, systeme, licence, qui) =>
+  `| ${echapper(nom)} | ${echapper(systeme)} | ${restreint(licence) ? `**${echapper(licence)}**` : echapper(licence)} | ${echapper(qui)} |`;
+
+const emulateurs = fs
+  .readFileSync(path.join(RACINE, 'src-tauri/src/emulators.rs'), 'utf8')
+  .replace(/\r\n/g, '\n');
+const tableau = emulateurs.slice(
+  emulateurs.indexOf('pub const STANDALONES'),
+  emulateurs.indexOf('\n];', emulateurs.indexOf('pub const STANDALONES')),
+);
+const champ = (bloc, nom) => (bloc.match(new RegExp(`${nom}: "([^"]*)"`)) ?? [, ''])[1];
+const externes = tableau
+  .split('Standalone {')
+  .slice(1)
+  .map((bloc) => ({
+    nom: champ(bloc, 'label'),
+    systeme: champ(bloc, 'system'),
+    licence: champ(bloc, 'license'),
+    ou: champ(bloc, 'site') || `https://github.com/${champ(bloc, 'repository')}`,
+  }));
+
+const bloc = [
+  DEBUT,
+  '',
+  `<details><summary><b>Les ${coeurs.length} cœurs libretro</b> — nom, console, licence, auteurs</summary>`,
+  '',
+  '| Cœur | Console | Licence | Auteurs |',
+  '|---|---|---|---|',
+  ...coeurs.map((c) => rangee(c.nom, c.systeme, c.licence, c.auteurs.split('|').join(', '))),
+  '',
+  '</details>',
+  '',
+  `<details><summary><b>Les ${externes.length} émulateurs autonomes</b> — ceux qui gardent leur propre fenêtre</summary>`,
+  '',
+  '| Émulateur | Console | Licence | Projet |',
+  '|---|---|---|---|',
+  ...externes.map((e) => rangee(e.nom, e.systeme, e.licence, e.ou)),
+  '',
+  '</details>',
+  '',
+  FIN,
+].join('\n');
+
+const page = fs.readFileSync(LISEZ, 'utf8').replace(/\r\n/g, '\n');
+const depart = page.indexOf(DEBUT);
+const arrivee = page.indexOf(FIN);
+if (depart < 0 || arrivee < 0) {
+  console.error(`marques ${DEBUT} / ${FIN} introuvables dans README.md`);
+  process.exit(1);
+}
+fs.writeFileSync(LISEZ, page.slice(0, depart) + bloc + page.slice(arrivee + FIN.length), 'utf8');
+console.log(`${coeurs.length} + ${externes.length} lignes de crédits posées dans README.md`);

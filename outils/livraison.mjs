@@ -1,20 +1,26 @@
 // Monte le dossier de livraison : l'exécutable, le code source, les crédits,
 // l'ossature des ROMs, le droit.
 //
-//     node outils/livraison.mjs <dossier cible>
+//     node outils/livraison.mjs <dossier cible> [--leger]
 //
 // La liste des consoles est lue dans `skeleton.rs`, et les crédits dans
 // `credits.rs` : ce sont les mêmes sources que celles dont l'application se
 // sert, et elles ne peuvent donc pas diverger d'une version à l'autre.
+//
+// `--leger` ne pose que l'exécutable, l'ossature des ROMs et la licence. C'est
+// ce qu'on publie quand le dépôt est en ligne : le code source, les crédits et
+// le mode d'emploi y sont déjà, et les recopier dans chaque archive ne ferait
+// que deux versions d'une même chose, dont une périmée.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const RACINE = path.resolve(import.meta.dirname, '..');
 const CIBLE = process.argv[2];
+const LEGER = process.argv.includes('--leger');
 
-if (!CIBLE) {
-  console.error('usage : node outils/livraison.mjs <dossier cible>');
+if (!CIBLE || CIBLE.startsWith('--')) {
+  console.error('usage : node outils/livraison.mjs <dossier cible> [--leger]');
   process.exit(2);
 }
 
@@ -42,7 +48,19 @@ for (const nom of consoles) {
 // --- Le programme et le droit -----------------------------------------------
 
 fs.copyFileSync(path.join(RACINE, 'src-tauri/target/release/evachi.exe'), path.join(CIBLE, 'evachi.exe'));
+// La licence part toujours : la GPL demande qu'elle accompagne le programme, et
+// c'est la seule chose qu'on ne peut pas remplacer par un lien.
 fs.copyFileSync(path.join(RACINE, 'LICENSE'), path.join(CIBLE, 'LICENSE'));
+
+if (LEGER) {
+  const compte = fs
+    .readdirSync(CIBLE, { recursive: true, withFileTypes: true })
+    .filter((e) => e.isFile()).length;
+  console.log(`${consoles.length} dossiers de console`);
+  console.log(`${compte} fichiers : l'exécutable et la licence, rien d'autre`);
+  process.exit(0);
+}
+
 fs.copyFileSync(path.join(RACINE, 'docs/livraison/LISEZ-MOI.txt'), path.join(CIBLE, 'LISEZ-MOI.txt'));
 
 // --- Le code source ---------------------------------------------------------
