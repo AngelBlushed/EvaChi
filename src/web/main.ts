@@ -190,7 +190,7 @@ const keypadBox = $<HTMLDivElement>('keypad');
 const padStatus = $<HTMLElement>('pad-status');
 const folderList = $<HTMLUListElement>('folder-list');
 const aboutBody = $<HTMLDListElement>('about-body');
-const creditsBody = $<HTMLDListElement>('credits-body');
+const creditsBody = $<HTMLElement>('credits-body');
 const creditsNote = $<HTMLElement>('credits-note');
 const raccourcisClavier = $<HTMLDListElement>('raccourcis-clavier');
 const presetList = $<HTMLUListElement>('preset-list');
@@ -5056,19 +5056,42 @@ async function renderCredits(): Promise<void> {
   }
 
   creditsBody.replaceChildren();
-  for (const ligne of lignes) {
-    const dt = document.createElement('dt');
-    dt.textContent = ligne.nom;
-    // Ce qui est posé sur la machine se distingue de ce qu'on propose : la
-    // liste sert autant à savoir ce qu'on a qu'à créditer ce qu'on doit.
-    dt.classList.toggle('pose', ligne.installe);
 
-    const dd = document.createElement('dd');
-    const morceaux = [ligne.systeme, ligne.licence, ligne.auteurs.join(' · ')];
-    dd.textContent = morceaux.filter(Boolean).join(' — ');
-    if (ligne.restreint) dd.classList.add('restreint');
+  // Deux groupes, parce que le même nom peut désigner deux choses : Azahar est
+  // à la fois un cœur libretro et un programme autonome, et ils n'ont ni la
+  // même version ni la même licence. Les lister pêle-mêle les ferait passer
+  // pour une contradiction.
+  const groupes: [string, Credit[]][] = [
+    [t('cœurs libretro'), lignes.filter((ligne) => ligne.genre === 'coeur')],
+    [t('émulateurs externes'), lignes.filter((ligne) => ligne.genre !== 'coeur')],
+  ];
 
-    creditsBody.append(dt, dd);
+  for (const [titre, membres] of groupes) {
+    if (membres.length === 0) continue;
+
+    const entete = document.createElement('h4');
+    entete.textContent = titre;
+    creditsBody.append(entete);
+
+    const liste = document.createElement('dl');
+    liste.className = 'about credits';
+    for (const ligne of membres) {
+      const dt = document.createElement('dt');
+      dt.textContent = ligne.nom;
+      // Ce qui est posé sur la machine se distingue de ce qu'on propose : la
+      // liste sert autant à savoir ce qu'on a qu'à créditer ce qu'on doit.
+      dt.classList.toggle('pose', ligne.installe);
+
+      const dd = document.createElement('dd');
+      // Les auteurs quand le projet les nomme ; son adresse sinon. Un crédit
+      // qui ne mène nulle part ne crédite qu'à moitié.
+      const qui = ligne.auteurs.join(' · ') || ligne.site;
+      dd.textContent = [ligne.systeme, ligne.licence, qui].filter(Boolean).join(' — ');
+      if (ligne.restreint) dd.classList.add('restreint');
+
+      liste.append(dt, dd);
+    }
+    creditsBody.append(liste);
   }
 
   // Une licence non commerciale n'empêche rien ici — EvaChi ne redistribue

@@ -1354,6 +1354,15 @@
         word-break: normal;
       }
       .credits dd.restreint { color: var(--warn); }
+      /* Le titre de groupe : plus discret qu'une section, mais il sépare. */
+      #credits-body h4 {
+        margin: 10px 0 4px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
     </style>
   </head>
   <body>
@@ -1956,7 +1965,7 @@
           recopiée ici, pas un octet n'est redistribué. Les noms et les licences
           ci-dessous sont ceux que chaque projet déclare lui-même.
         </p>
-        <dl class="about credits" id="credits-body"></dl>
+        <div id="credits-body"></div>
         <p class="hint-text" id="credits-note"></p>
       </div>
       <div class="dialog-foot">
