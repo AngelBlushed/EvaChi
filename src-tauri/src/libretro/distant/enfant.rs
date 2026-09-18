@@ -141,6 +141,7 @@ fn traiter(
                     Path::new(&ouverture.coeur),
                     Path::new(&ouverture.dossier_systeme),
                     Path::new(&ouverture.dossier_sauvegardes),
+                    &ouverture.langue,
                 )
             }
             .map_err(|erreur| erreur.to_string())?;

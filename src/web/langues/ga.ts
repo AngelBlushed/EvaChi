@@ -366,4 +366,9 @@ export const ga: readonly string[] = [
   /* 356 */ "Ní scríobhann EvaChi aithriseoir ar bith: óstáil a dhéanann sí orthu. Is tionscadal saor ann féin é gach ceann acu, scríofa ag daoine eile, agus faigheann EvaChi óna n-údair féin iad de réir mar a theastaíonn — níl líne dá gcód cóipeáilte anseo, níl beart dá gcuid á athdháileadh. Is iad na hainmneacha agus na ceadúnais thíos na cinn a dhearbhaíonn gach tionscadal é féin.",
   /* 357 */ "Roithleán",
   /* 358 */ "Na clúdaigh ar aghaidh, na consóil ina gcruach, deannach ag éirí. Ar nós seastán taispeána.",
+  /* 359 */ "Mar an comhéadan",
+  /* 360 */ "Teanga an chomhéadain",
+  /* 361 */ "Teanga na gcluichí",
+  /* 362 */ "Teanga na gcluichí: {0}. Beidh feidhm aige ón gcéad tosú eile.",
+  /* 363 */ "Ar ais",
 ];

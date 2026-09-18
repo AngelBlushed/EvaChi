@@ -343,11 +343,17 @@ pub struct Trame {
 }
 
 /// De quoi charger un cœur, prêt à partir.
-pub fn ouverture(coeur: &Path, systeme: &Path, sauvegardes: &Path) -> Result<Vec<u8>, String> {
+pub fn ouverture(
+    coeur: &Path,
+    systeme: &Path,
+    sauvegardes: &Path,
+    langue: &str,
+) -> Result<Vec<u8>, String> {
     serde_json::to_vec(&Ouverture {
         coeur: coeur.to_string_lossy().into_owned(),
         dossier_systeme: systeme.to_string_lossy().into_owned(),
         dossier_sauvegardes: sauvegardes.to_string_lossy().into_owned(),
+        langue: langue.to_owned(),
     })
     .map_err(|erreur| erreur.to_string())
 }

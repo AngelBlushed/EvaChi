@@ -365,4 +365,9 @@ export const ro: readonly string[] = [
   /* 356 */ "EvaChi nu scrie niciun emulator: ea îi găzduiește. Fiecare e un proiect liber de sine stătător, scris de alții, pe care EvaChi îl aduce de la autorii lui la cerere — nicio linie din codul lor nu e recopiată aici, niciun octet nu e redistribuit. Numele și licențele de mai jos sunt cele pe care fiecare proiect le declară el însuși.",
   /* 357 */ "Carusel",
   /* 358 */ "Coperțile din față, consolele în stivă, un praf care urcă. Ca o vitrină.",
+  /* 359 */ "Ca interfața",
+  /* 360 */ "Limba interfeței",
+  /* 361 */ "Limba jocurilor",
+  /* 362 */ "Limba jocurilor: {0}. Se va aplica de la următoarea pornire.",
+  /* 363 */ "Înapoi",
 ];

@@ -365,4 +365,9 @@ export const ptBR: readonly string[] = [
   /* 356 */ "O EvaChi não escreve nenhum emulador: ele os hospeda. Cada um é um projeto livre por inteiro, escrito por outras pessoas, que o EvaChi vai buscar com os próprios autores sob demanda — nem uma linha do código deles é copiada aqui, nem um byte é redistribuído. Os nomes e as licenças abaixo são os que cada projeto declara por si mesmo.",
   /* 357 */ "Carrossel",
   /* 358 */ "As capas de frente, os consoles empilhados, uma poeira que sobe. No estilo de uma vitrine.",
+  /* 359 */ "Como a interface",
+  /* 360 */ "Idioma da interface",
+  /* 361 */ "Idioma dos jogos",
+  /* 362 */ "Idioma dos jogos: {0}. Valerá a partir da próxima execução.",
+  /* 363 */ "Voltar",
 ];

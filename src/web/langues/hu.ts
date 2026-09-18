@@ -368,4 +368,9 @@ export const hu: readonly string[] = [
   /* 356 */ "Az EvaChi egyetlen emulátort sem ír: helyet ad nekik. Mindegyikük teljes értékű, önálló szabad projekt, amelyet mások írtak, és amelyet az EvaChi kérésre a szerzőitől hoz el — egyetlen soruk sincs ide másolva, egyetlen bájtjukat sem terjeszti tovább. Az alábbi nevek és licencek azok, amelyeket az egyes projektek maguk adnak meg.",
   /* 357 */ "Körhinta",
   /* 358 */ "A borítók szemből, a konzolok egymáson, felszálló por. Mint egy kirakat.",
+  /* 359 */ "Mint a felület",
+  /* 360 */ "A felület nyelve",
+  /* 361 */ "A játékok nyelve",
+  /* 362 */ "A játékok nyelve: {0}. A következő indítástól érvényes.",
+  /* 363 */ "Vissza",
 ];

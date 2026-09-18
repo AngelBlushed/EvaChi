@@ -103,6 +103,7 @@ import {
 } from './input.ts';
 import type { ButtonLayout } from './input.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
+import { COMME_INTERFACE, PARLERS, langueDemandee, parlerParCode } from './parlers.ts';
 import {
   aTraduire,
   compte,
@@ -216,6 +217,7 @@ const biosFolder = $<HTMLButtonElement>('bios-folder');
 const themeList = $<HTMLDivElement>('theme-list');
 const menuList = $<HTMLDivElement>('menu-list');
 const langueList = $<HTMLDivElement>('langue-list');
+const langueMenu = $<HTMLDivElement>('menu-langue');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
@@ -290,6 +292,7 @@ const RETENU = {
   emplacement: 'evachi.emplacement',
   recents: 'evachi.recents',
   langue: 'evachi.langue',
+  parler: 'evachi.langue-jeux',
   tempo: 'evachi.tempo',
 } as const;
 
@@ -418,16 +421,161 @@ function choisirLangue(code: string): void {
   refreshMenus();
 }
 
-/**
- * Dessine le menu des langues, le dernier de la barre.
+/*
+ * Le menu des langues, le dernier de la barre.
  *
- * Un menu à soi plutôt qu'une ligne dans les thèmes : on cherche sa langue
- * tout de suite, et sans savoir lire ce qui est écrit autour. Le nom de chaque
+ * Un menu à soi plutôt qu'une ligne dans les thèmes : on cherche sa langue tout
+ * de suite, et sans savoir lire ce qui est écrit autour. Le nom de chaque
  * langue y est écrit dans cette langue-là — c'est ainsi qu'on reconnaît la
  * sienne dans une liste qu'on ne sait pas lire.
+ *
+ * Deux langues s'y règlent, qui n'ont rien à voir l'une avec l'autre : celle
+ * de l'interface, et celle qu'on voudrait entendre parler aux jeux. La seconde
+ * n'a d'endroit naturel nulle part ailleurs — ce n'est ni un thème, ni un
+ * réglage de cœur — et la mettre ici évite d'avoir à chercher.
  */
+
+/**
+ * Lequel des trois volets le menu « Langue » montre en ce moment.
+ *
+ * Un seul volet dans la page, dont on redessine le contenu : deux listes
+ * posées côte à côte demanderaient à la feuille de style de savoir laquelle
+ * cacher, et à la manette de savoir laquelle parcourir. Ici il n'y a jamais
+ * qu'une liste, et tout ce qui la parcourt marche sans rien apprendre.
+ */
+let voletLangue: 'accueil' | 'interface' | 'jeux' = 'accueil';
+
+/** Montre un volet du menu des langues, et vise sa première entrée. */
+function ouvrirVoletLangue(volet: 'accueil' | 'interface' | 'jeux'): void {
+  voletLangue = volet;
+  renderLangues();
+  langueList.querySelector<HTMLButtonElement>('button')?.focus();
+}
+
+/** Dessine le volet en cours du menu des langues. */
 function renderLangues(): void {
   langueList.replaceChildren();
+  // La liste est une grille de quatre colonnes ancrée à droite ; l'accueil, un
+  // menu ordinaire sous son titre. C'est la seule différence de forme.
+  const liste = voletLangue !== 'accueil';
+  langueList.classList.toggle('langues', liste);
+  if (liste) langueMenu.dataset.volet = 'liste';
+  else delete langueMenu.dataset.volet;
+
+  if (voletLangue === 'accueil') return renderAccueilLangues();
+  if (voletLangue === 'jeux') return renderParlers();
+  return renderLanguesInterface();
+}
+
+/**
+ * Les deux lignes d'accueil.
+ *
+ * Elles disent laquelle des deux langues on va régler. Sans elles, la liste des
+ * cinquante s'ouvrait directement, et la langue des jeux n'aurait eu nulle part
+ * où se mettre — ou serait allée se perdre dans une fenêtre de réglages, loin
+ * de la seule autre chose qui lui ressemble.
+ */
+function renderAccueilLangues(): void {
+  const entrees: [string, 'interface' | 'jeux', string][] = [
+    [t("Langue de l'interface"), 'interface', langueRetenue().nom],
+    [t('Langue des jeux'), 'jeux', nomDuParler()],
+  ];
+
+  for (const [libelle, volet, etat] of entrees) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    choix.textContent = libelle;
+
+    const dit = document.createElement('span');
+    dit.className = 'shortcut';
+    dit.textContent = etat;
+    choix.append(dit);
+
+    // Le menu se referme au moindre clic dans la page : celui-ci change de
+    // volet, il ne choisit rien.
+    choix.addEventListener('click', (event) => {
+      event.stopPropagation();
+      ouvrirVoletLangue(volet);
+    });
+    langueList.append(choix);
+  }
+}
+
+/** Le nom de la langue demandée aux jeux, tel qu'il s'écrit sur la ligne. */
+function nomDuParler(): string {
+  const garde = retenu(RETENU.parler);
+  return parlerParCode(garde)?.nom ?? t("Comme l'interface");
+}
+
+/** La ligne par laquelle on remonte à l'accueil, en tête de chaque liste. */
+function retourAuxLangues(): void {
+  const retour = document.createElement('button');
+  retour.type = 'button';
+  retour.className = 'retour';
+  retour.textContent = `‹ ${t('Retour')}`;
+  retour.addEventListener('click', (event) => {
+    event.stopPropagation();
+    ouvrirVoletLangue('accueil');
+  });
+  langueList.append(retour);
+}
+
+/**
+ * Les langues qu'on peut demander aux jeux.
+ *
+ * Onze, et non cinquante : ce sont celles que les jeux parlent. Proposer d'en
+ * demander une dans laquelle aucun jeu n'existe serait promettre quelque chose
+ * qui n'arrivera pas.
+ */
+function renderParlers(): void {
+  retourAuxLangues();
+  const courante = retenu(RETENU.parler) ?? COMME_INTERFACE;
+
+  const lignes: [string, string][] = [
+    [COMME_INTERFACE, t("Comme l'interface")],
+    ...PARLERS.map((parler): [string, string] => [parler.code, parler.nom]),
+  ];
+
+  for (const [code, nom] of lignes) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    const active = code === courante;
+    choix.setAttribute('aria-pressed', String(active));
+    if (code !== COMME_INTERFACE) choix.lang = code;
+
+    const coche = document.createElement('span');
+    coche.className = 'coche';
+    coche.textContent = active ? '●' : '';
+
+    const etiquette = document.createElement('span');
+    etiquette.textContent = nom;
+
+    choix.append(coche, etiquette);
+    choix.addEventListener('click', () => choisirParler(code));
+    langueList.append(choix);
+  }
+}
+
+/**
+ * Retient la langue à demander aux jeux.
+ *
+ * Elle ne rattrape pas la partie en cours : un cœur lit ses options une fois,
+ * au chargement, et la plupart des consoles émulées liraient leur langue au
+ * démarrage de toute façon. On le dit plutôt que de laisser croire à une panne.
+ */
+function choisirParler(code: string): void {
+  retenir(RETENU.parler, code);
+  renderLangues();
+  log(dit('Langue des jeux : {0}. Elle vaudra au prochain lancement.', nomDuParler()), 'ok');
+}
+
+/** La langue à demander au prochain cœur chargé. */
+function langueDesJeux(): string {
+  return langueDemandee(retenu(RETENU.parler), langueRetenue().code);
+}
+
+function renderLanguesInterface(): void {
+  retourAuxLangues();
   const courante = retenu(RETENU.langue) ?? langueRetenue().code;
 
   for (const langue of LANGUES) {
@@ -1781,6 +1929,12 @@ function closeMenus(): void {
   for (const menu of menubar.querySelectorAll('[data-menu]')) {
     menu.removeAttribute('data-open');
   }
+  // Le menu des langues revient toujours a son accueil : rouvrir « Langue » et
+  // tomber sur la liste ou l'on etait la fois d'avant se lit comme une panne.
+  if (voletLangue !== 'accueil') {
+    voletLangue = 'accueil';
+    renderLangues();
+  }
 }
 
 /** Active ou grise les entrées de menu selon ce qui est possible maintenant. */
@@ -2172,7 +2326,7 @@ async function selectCore(next: CatalogEntry): Promise<boolean> {
   chip8Options.hidden = next.id !== 'chip8';
 
   try {
-    core = await next.open();
+    core = await next.open(langueDesJeux());
   } catch (error) {
     log(`${next.label} — ${reason(error)}`, 'err');
     entry = null;

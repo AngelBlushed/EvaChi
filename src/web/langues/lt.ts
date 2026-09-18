@@ -365,4 +365,9 @@ export const lt: readonly string[] = [
   /* 356 */ "EvaChi nerašo nė vieno emuliatoriaus: ji juos priglaudžia. Kiekvienas iš jų yra savarankiškas laisvas projektas, parašytas kitų, ir EvaChi jį prireikus parsisiunčia iš pačių autorių — nė viena jų kodo eilutė čia nenukopijuota, nė vienas baitas iš naujo neplatinamas. Toliau nurodyti pavadinimai ir licencijos yra tie, kuriuos kiekvienas projektas skelbia pats.",
   /* 357 */ "Karuselė",
   /* 358 */ "Viršeliai priekyje, konsolės krūvoje, kylančios dulkės. Tarsi vitrina.",
+  /* 359 */ "Kaip sąsajos",
+  /* 360 */ "Sąsajos kalba",
+  /* 361 */ "Žaidimų kalba",
+  /* 362 */ "Žaidimų kalba: {0}. Ji galios nuo kito paleidimo.",
+  /* 363 */ "Atgal",
 ];

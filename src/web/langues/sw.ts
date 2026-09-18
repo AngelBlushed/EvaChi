@@ -365,4 +365,9 @@ export const sw: readonly string[] = [
   /* 356 */ "EvaChi haiandiki emulata yoyote: inaziweka tu kwake. Kila moja ni mradi huru kamili, ulioandikwa na wengine, ambao EvaChi huuchukua kwa waandishi wake inapohitajika — hakuna hata mstari mmoja wa msimbo wao ulionakiliwa hapa, wala baiti moja inayosambazwa tena. Majina na leseni hapa chini ni zile ambazo kila mradi hutangaza wenyewe.",
   /* 357 */ "Karuseli",
   /* 358 */ "Majalada yakitazama mbele, konsoli zikiwa rundo, vumbi linalopanda. Kama rafu ya maonyesho.",
+  /* 359 */ "Kama kiolesura",
+  /* 360 */ "Lugha ya kiolesura",
+  /* 361 */ "Lugha ya michezo",
+  /* 362 */ "Lugha ya michezo: {0}. Itaanza kutumika wakati wa kuanzisha ujao.",
+  /* 363 */ "Rudi",
 ];

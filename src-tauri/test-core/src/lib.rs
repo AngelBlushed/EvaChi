@@ -24,6 +24,9 @@ pub const SAMPLE_RATE: f64 = 44100.0;
 pub const AUDIO_FRAMES: usize = 735;
 
 const ENV_SET_PIXEL_FORMAT: c_uint = 10;
+const ENV_GET_VARIABLE: c_uint = 15;
+const ENV_SET_VARIABLES: c_uint = 16;
+const ENV_GET_LANGUAGE: c_uint = 21;
 const ENV_GET_LOG_INTERFACE: c_uint = 27;
 const PIXEL_FORMAT_XRGB8888: c_uint = 1;
 const RETRO_DEVICE_JOYPAD: c_uint = 1;
@@ -37,6 +40,27 @@ pub const CONTENU_REFUSE: &[u8] = b"refuse";
 
 /// Ce qu'il écrit avant de refuser. Choisi pour ressembler à une vraie plainte.
 pub const PLAINTE: &str = "error: missing bios file lynxboot.img";
+
+/// L'option par laquelle ce cœur demande la langue de la machine émulée.
+///
+/// Nommée comme les vrais la nomment — avec le mot « language » dedans —
+/// puisque c'est là-dessus que l'hôte les reconnaît. L'anglais est en tête :
+/// c'est la valeur que retiendrait un hôte qui ne ferait rien, et donc celle
+/// qu'une épreuve doit voir changer pour conclure quoi que ce soit.
+const CLE_LANGUE: &[u8] = b"evachi_essai_language\0";
+const OFFRE_LANGUE: &[u8] = b"Langue du jeu; English|French|Japanese|Spanish\0";
+
+/// Ce que le cœur écrit pour dire la langue qu'on lui a donnée.
+pub const DIT_OPTION: &str = "option de langue : ";
+/// Et celle que l'hôte lui annonce par `GET_LANGUAGE`.
+pub const DIT_RETRO: &str = "langue annoncée : ";
+
+/// Une paire clé/valeur, telle que libretro la fait voyager.
+#[repr(C)]
+struct Variable {
+    key: *const c_char,
+    value: *const c_char,
+}
 
 /// L'interface de journal que libretro tend au cœur.
 ///
@@ -272,6 +296,20 @@ pub unsafe extern "C" fn retro_get_system_av_info(info: *mut SystemAvInfo) {
 #[no_mangle]
 pub unsafe extern "C" fn retro_set_environment(cb: EnvironmentFn) {
     ENVIRONMENT = Some(cb);
+
+    // Les vrais cœurs déclarent leurs options ici, et l'hôte n'a que ce
+    // moment-là pour peser dessus : ensuite le cœur a déjà lu sa valeur.
+    let mut variables = [
+        Variable {
+            key: CLE_LANGUE.as_ptr().cast::<c_char>(),
+            value: OFFRE_LANGUE.as_ptr().cast::<c_char>(),
+        },
+        Variable {
+            key: std::ptr::null(),
+            value: std::ptr::null(),
+        },
+    ];
+    cb(ENV_SET_VARIABLES, variables.as_mut_ptr().cast::<c_void>());
 }
 
 /// # Safety
@@ -322,6 +360,32 @@ pub unsafe extern "C" fn retro_init() {
             std::ptr::addr_of_mut!(interface).cast::<c_void>(),
         ) {
             JOURNAL = interface.log;
+        }
+    }
+
+    // Ce que l'hôte a retenu pour la langue. Dit ici et non gardé pour soi :
+    // c'est la seule chose que l'hôte ne peut pas vérifier tout seul — il sait
+    // ce qu'il a posé, pas ce que le cœur a lu.
+    if let Some(env) = ENVIRONMENT {
+        let mut demande = Variable {
+            key: CLE_LANGUE.as_ptr().cast::<c_char>(),
+            value: std::ptr::null(),
+        };
+        if env(
+            ENV_GET_VARIABLE,
+            std::ptr::addr_of_mut!(demande).cast::<c_void>(),
+        ) && !demande.value.is_null()
+        {
+            let valeur = std::ffi::CStr::from_ptr(demande.value).to_string_lossy();
+            dire(&format!("{DIT_OPTION}{valeur}"));
+        }
+
+        let mut annoncee: c_uint = u32::MAX;
+        if env(
+            ENV_GET_LANGUAGE,
+            std::ptr::addr_of_mut!(annoncee).cast::<c_void>(),
+        ) {
+            dire(&format!("{DIT_RETRO}{annoncee}"));
         }
     }
 

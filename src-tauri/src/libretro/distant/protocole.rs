@@ -99,6 +99,13 @@ pub struct Ouverture {
     pub coeur: String,
     pub dossier_systeme: String,
     pub dossier_sauvegardes: String,
+    /// La langue qu'on voudrait entendre parler au jeu, en BCP 47.
+    ///
+    /// Avec un défaut : les deux côtés sont le même exécutable, mais une
+    /// ouverture écrite par une version plus ancienne ne doit pas faire tomber
+    /// le chargement pour un champ manquant.
+    #[serde(default)]
+    pub langue: String,
 }
 
 /// La requête d'une trame, en octets fixes plutôt qu'en JSON : c'est la seule

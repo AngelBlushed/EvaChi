@@ -366,4 +366,9 @@ export const sv: readonly string[] = [
   /* 356 */ "EvaChi skriver ingen emulator: den ger dem husrum. Var och en är ett fritt projekt i egen rätt, skrivet av andra, som EvaChi hämtar hos upphovsmännen vid behov — inte en rad av deras kod är kopierad hit, inte en byte sprids vidare. Namnen och licenserna nedan är de som varje projekt själv anger.",
   /* 357 */ "Karusell",
   /* 358 */ "Omslagen framifrån, konsolerna i en stapel, damm som stiger. Som ett skyltställ.",
+  /* 359 */ "Som gränssnittet",
+  /* 360 */ "Gränssnittets språk",
+  /* 361 */ "Spelens språk",
+  /* 362 */ "Spelens språk: {0}. Det gäller från nästa start.",
+  /* 363 */ "Tillbaka",
 ];

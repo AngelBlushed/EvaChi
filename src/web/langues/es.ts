@@ -365,4 +365,9 @@ export const es: readonly string[] = [
   /* 356 */ "EvaChi no escribe ningún emulador: los aloja. Cada uno es un proyecto libre por derecho propio, escrito por otros, que EvaChi va a buscar a casa de sus autores según hace falta — ni una línea de su código se copia aquí, ni un byte se redistribuye. Los nombres y las licencias de abajo son los que declara cada proyecto por sí mismo.",
   /* 357 */ "Carrusel",
   /* 358 */ "Las carátulas de frente, las consolas apiladas, un polvo que sube. A la manera de un expositor.",
+  /* 359 */ "Como la interfaz",
+  /* 360 */ "Idioma de la interfaz",
+  /* 361 */ "Idioma de los juegos",
+  /* 362 */ "Idioma de los juegos: {0}. Se aplicará en el próximo arranque.",
+  /* 363 */ "Atrás",
 ];

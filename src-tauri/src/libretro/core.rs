@@ -126,10 +126,19 @@ unsafe fn resolve<T: Copy>(lib: &Library, name: &'static str) -> Result<T, CoreE
 impl Core {
     /// Charge une bibliothèque de cœur et vérifie qu'elle parle bien libretro.
     ///
+    /// `langue` est l'étiquette BCP 47 de la langue qu'on voudrait entendre
+    /// parler au jeu. Elle est posée avant `retro_set_environment`, seul
+    /// moment où elle puisse encore peser sur les options du cœur.
+    ///
     /// # Safety
     /// Charger une bibliothèque exécute son code d'initialisation. L'appelant
     /// répond de la provenance du fichier.
-    pub unsafe fn load(path: &Path, system_dir: &Path, save_dir: &Path) -> Result<Self, CoreError> {
+    pub unsafe fn load(
+        path: &Path,
+        system_dir: &Path,
+        save_dir: &Path,
+        langue: &str,
+    ) -> Result<Self, CoreError> {
         let lib = Library::new(path)?;
 
         let api = Api {
@@ -167,10 +176,12 @@ impl Core {
         };
         let system = to_cstring(system_dir)?;
         let save = to_cstring(save_dir)?;
+        let parler = super::langues::parler(langue).unwrap_or_else(super::langues::defaut);
         with_host(|state| {
             *state = host::HostState {
                 system_dir: system,
                 save_dir: save,
+                langue: parler,
                 ..Default::default()
             };
         });

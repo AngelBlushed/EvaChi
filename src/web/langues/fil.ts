@@ -365,4 +365,9 @@ export const fil: readonly string[] = [
   /* 356 */ "Walang isinusulat na emulator ang EvaChi: pinatutuloy niya sila. Bawat isa ay isang ganap na malayang proyekto, isinulat ng iba, na kinukuha ng EvaChi sa mga may-akda nito kapag kailangan — walang isang linya ng kanilang code ang kinopya rito, walang isang byte ang ipinamamahaging muli. Ang mga pangalan at lisensyang nasa ibaba ay ang mismong idinedeklara ng bawat proyekto.",
   /* 357 */ "Karusel",
   /* 358 */ "Nakaharap ang mga balat, nakasalansan ang mga konsola, may alikabok na pumapaitaas. Parang display stand.",
+  /* 359 */ "Gaya ng interface",
+  /* 360 */ "Wika ng interface",
+  /* 361 */ "Wika ng mga laro",
+  /* 362 */ "Wika ng mga laro: {0}. Iiral ito sa susunod na pagbukas.",
+  /* 363 */ "Bumalik",
 ];

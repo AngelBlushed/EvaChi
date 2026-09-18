@@ -94,7 +94,7 @@ fn session_with_content() -> (MutexGuard<'static, ()>, Session, tempdir::TempDir
     let session = Session::locale();
 
     session
-        .load_core(&test_core_path(), scratch.path(), scratch.path())
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
         .expect("chargement du cœur d'essai");
 
     let content = scratch.path().join("factice.test");
@@ -125,7 +125,7 @@ fn le_coeur_annonce_son_identite() {
     let session = Session::locale();
 
     let info = session
-        .load_core(&test_core_path(), scratch.path(), scratch.path())
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
         .expect("chargement du cœur d'essai");
 
     assert_eq!(info.name, "EvaChi Test Core");
@@ -310,7 +310,7 @@ fn un_fichier_qui_n_est_pas_un_coeur_est_rejete() {
     std::fs::write(&bogus, b"ceci n'est pas une bibliotheque").expect("écriture");
 
     let error = session
-        .load_core(&bogus, scratch.path(), scratch.path())
+        .load_core(&bogus, scratch.path(), scratch.path(), "en")
         .expect_err("doit échouer");
     assert!(
         error.contains("illisible") || error.contains("symbole"),

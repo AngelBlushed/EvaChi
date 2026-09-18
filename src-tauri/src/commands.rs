@@ -1972,7 +1972,9 @@ pub fn probe_core_to_stdout(path: &Path) -> i32 {
 
     // SAFETY : charger une bibliothèque exécute son code d'initialisation. Ce
     // processus n'existe que pour ça et se termine juste après.
-    let outcome = unsafe { evachi::libretro::Core::load(path, &workdir, &workdir) };
+    // La sonde ne fait que lire l'identité du cœur : la langue n'y change
+    // rien, et lui en imposer une donnerait à croire qu'elle compte.
+    let outcome = unsafe { evachi::libretro::Core::load(path, &workdir, &workdir, "") };
 
     let core = match outcome {
         Ok(core) => core,
@@ -2541,13 +2543,14 @@ async fn au_travail<T: Send + 'static>(
 #[tauri::command]
 pub async fn load_core(
     path: String,
+    langue: String,
     session: State<'_, Arc<Session>>,
     paths: State<'_, Paths>,
 ) -> Result<CoreInfo, String> {
     let session = Arc::clone(&session);
     let system = paths.system.clone();
     let saves = paths.saves.clone();
-    au_travail(move || session.load_core(Path::new(&path), &system, &saves)).await
+    au_travail(move || session.load_core(Path::new(&path), &system, &saves, &langue)).await
 }
 
 #[tauri::command]

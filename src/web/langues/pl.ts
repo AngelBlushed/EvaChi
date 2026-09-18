@@ -366,4 +366,9 @@ export const pl: readonly string[] = [
   /* 356 */ "EvaChi nie pisze żadnego emulatora: gości je u siebie. Każdy z nich to pełnoprawny wolny projekt, napisany przez kogoś innego, po który EvaChi sięga do jego autorów na żądanie — ani jedna linijka ich kodu nie jest tu przepisana, ani jeden bajt nie jest rozpowszechniany dalej. Nazwy i licencje poniżej to te, które każdy projekt podaje sam.",
   /* 357 */ "Karuzela",
   /* 358 */ "Okładki od frontu, konsole w stosie, unoszący się kurz. Niczym witryna.",
+  /* 359 */ "Jak interfejs",
+  /* 360 */ "Język interfejsu",
+  /* 361 */ "Język gier",
+  /* 362 */ "Język gier: {0}. Zadziała od następnego uruchomienia.",
+  /* 363 */ "Wstecz",
 ];

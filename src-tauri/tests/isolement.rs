@@ -106,7 +106,7 @@ fn partie() -> (Session, tempdir::TempDir) {
     let session = Session::isolee(evachi());
 
     session
-        .load_core(&test_core_path(), bac.path(), bac.path())
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
         .expect("chargement du cœur d'essai");
 
     let contenu = bac.path().join("factice.test");
@@ -125,7 +125,7 @@ fn le_coeur_repond_depuis_son_processus() {
     let session = Session::isolee(evachi());
 
     let info = session
-        .load_core(&test_core_path(), bac.path(), bac.path())
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
         .expect("chargement du cœur d'essai");
 
     assert_eq!(info.name, "EvaChi Test Core");
@@ -287,12 +287,65 @@ fn un_fichier_absent_est_dit_comme_tel() {
     let bac = tempdir::TempDir::new();
     let session = Session::isolee(evachi());
     session
-        .load_core(&test_core_path(), bac.path(), bac.path())
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
         .expect("chargement du cœur d'essai");
 
     let absent = bac.path().join("ce-fichier-n-existe-pas.test");
     let erreur = session.load_content(&absent).expect_err("refus attendu");
     assert!(erreur.contains("chemin illisible") || erreur.contains("os error"), "{erreur}");
+}
+
+#[test]
+fn la_langue_demandee_arrive_jusqu_au_coeur() {
+    // Le réglage ne vaut que s'il traverse tout : la commande, le tuyau, le
+    // processus voisin, l'hôte, puis l'option que le cœur relit. Rien de moins
+    // ne prouve qu'une cartouche européenne démarrera en français.
+    //
+    // Le cœur d'essai propose « English|French|Japanese|Spanish » et dit ce
+    // qu'il a reçu. L'anglais est sa valeur d'usine — celle que retiendrait un
+    // hôte qui ne fait rien — donc voir « French » prouve qu'on l'a changée.
+    let bac = tempdir::TempDir::new();
+    let session = Session::isolee(evachi());
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path(), "fr")
+        .expect("chargement du cœur d'essai");
+
+    let dits = session.take_messages();
+    assert!(
+        dits.iter().any(|ligne| ligne.contains("option de langue : French")),
+        "le cœur n'a pas reçu le français : {dits:?}"
+    );
+    // 2, c'est `RETRO_LANGUAGE_FRENCH` : l'autre chemin, celui que le cœur
+    // interroge de lui-même.
+    assert!(
+        dits.iter().any(|ligne| ligne.contains("langue annoncée : 2")),
+        "GET_LANGUAGE n'a rien répondu : {dits:?}"
+    );
+}
+
+#[test]
+fn une_langue_que_le_coeur_ne_parle_pas_lui_laisse_la_sienne() {
+    // Le coréen n'est pas dans ce que ce cœur-là propose. Lui imposer une
+    // valeur qu'il ne connaît pas serait pire que de ne rien faire : selon le
+    // cœur, il la refuserait ou la prendrait pour une autre. On le laisse donc
+    // sur sa valeur d'usine — mais on continue de répondre à GET_LANGUAGE,
+    // qui, lui, ne demande pas au cœur de reconnaître quoi que ce soit.
+    let bac = tempdir::TempDir::new();
+    let session = Session::isolee(evachi());
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path(), "ko")
+        .expect("chargement du cœur d'essai");
+
+    let dits = session.take_messages();
+    assert!(
+        dits.iter().any(|ligne| ligne.contains("option de langue : English")),
+        "le cœur aurait dû garder sa valeur d'usine : {dits:?}"
+    );
+    // 10, c'est `RETRO_LANGUAGE_KOREAN`.
+    assert!(
+        dits.iter().any(|ligne| ligne.contains("langue annoncée : 10")),
+        "GET_LANGUAGE n'a rien répondu : {dits:?}"
+    );
 }
 
 #[test]
@@ -307,7 +360,7 @@ fn ce_que_le_coeur_a_dit_avant_de_refuser_arrive_quand_meme() {
     let bac = tempdir::TempDir::new();
     let session = Session::isolee(evachi());
     session
-        .load_core(&test_core_path(), bac.path(), bac.path())
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
         .expect("chargement du cœur d'essai");
 
     // Le cœur d'essai refuse ce contenu-là, après s'en être plaint.
@@ -351,7 +404,7 @@ fn deux_parties_de_suite_ne_se_marchent_pas_dessus() {
 
     for tour in 0..3 {
         session
-            .load_core(&test_core_path(), bac.path(), bac.path())
+            .load_core(&test_core_path(), bac.path(), bac.path(), "en")
             .unwrap_or_else(|erreur| panic!("tour {tour} : {erreur}"));
         session
             .load_content(&contenu)
@@ -370,7 +423,7 @@ fn une_partie_survit_a_la_partie_qui_a_plante() {
     let _ = session.run_frame(saboter(None));
 
     session
-        .load_core(&test_core_path(), bac.path(), bac.path())
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
         .expect("un cœur neuf après un plantage");
     let contenu = bac.path().join("factice.test");
     session.load_content(&contenu).expect("contenu");

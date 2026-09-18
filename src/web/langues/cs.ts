@@ -366,4 +366,9 @@ export const cs: readonly string[] = [
   /* 356 */ "EvaChi nepíše žádný emulátor: hostí je. Každý z nich je plnohodnotný svobodný projekt, napsaný jinými, a EvaChi si pro něj na vyžádání dojde k jeho autorům — ani řádek jejich kódu se zde neopisuje, ani bajt se dál nešíří. Jména a licence níže jsou ty, které každý projekt uvádí sám o sobě.",
   /* 357 */ "Kolotoč",
   /* 358 */ "Obaly zpředu, konzole na sobě, stoupající prach. Ve stylu výkladního stojanu.",
+  /* 359 */ "Jako rozhraní",
+  /* 360 */ "Jazyk rozhraní",
+  /* 361 */ "Jazyk her",
+  /* 362 */ "Jazyk her: {0}. Projeví se při příštím spuštění.",
+  /* 363 */ "Zpět",
 ];

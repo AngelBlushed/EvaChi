@@ -366,4 +366,9 @@ export const eu: readonly string[] = [
   /* 356 */ "EvaChi-k ez du emulagailurik idazten: ostatu ematen die. Bakoitza berez proiektu libre oso bat da, beste batzuek idatzia, eta EvaChi-k bere egileengana jotzen du bila, eskatu ahala — haien kodearen lerro bakar bat ere ez dago hemen kopiatuta, byte bakar bat ere ez da birbanatzen. Beheko izenak eta lizentziak proiektu bakoitzak berak aitortzen dituenak dira.",
   /* 357 */ "Karrusela",
   /* 358 */ "Azalak aurrez aurre, kontsolak pilan, gora doan hautsa. Erakusmahai baten gisara.",
+  /* 359 */ "Interfazearen berdina",
+  /* 360 */ "Interfazearen hizkuntza",
+  /* 361 */ "Jokoen hizkuntza",
+  /* 362 */ "Jokoen hizkuntza: {0}. Hurrengo abiaraztetik aurrera balioko du.",
+  /* 363 */ "Atzera",
 ];

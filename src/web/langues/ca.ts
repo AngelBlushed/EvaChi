@@ -366,4 +366,9 @@ export const ca: readonly string[] = [
   /* 356 */ "EvaChi no escriu cap emulador: n'allotja. Cadascun és un projecte lliure de ple dret, escrit per altres, que EvaChi va a buscar als seus autors a petició — aquí no s'ha copiat ni una línia del seu codi, ni s'ha redistribuït ni un sol byte. Els noms i les llicències de sota són els que cada projecte declara ell mateix.",
   /* 357 */ "Carrusel",
   /* 358 */ "Les caràtules de cara, les consoles en pila, una pols que puja. A la manera d’un expositor.",
+  /* 359 */ "Com la interfície",
+  /* 360 */ "Llengua de la interfície",
+  /* 361 */ "Llengua dels jocs",
+  /* 362 */ "Llengua dels jocs: {0}. S'aplicarà al pròxim llançament.",
+  /* 363 */ "Enrere",
 ];

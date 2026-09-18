@@ -365,4 +365,9 @@ export const id: readonly string[] = [
   /* 356 */ "EvaChi tidak menulis satu pun emulator: ia menampungnya. Masing-masing adalah proyek bebas yang berdiri sendiri, ditulis oleh orang lain, dan diambil EvaChi dari para pembuatnya saat diminta — tak satu baris pun kode mereka disalin ke sini, tak satu byte pun diedarkan ulang. Nama dan lisensi di bawah ini adalah yang dinyatakan sendiri oleh tiap proyek.",
   /* 357 */ "Korsel",
   /* 358 */ "Sampul menghadap depan, konsol bertumpuk, debu yang naik. Seperti etalase.",
+  /* 359 */ "Seperti antarmuka",
+  /* 360 */ "Bahasa antarmuka",
+  /* 361 */ "Bahasa game",
+  /* 362 */ "Bahasa game: {0}. Berlaku mulai peluncuran berikutnya.",
+  /* 363 */ "Kembali",
 ];

@@ -365,4 +365,9 @@ export const vi: readonly string[] = [
   /* 356 */ "EvaChi không viết trình giả lập nào: nó chỉ chứa chúng. Mỗi cái là một dự án tự do trọn vẹn, do người khác viết, và EvaChi đi lấy từ chính tác giả của nó khi cần — không một dòng mã nào của họ được chép lại ở đây, không một byte nào được phát tán lại. Tên và giấy phép dưới đây là những gì mỗi dự án tự công bố.",
   /* 357 */ "Vòng quay",
   /* 358 */ "Bìa game quay mặt ra trước, các hệ máy xếp chồng, bụi bay lên. Kiểu quầy trưng bày.",
+  /* 359 */ "Như giao diện",
+  /* 360 */ "Ngôn ngữ giao diện",
+  /* 361 */ "Ngôn ngữ trò chơi",
+  /* 362 */ "Ngôn ngữ trò chơi: {0}. Sẽ có hiệu lực từ lần chạy sau.",
+  /* 363 */ "Quay lại",
 ];

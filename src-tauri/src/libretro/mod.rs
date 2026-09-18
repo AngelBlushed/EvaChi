@@ -17,6 +17,7 @@ pub mod distant;
 #[cfg(windows)]
 pub mod gl;
 pub mod host;
+pub mod langues;
 pub mod session;
 
 pub use abi::JOYPAD_BUTTONS;

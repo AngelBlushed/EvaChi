@@ -379,6 +379,11 @@ export const CLES: readonly string[] = [
   "EvaChi n'écrit aucun émulateur : elle en héberge. Chacun est un projet libre à part entière, écrit par d'autres, et qu'EvaChi va chercher chez ses auteurs à la demande — pas une ligne de leur code n'est recopiée ici, pas un octet n'est redistribué. Les noms et les licences ci-dessous sont ceux que chaque projet déclare lui-même.",
   "Carrousel",
   "Les jaquettes de face, les consoles en pile, une poussière qui monte. Façon présentoir.",
+  "Comme l'interface",
+  "Langue de l'interface",
+  "Langue des jeux",
+  "Langue des jeux : {0}. Elle vaudra au prochain lancement.",
+  "Retour",
 ];
 
 /**

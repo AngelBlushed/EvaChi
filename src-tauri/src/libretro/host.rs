@@ -16,6 +16,7 @@ use std::sync::Mutex;
 use std::os::raw::{c_char, c_uint, c_void};
 
 use super::abi::*;
+use super::langues;
 
 /// Une trame vidéo convertie en RGBA8888, prête pour un canvas.
 #[derive(Default, Clone)]
@@ -42,6 +43,12 @@ pub struct HostState {
     /// Options du cœur : valeur courante par clé, gardée en `CString` pour que
     /// le pointeur rendu au cœur reste valide après le retour du rappel.
     pub options: HashMap<String, CString>,
+    /// La langue qu'on voudrait entendre parler au jeu.
+    ///
+    /// Posée avant `retro_set_environment`, car c'est là que le cœur déclare
+    /// ses options — et c'est en les déclarant qu'il se voit imposer la
+    /// sienne. Après, il est trop tard : il a déjà lu sa valeur par défaut.
+    pub langue: &'static super::langues::Parler,
     /// Vrai tant que le cœur n'a pas relu les options modifiées.
     pub options_dirty: bool,
     /// Quarts de tour à appliquer à l'image, dans le sens direct.
@@ -97,6 +104,7 @@ impl Default for HostState {
             shutdown: false,
             options: HashMap::new(),
             options_dirty: false,
+            langue: super::langues::defaut(),
             rotation: 0,
             hw: None,
             #[cfg(windows)]
@@ -481,6 +489,18 @@ pub unsafe extern "C" fn evachi_log_line(level: c_uint, text: *const c_char) {
     }
 }
 
+/// Note une décision de l'hôte dans le même journal que les lignes du cœur.
+///
+/// Au même endroit et non à part : qui lit le journal pour comprendre pourquoi
+/// un jeu s'est lancé ainsi veut les deux dans l'ordre où elles sont arrivées.
+fn noter(ligne: String) {
+    eprintln!("[hôte] {ligne}");
+    let mut file = CORE_LOG.lock().unwrap_or_else(|poison| poison.into_inner());
+    if file.len() < CORE_LOG_MAX {
+        file.push(format!("info · {ligne}"));
+    }
+}
+
 /// Relève les lignes accumulées depuis le dernier passage.
 pub fn take_core_log() -> Vec<String> {
     let mut file = CORE_LOG.lock().unwrap_or_else(|poison| poison.into_inner());
@@ -552,12 +572,26 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 
                     // Forme attendue : « Description; valeur1|valeur2|valeur3 ».
                     // La première valeur est celle par défaut.
-                    if let Some(default) = spec
-                        .split_once(';')
-                        .map(|(_, values)| values.trim())
-                        .and_then(|values| values.split('|').next())
-                    {
-                        if let Ok(value) = CString::new(default.trim()) {
+                    if let Some(valeurs) = spec.split_once(';').map(|(_, valeurs)| valeurs.trim()) {
+                        // Sauf pour la langue de la machine émulée : là, c'est
+                        // celle qu'on a demandée qui l'emporte sur l'anglais
+                        // d'usine, quand le cœur la propose. C'est tout l'objet
+                        // du réglage — un jeu européen multilingue démarre sinon
+                        // dans une langue que personne n'a choisie.
+                        let voulue = if langues::cle_de_langue(&key) {
+                            langues::valeur_choisie(host.langue, valeurs)
+                        } else {
+                            None
+                        };
+                        if let Some(langue) = &voulue {
+                            // Dit dans le journal : un jeu qui démarre dans la
+                            // mauvaise langue est sans cela un mystère complet.
+                            noter(format!("langue des jeux · {key} = {langue}"));
+                        }
+
+                        let retenue = voulue
+                            .or_else(|| valeurs.split('|').next().map(|valeur| valeur.trim().to_owned()));
+                        if let Some(value) = retenue.and_then(|valeur| CString::new(valeur).ok()) {
                             host.options.entry(key).or_insert(value);
                         }
                     }
@@ -594,6 +628,20 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
             with_host(|host| {
                 data.cast::<bool>().write(host.options_dirty);
                 host.options_dirty = false;
+            });
+            true
+        }
+
+        ENV_GET_LANGUAGE => {
+            if data.is_null() {
+                return false;
+            }
+            // Le second chemin, et le plus faible : tous les cœurs ne
+            // l'interrogent pas, et ceux qui le font s'en servent souvent pour
+            // leurs propres messages plutôt que pour la machine émulée. C'est
+            // l'option nommée qui fait le gros du travail.
+            with_host(|host| {
+                data.cast::<c_uint>().write(host.langue.retro);
             });
             true
         }

@@ -1341,8 +1341,10 @@
       .menu[data-open] .menu-items.langues { display: grid; }
       /* Le dernier menu ne se positionne pas lui-même : son volet s'ancre alors
          sur la barre, et son bord droit tombe sur celui de la fenêtre. Ancré
-         sur le menu, large de quatre colonnes, il sortait par la gauche. */
-      #menu-langue { position: static; }
+         sur le menu, large de quatre colonnes, il sortait par la gauche.
+         Seulement quand une liste est dépliée : les deux lignes du volet
+         d'accueil sont un menu ordinaire, qui s'ouvre sous son titre. */
+      #menu-langue[data-volet='liste'] { position: static; }
       .menu-items.langues {
         inset-inline-start: auto;
         inset-inline-end: 0;
@@ -1363,6 +1365,15 @@
          cinquante alphabets. */
       .menu-items.langues button[aria-pressed='true'] { color: var(--accent); }
       .menu-items.langues .coche { width: 8px; color: var(--accent); }
+      /* Le retour à l'accueil tient toute la largeur : une ligne de retour
+         rangée en troisième colonne se chercherait à chaque fois. */
+      .menu-items.langues .retour {
+        grid-column: 1 / -1;
+        color: var(--muted);
+        border-bottom: 1px solid var(--edge);
+        border-radius: 0;
+        margin-bottom: 3px;
+      }
 
       /* Le menu animé est une géométrie, pas un texte : ses rangées, ses rails
          et ses translations sont calculés en pixels depuis la gauche. Le
@@ -1722,10 +1733,13 @@
 
         <!-- La langue a son propre menu, et non une ligne dans les thèmes : on la
              cherche là, tout de suite, sans savoir lire ce qui est écrit autour.
-             Le contenu est dessiné par `renderLangues`. -->
+             Deux langues s'y règlent, qui n'ont rien à voir : celle de
+             l'interface et celle qu'on voudrait entendre parler aux jeux. D'où
+             deux lignes d'accueil, puis la liste de l'une ou de l'autre dans le
+             même volet. Tout est dessiné par `renderLangues`. -->
         <div class="menu" data-menu id="menu-langue">
           <button class="menu-title" type="button">Langue</button>
-          <div class="menu-items langues" id="langue-list"></div>
+          <div class="menu-items" id="langue-list"></div>
         </div>
 
         <span class="title" id="now-playing">EvaChi</span>

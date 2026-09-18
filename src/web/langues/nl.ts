@@ -366,4 +366,9 @@ export const nl: readonly string[] = [
   /* 356 */ "EvaChi schrijft geen enkele emulator: ze biedt er onderdak aan. Elk ervan is een volwaardig vrij project, geschreven door anderen, dat EvaChi op verzoek bij de makers zelf ophaalt — geen regel van hun code staat hier overgeschreven, geen byte wordt opnieuw verspreid. De namen en de licenties hieronder zijn wat elk project zelf opgeeft.",
   /* 357 */ "Carrousel",
   /* 358 */ "De covers van voren, de consoles op een stapel, opstijgend stof. Als een vitrine.",
+  /* 359 */ "Zoals de interface",
+  /* 360 */ "Taal van de interface",
+  /* 361 */ "Taal van de spellen",
+  /* 362 */ "Taal van de spellen: {0}. Dit geldt vanaf de volgende start.",
+  /* 363 */ "Terug",
 ];

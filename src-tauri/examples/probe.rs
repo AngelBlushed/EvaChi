@@ -54,7 +54,7 @@ fn main() {
 
     let session = Session::locale();
 
-    let info = match session.load_core(&core_path, &system, &workdir) {
+    let info = match session.load_core(&core_path, &system, &workdir, "en") {
         Ok(info) => info,
         Err(error) => {
             eprintln!("chargement impossible : {error}");

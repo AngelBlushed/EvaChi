@@ -37,7 +37,12 @@ export interface CatalogEntry {
    * format ou trouver ses voisins.
    */
   readonly needsPath: boolean;
-  open(): Promise<AsyncEmulatorCore>;
+  /**
+   * @param langue l'étiquette BCP 47 de la langue qu'on voudrait entendre
+   *   parler au jeu. Un cœur libretro la traduit en option de console ; les
+   *   autres n'en font rien.
+   */
+  open(langue: string): Promise<AsyncEmulatorCore>;
 }
 
 /**
@@ -103,8 +108,8 @@ export async function libretroCores(): Promise<CatalogEntry[]> {
       extensions: entry.extensions,
       layout: JOYPAD,
       needsPath: true,
-      async open() {
-        return LibretroCore.open(entry);
+      async open(langue: string) {
+        return LibretroCore.open(entry, langue);
       },
     }));
 

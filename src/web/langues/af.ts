@@ -365,4 +365,9 @@ export const af: readonly string[] = [
   /* 356 */ "EvaChi skryf geen emulator nie: sy huisves hulle. Elkeen is 'n volwaardige vrye projek, deur ander geskryf, wat EvaChi op aanvraag by sy makers gaan haal — nie 'n enkele reël van hul kode word hier oorgeskryf nie, nie 'n enkele greep word herversprei nie. Die name en lisensies hieronder is dié wat elke projek self opgee.",
   /* 357 */ "Karrousel",
   /* 358 */ "Die omslae van voor, die konsoles op ’n stapel, stof wat opstyg. Soos ’n uitstalrak.",
+  /* 359 */ "Soos die koppelvlak",
+  /* 360 */ "Taal van die koppelvlak",
+  /* 361 */ "Taal van die speletjies",
+  /* 362 */ "Taal van die speletjies: {0}. Dit geld vanaf die volgende begin.",
+  /* 363 */ "Terug",
 ];

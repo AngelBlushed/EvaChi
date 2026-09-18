@@ -368,4 +368,9 @@ export const tr: readonly string[] = [
   /* 356 */ "EvaChi hiçbir emülatör yazmaz: onlara ev sahipliği eder. Her biri başkalarının yazdığı, başlı başına özgür bir projedir; EvaChi onları gerektiğinde yazarlarının kendi kaynağından alır — kodlarının tek satırı buraya kopyalanmaz, tek baytı yeniden dağıtılmaz. Aşağıdaki adlar ve lisanslar, her projenin kendi bildirdikleridir.",
   /* 357 */ "Atlıkarınca",
   /* 358 */ "Kapaklar önden, konsollar üst üste, yükselen bir toz. Vitrin gibi.",
+  /* 359 */ "Arayüzle aynı",
+  /* 360 */ "Arayüz dili",
+  /* 361 */ "Oyunların dili",
+  /* 362 */ "Oyunların dili: {0}. Bir sonraki başlatmadan itibaren geçerli olur.",
+  /* 363 */ "Geri",
 ];

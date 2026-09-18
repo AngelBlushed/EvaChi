@@ -70,6 +70,7 @@ enum Request {
         path: PathBuf,
         system_dir: PathBuf,
         save_dir: PathBuf,
+        langue: String,
         reply: Reply<CoreInfo>,
     },
     LoadContent {
@@ -124,6 +125,7 @@ impl Locale {
                             path,
                             system_dir,
                             save_dir,
+                            langue,
                             reply,
                         } => {
                             // Le cœur précédent est détruit d'abord : deux cœurs
@@ -133,7 +135,8 @@ impl Locale {
                             // SAFETY : charger une bibliothèque exécute son code
                             // d'initialisation ; le chemin vient de l'utilisateur,
                             // qui répond de sa provenance.
-                            let outcome = unsafe { Core::load(&path, &system_dir, &save_dir) };
+                            let outcome =
+                                unsafe { Core::load(&path, &system_dir, &save_dir, &langue) };
                             let _ = reply.send(match outcome {
                                 Ok(loaded) => {
                                     let info = loaded.info().clone();
@@ -222,11 +225,13 @@ impl Locale {
         path: &Path,
         system_dir: &Path,
         save_dir: &Path,
+        langue: &str,
     ) -> Result<CoreInfo, String> {
         self.call(|reply| Request::LoadCore {
             path: path.to_path_buf(),
             system_dir: system_dir.to_path_buf(),
             save_dir: save_dir.to_path_buf(),
+            langue: langue.to_owned(),
             reply,
         })
     }
@@ -371,13 +376,14 @@ impl Session {
         path: &Path,
         system_dir: &Path,
         save_dir: &Path,
+        langue: &str,
     ) -> Result<CoreInfo, String> {
         let mut tenant = self.tenant();
         match &mut *tenant {
-            Tenant::Local(locale) => locale.load_core(path, system_dir, save_dir),
+            Tenant::Local(locale) => locale.load_core(path, system_dir, save_dir, langue),
             #[cfg(windows)]
             Tenant::Distant(chantier) => {
-                let issue = self.ouvrir_a_cote(chantier, path, system_dir, save_dir);
+                let issue = self.ouvrir_a_cote(chantier, path, system_dir, save_dir, langue);
                 match issue {
                     Ok(info) => Ok(info),
                     // Aucun cœur n'a encore vécu à côté, et c'est le démarrage
@@ -388,7 +394,7 @@ impl Session {
                     {
                         eprintln!("[session] {raison} — le cœur restera dans la fenêtre");
                         let locale = Locale::spawn();
-                        let repli = locale.load_core(path, system_dir, save_dir);
+                        let repli = locale.load_core(path, system_dir, save_dir, langue);
                         *tenant = Tenant::Local(locale);
                         repli
                     }
@@ -406,6 +412,7 @@ impl Session {
         path: &Path,
         system_dir: &Path,
         save_dir: &Path,
+        langue: &str,
     ) -> Result<CoreInfo, String> {
         use super::distant::{parent, protocole::Demande, Distante};
 
@@ -434,7 +441,7 @@ impl Session {
         // a fauté, on ne doit surtout pas le réessayer dans la fenêtre : il la
         // tuerait à son tour.
         chantier.engage = true;
-        let charge = parent::ouverture(path, system_dir, save_dir)?;
+        let charge = parent::ouverture(path, system_dir, save_dir, langue)?;
 
         let issue = voisin.demander(Demande::ChargerCoeur, &charge);
         // Relevé avant de regarder l'issue : ce que le cœur a écrit avant de
@@ -732,6 +739,7 @@ mod tests {
                 Path::new("coeur-qui-n-existe-pas.dll"),
                 Path::new("."),
                 Path::new("."),
+                "fr",
             )
             .expect_err("refus attendu");
 

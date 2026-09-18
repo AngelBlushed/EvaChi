@@ -365,4 +365,9 @@ export const is: readonly string[] = [
   /* 356 */ "EvaChi skrifar engan hermi: hún hýsir þá. Hver og einn er sjálfstætt frjálst verkefni, skrifað af öðrum, sem EvaChi sækir til höfunda sinna þegar á þarf að halda — ekki ein lína af kóða þeirra er afrituð hingað, engu bæti er dreift áfram. Nöfnin og leyfin hér að neðan eru þau sem hvert verkefni gefur upp sjálft.",
   /* 357 */ "Hringekja",
   /* 358 */ "Kápurnar að framan, tölvurnar í stafla, ryk sem stígur. Eins og sýningarstandur.",
+  /* 359 */ "Eins og viðmótið",
+  /* 360 */ "Tungumál viðmótsins",
+  /* 361 */ "Tungumál leikjanna",
+  /* 362 */ "Tungumál leikjanna: {0}. Það gildir frá næstu ræsingu.",
+  /* 363 */ "Til baka",
 ];

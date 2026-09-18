@@ -365,4 +365,9 @@ export const fi: readonly string[] = [
   /* 356 */ "EvaChi ei kirjoita yhtään emulaattoria: se isännöi niitä. Jokainen on täysin oma vapaa projektinsa, muiden kirjoittama, jonka EvaChi hakee tekijöiltään tarvittaessa — riviäkään heidän koodistaan ei ole kopioitu tänne, tavuakaan ei levitetä edelleen. Alla olevat nimet ja lisenssit ovat ne, jotka kukin projekti itse ilmoittaa.",
   /* 357 */ "Karuselli",
   /* 358 */ "Kannet edestä, konsolit pinossa, nouseva pöly. Näyttelytelineen tapaan.",
+  /* 359 */ "Kuten käyttöliittymä",
+  /* 360 */ "Käyttöliittymän kieli",
+  /* 361 */ "Pelien kieli",
+  /* 362 */ "Pelien kieli: {0}. Se pätee seuraavasta käynnistyksestä.",
+  /* 363 */ "Takaisin",
 ];

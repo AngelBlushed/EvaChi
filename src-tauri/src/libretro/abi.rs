@@ -39,6 +39,8 @@ pub const ENV_SET_VARIABLES: c_uint = 16;
 pub const ENV_GET_VARIABLE_UPDATE: c_uint = 17;
 pub const ENV_SET_SUPPORT_NO_GAME: c_uint = 18;
 pub const ENV_GET_LIBRETRO_PATH: c_uint = 19;
+/// La langue que l'hôte demande au cœur. Voir [`crate::libretro::langues`].
+pub const ENV_GET_LANGUAGE: c_uint = 21;
 pub const ENV_GET_LOG_INTERFACE: c_uint = 27;
 pub const ENV_GET_CORE_ASSETS_DIRECTORY: c_uint = 30;
 pub const ENV_GET_SAVE_DIRECTORY: c_uint = 31;

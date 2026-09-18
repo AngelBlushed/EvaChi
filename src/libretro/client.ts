@@ -676,8 +676,8 @@ export class LibretroCore implements AsyncEmulatorCore {
    * Charge une bibliothèque de cœur. Un seul cœur tourne à la fois : celui-ci
    * remplace le précédent.
    */
-  static async open(entry: CoreEntry): Promise<LibretroCore> {
-    const identity = await invoke<CoreIdentity>('load_core', { path: entry.path });
+  static async open(entry: CoreEntry, langue = 'en'): Promise<LibretroCore> {
+    const identity = await invoke<CoreIdentity>('load_core', { path: entry.path, langue });
     return new LibretroCore(entry.id, identity);
   }
 

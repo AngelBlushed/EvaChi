@@ -365,4 +365,9 @@ export const lv: readonly string[] = [
   /* 356 */ "EvaChi neraksta nevienu emulatoru: tā tos izmitina. Katrs no tiem ir pilnvērtīgs brīvs projekts, ko sarakstījuši citi un ko EvaChi pēc vajadzības atnes no pašu autoriem — šeit nav pārkopēta neviena viņu koda rindiņa, nav tālāk izplatīts neviens baits. Zemāk redzamie nosaukumi un licences ir tie, ko katrs projekts paziņo pats.",
   /* 357 */ "Karuselis",
   /* 358 */ "Vāki no priekšas, konsoles kaudzē, augšup ceļoši putekļi. Kā izstādes stends.",
+  /* 359 */ "Tāpat kā saskarnē",
+  /* 360 */ "Saskarnes valoda",
+  /* 361 */ "Spēļu valoda",
+  /* 362 */ "Spēļu valoda: {0}. Tā stāsies spēkā nākamajā palaišanā.",
+  /* 363 */ "Atpakaļ",
 ];

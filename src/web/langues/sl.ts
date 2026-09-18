@@ -366,4 +366,9 @@ export const sl: readonly string[] = [
   /* 356 */ "EvaChi ne piše nobenega emulatorja: gosti jih. Vsak je samostojen prost projekt, ki so ga napisali drugi in ga EvaChi po potrebi prinese od njegovih avtorjev — niti vrstica njihove kode ni prepisana sem, niti bajt se ne razširja naprej. Imena in licence spodaj so tisti, ki jih vsak projekt navede sam.",
   /* 357 */ "Vrtiljak",
   /* 358 */ "Ovitki od spredaj, konzole na kupu, prah, ki se dviga. Kot razstavni pult.",
+  /* 359 */ "Kot vmesnik",
+  /* 360 */ "Jezik vmesnika",
+  /* 361 */ "Jezik iger",
+  /* 362 */ "Jezik iger: {0}. Veljal bo od naslednjega zagona.",
+  /* 363 */ "Nazaj",
 ];

@@ -365,4 +365,9 @@ export const et: readonly string[] = [
   /* 356 */ "EvaChi ei kirjuta ühtki emulaatorit: ta majutab neid. Igaüks neist on omaette vaba projekt, mille on kirjutanud teised ja mille EvaChi toob vajaduse korral selle autorite juurest — nende koodist ei ole siia ümber kirjutatud ainsatki rida, edasi ei levitata ainsatki baiti. Allpool olevad nimed ja litsentsid on need, mille iga projekt ise teatab.",
   /* 357 */ "Karussell",
   /* 358 */ "Kaaned otse vaates, konsoolid virnas, tõusev tolm. Väljapanekuriiuli moodi.",
+  /* 359 */ "Nagu liides",
+  /* 360 */ "Liidese keel",
+  /* 361 */ "Mängude keel",
+  /* 362 */ "Mängude keel: {0}. See kehtib järgmisest käivitusest.",
+  /* 363 */ "Tagasi",
 ];
