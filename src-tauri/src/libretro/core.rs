@@ -5,7 +5,7 @@
 //! que l'ABI impose : environnement, initialisation, rappels, contenu.
 
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_uint, c_void};
+use std::os::raw::{c_char, c_uint, c_void};
 use std::path::Path;
 
 use libloading::{Library, Symbol};
@@ -91,6 +91,15 @@ struct Api {
     load_game: unsafe extern "C" fn(*const GameInfo) -> bool,
     unload_game: unsafe extern "C" fn(),
     set_controller_port_device: unsafe extern "C" fn(c_uint, c_uint),
+    /// Oublie toutes les triches. À appeler avant d'en reposer.
+    cheat_reset: unsafe extern "C" fn(),
+    /// Pose une triche, dans le dialecte de la console. C'est le cœur qui
+    /// décode : lui seul connaît le sien.
+    cheat_set: unsafe extern "C" fn(c_uint, bool, *const c_char),
+    /// Le début d'une zone de mémoire, ou un pointeur nul si le cœur ne
+    /// l'expose pas.
+    get_memory_data: unsafe extern "C" fn(c_uint) -> *mut c_void,
+    get_memory_size: unsafe extern "C" fn(c_uint) -> usize,
 }
 
 /// Une manette ordinaire, au sens de libretro.
@@ -111,6 +120,12 @@ pub struct Core {
     info: CoreInfo,
     content_loaded: bool,
     initialised: bool,
+    /// Les valeurs qu'on maintient en RAM, déjà vérifiées contre sa taille.
+    ///
+    /// Gardées ici plutôt que redemandées à chaque trame : elles ne changent
+    /// qu'au gré de l'utilisateur, et la trame est le seul endroit de ce
+    /// programme où compter les microsecondes a un sens.
+    pokes: Vec<super::triches::Poke>,
 }
 
 /// Résout un symbole obligatoire de l'ABI.
@@ -161,6 +176,10 @@ impl Core {
             load_game: resolve(&lib, "retro_load_game")?,
             unload_game: resolve(&lib, "retro_unload_game")?,
             set_controller_port_device: resolve(&lib, "retro_set_controller_port_device")?,
+            cheat_reset: resolve(&lib, "retro_cheat_reset")?,
+            cheat_set: resolve(&lib, "retro_cheat_set")?,
+            get_memory_data: resolve(&lib, "retro_get_memory_data")?,
+            get_memory_size: resolve(&lib, "retro_get_memory_size")?,
         };
 
         let found = (api.api_version)();
@@ -224,6 +243,7 @@ impl Core {
             info,
             content_loaded: false,
             initialised: true,
+            pokes: Vec::new(),
         })
     }
 
@@ -410,6 +430,8 @@ impl Core {
             }
         });
 
+        self.maintenir();
+
         // SAFETY : contenu chargé, rappels posés, même thread qu'au chargement.
         unsafe { (self.api.run)() };
 
@@ -426,6 +448,113 @@ impl Core {
             },
             shutdown: host.shutdown,
         }))
+    }
+
+    /// La RAM de travail de la console, telle que le cœur l'expose.
+    ///
+    /// Vide quand le cœur ne l'expose pas — c'est son droit, et plusieurs ne le
+    /// font pas. On rend alors une tranche vide plutôt qu'une erreur : c'est à
+    /// l'appelant de dire que la recherche est impossible, pas au cœur de
+    /// paraître en panne.
+    fn zone(&self, quoi: c_uint) -> Option<(*mut u8, usize)> {
+        if !self.content_loaded {
+            return None;
+        }
+        // SAFETY : les deux appels vont de pair, et le cœur garantit la zone
+        // valide tant que le contenu est chargé, ce qu'on vient de vérifier.
+        let (debut, taille) = unsafe {
+            (
+                (self.api.get_memory_data)(quoi),
+                (self.api.get_memory_size)(quoi),
+            )
+        };
+        if debut.is_null() || taille == 0 {
+            return None;
+        }
+        Some((debut.cast::<u8>(), taille))
+    }
+
+    /// Ce que la recherche a le droit de lire et d'écrire.
+    ///
+    /// La RAM de travail, et elle seule. La mémoire de sauvegarde est une
+    /// autre zone, que rien ici ne demande jamais : c'est ce qui fait qu'une
+    /// triche ne peut pas coûter une partie sauvegardée.
+    pub fn ram(&self) -> &[u8] {
+        match self.zone(MEMORY_SYSTEM_RAM) {
+            // SAFETY : la zone vaut tant que le contenu est chargé, et
+            // l'emprunt partagé qu'on rend ne vit pas plus longtemps que
+            // `&self` — donc pas plus longtemps que le cœur.
+            Some((debut, taille)) => unsafe { std::slice::from_raw_parts(debut, taille) },
+            None => &[],
+        }
+    }
+
+    /// La même, pour y écrire.
+    ///
+    /// Séparée de [`Core::ram`] à dessein : un `&mut` tiré d'un emprunt
+    /// partagé permettrait à deux tranches modifiables de vivre ensemble, ce
+    /// que Rust interdit partout ailleurs et pour de bonnes raisons. Ici c'est
+    /// `&mut self` qui l'empêche, comme il se doit.
+    fn ram_mut(&mut self) -> &mut [u8] {
+        match self.zone(MEMORY_SYSTEM_RAM) {
+            // SAFETY : même garantie, et l'unicité vient de `&mut self`.
+            Some((debut, taille)) => unsafe { std::slice::from_raw_parts_mut(debut, taille) },
+            None => &mut [],
+        }
+    }
+
+    /// Combien d'octets la RAM de travail compte, zéro si le cœur la cache.
+    pub fn taille_ram(&self) -> usize {
+        self.ram().len()
+    }
+
+    /// Pose les triches, et garde les valeurs à maintenir.
+    ///
+    /// Les codes partent au cœur tels quels : chaque console a son dialecte,
+    /// et `retro_cheat_set` est précisément la porte que l'ABI ouvre pour ne
+    /// pas avoir à les décoder soi-même.
+    ///
+    /// Les valeurs, elles, sont filtrées ici contre la taille réelle de la RAM
+    /// de cette console-ci. Une adresse relevée sur une autre partie, ou une
+    /// fiche mal lue, s'arrête donc là plutôt que d'aller écrire ailleurs.
+    pub fn poser_triches(&mut self, consignes: &super::triches::Consignes) -> super::triches::Etat {
+        let ram = self.taille_ram();
+        self.pokes = consignes.retenues(ram);
+
+        // SAFETY : symboles obligatoires de l'ABI, cœur chargé sur ce thread.
+        unsafe {
+            (self.api.cheat_reset)();
+            for (rang, code) in consignes.codes.iter().enumerate() {
+                let Ok(texte) = CString::new(code.as_str()) else {
+                    continue;
+                };
+                (self.api.cheat_set)(rang as c_uint, true, texte.as_ptr());
+            }
+        }
+
+        super::triches::Etat {
+            retenus: self.pokes.len(),
+            ram,
+        }
+    }
+
+    /// Réécrit les valeurs qu'on maintient, juste avant que le cœur ne tourne.
+    ///
+    /// Avant et non après : le jeu doit lire la valeur qu'on a posée pendant la
+    /// trame qui suit. Posée après, elle serait écrasée par le jeu lui-même
+    /// avant d'avoir servi à quoi que ce soit.
+    fn maintenir(&mut self) {
+        if self.pokes.is_empty() {
+            return;
+        }
+        // La liste est empruntée le temps de l'écriture : sans cela, elle et la
+        // RAM seraient deux emprunts du même cœur, l'un partagé et l'autre non.
+        let pokes = std::mem::take(&mut self.pokes);
+        let ram = self.ram_mut();
+        for poke in &pokes {
+            super::triches::deposer(ram, poke);
+        }
+        self.pokes = pokes;
     }
 
     pub fn reset(&mut self) -> Result<(), CoreError> {

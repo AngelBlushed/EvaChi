@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use evachi::libretro::{Session, JOYPAD_BUTTONS};
+use evachi::libretro::{Consignes, Poke, Session, JOYPAD_BUTTONS};
 
 /// Dimensions annoncées par le cœur d'essai.
 const WIDTH: u32 = 32;
@@ -293,6 +293,146 @@ fn un_fichier_absent_est_dit_comme_tel() {
     let absent = bac.path().join("ce-fichier-n-existe-pas.test");
     let erreur = session.load_content(&absent).expect_err("refus attendu");
     assert!(erreur.contains("chemin illisible") || erreur.contains("os error"), "{erreur}");
+}
+
+/// La RAM que le cœur d'essai expose, et l'octet qu'il y compte.
+const RAM_TAILLE: usize = 2048;
+const RAM_COMPTEUR: u32 = 0;
+
+/// Fait tourner quelques trames, sans toucher à la manette.
+fn tourner(session: &Session, combien: usize) {
+    for _ in 0..combien {
+        session.run_frame(NO_BUTTONS).expect("trame");
+    }
+}
+
+/// L'octet que le cœur d'essai compte, relu depuis son processus.
+fn compteur(session: &Session) -> u8 {
+    let lu = session.lire_memoire(RAM_COMPTEUR, 1).expect("lecture de la RAM");
+    assert_eq!(lu.len(), 1, "la tranche demandée n'est pas revenue entière");
+    lu[0]
+}
+
+#[test]
+fn une_valeur_maintenue_est_reecrite_avant_chaque_trame() {
+    // La différence entre une triche et une valeur posée une fois tient
+    // là-dedans. Le cœur d'essai incrémente un octet de sa RAM à chaque trame :
+    // si la valeur n'était déposée qu'au moment où on la demande, le compteur
+    // repartirait de là et continuerait de monter. Maintenue, elle le ramène à
+    // son point de départ avant chaque trame, et il ne monte plus que d'un.
+    let (session, _bac) = partie();
+
+    tourner(&session, 5);
+    assert_eq!(compteur(&session), 5, "le cœur doit compter ses trames");
+
+    let etat = session
+        .poser_triches(Consignes {
+            codes: Vec::new(),
+            pokes: vec![Poke { adresse: RAM_COMPTEUR, taille: 1, valeur: 100 }],
+        })
+        .expect("pose des triches");
+    assert_eq!(etat.retenus, 1, "la valeur devait être retenue");
+    assert_eq!(etat.ram, RAM_TAILLE, "le cœur d'essai expose deux kilooctets");
+
+    tourner(&session, 5);
+    assert_eq!(
+        compteur(&session),
+        101,
+        "cent, réécrit avant chaque trame, plus l'incrément de la dernière"
+    );
+
+    // Et décocher arrête l'écriture à l'instant : le compte repart d'où il en
+    // était, sans qu'on ait eu à recharger quoi que ce soit.
+    session
+        .poser_triches(Consignes::default())
+        .expect("retrait des triches");
+    tourner(&session, 3);
+    assert_eq!(compteur(&session), 104, "le compteur devait repartir");
+}
+
+#[test]
+fn une_adresse_hors_de_la_ram_est_ecartee_et_le_jeu_continue() {
+    // L'erreur qu'on veut rendre impossible : une adresse relevée sur une autre
+    // console, ou une fiche mal lue, qui irait écrire au-delà de la mémoire.
+    // Elle est écartée, on le dit en le comptant, et la partie continue.
+    let (session, _bac) = partie();
+
+    let etat = session
+        .poser_triches(Consignes {
+            codes: Vec::new(),
+            pokes: vec![
+                Poke { adresse: RAM_TAILLE as u32, taille: 1, valeur: 1 },
+                Poke { adresse: RAM_TAILLE as u32 - 1, taille: 4, valeur: 1 },
+                Poke { adresse: 0x10, taille: 1, valeur: 0x2a },
+            ],
+        })
+        .expect("pose des triches");
+
+    assert_eq!(etat.retenus, 1, "seule celle qui tient devait être retenue");
+
+    tourner(&session, 2);
+    let lu = session.lire_memoire(0x10, 1).expect("lecture de la RAM");
+    assert_eq!(lu[0], 0x2a, "celle qui tenait devait s'appliquer");
+}
+
+#[test]
+fn les_codes_partent_au_coeur_sans_qu_on_y_touche() {
+    // Chaque console a son dialecte, et plusieurs sont chiffrés. EvaChi n'en
+    // décode aucun : elle passe la chaîne au cœur, à qui l'ABI confie ce
+    // travail. L'épreuve vérifie qu'elle arrive intacte, ponctuation comprise,
+    // et qu'on a bien fait oublier les précédentes d'abord.
+    let (session, _bac) = partie();
+    let _ = session.take_messages();
+
+    let etat = session
+        .poser_triches(Consignes {
+            codes: vec![
+                "ATGA-AA56".to_owned(),
+                "8005FA8A+3C00".to_owned(),
+                "0754:00+0756:01".to_owned(),
+            ],
+            pokes: Vec::new(),
+        })
+        .expect("pose des triches");
+    assert_eq!(etat.retenus, 0, "aucune valeur maintenue ici");
+
+    // Une trame pour que ce que le cœur a dit revienne.
+    tourner(&session, 1);
+    let dits = session.take_messages();
+    let dit = |quoi: &str| {
+        assert!(
+            dits.iter().any(|ligne| ligne.contains(quoi)),
+            "« {quoi} » n'est pas arrivé : {dits:?}"
+        );
+    };
+
+    dit("triches oubliées");
+    dit("triche posée : 0 true ATGA-AA56");
+    dit("triche posée : 1 true 8005FA8A+3C00");
+    dit("triche posée : 2 true 0754:00+0756:01");
+}
+
+#[test]
+fn la_lecture_de_memoire_est_bornee_par_la_ram_elle_meme() {
+    // La recherche demande volontiers « tout depuis ici » sans savoir où la RAM
+    // s'arrête : la borne est justement ce qu'elle vient apprendre. On rogne
+    // donc, on ne refuse pas — et on ne lit jamais au-delà.
+    let (session, _bac) = partie();
+
+    assert_eq!(
+        session.lire_memoire(0, u32::MAX).expect("lecture").len(),
+        RAM_TAILLE,
+        "la tranche devait être rognée à la taille réelle"
+    );
+    assert!(
+        session.lire_memoire(RAM_TAILLE as u32, 16).expect("lecture").is_empty(),
+        "une lecture qui commence après la fin ne rend rien"
+    );
+    assert_eq!(
+        session.lire_memoire(RAM_TAILLE as u32 - 4, 16).expect("lecture").len(),
+        4,
+        "une tranche à cheval sur la fin s'arrête à la fin"
+    );
 }
 
 #[test]

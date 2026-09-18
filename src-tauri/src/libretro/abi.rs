@@ -41,6 +41,15 @@ pub const ENV_SET_SUPPORT_NO_GAME: c_uint = 18;
 pub const ENV_GET_LIBRETRO_PATH: c_uint = 19;
 /// La langue que l'hôte demande au cœur. Voir [`crate::libretro::langues`].
 pub const ENV_GET_LANGUAGE: c_uint = 21;
+
+/// La mémoire de sauvegarde de la cartouche, celle qui finit sur le disque.
+///
+/// Nommée pour être reconnue, jamais pour être touchée : c'est la distinction
+/// entre elle et la RAM de travail qui garantit qu'une triche ne peut pas
+/// abîmer une sauvegarde. Voir [`crate::libretro::triches`].
+pub const MEMORY_SAVE_RAM: c_uint = 0;
+/// La RAM de travail de la console. La seule que les triches écrivent.
+pub const MEMORY_SYSTEM_RAM: c_uint = 2;
 pub const ENV_GET_LOG_INTERFACE: c_uint = 27;
 pub const ENV_GET_CORE_ASSETS_DIRECTORY: c_uint = 30;
 pub const ENV_GET_SAVE_DIRECTORY: c_uint = 31;

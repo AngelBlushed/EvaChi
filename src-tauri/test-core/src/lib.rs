@@ -28,6 +28,8 @@ const ENV_GET_VARIABLE: c_uint = 15;
 const ENV_SET_VARIABLES: c_uint = 16;
 const ENV_GET_LANGUAGE: c_uint = 21;
 const ENV_GET_LOG_INTERFACE: c_uint = 27;
+/// La RAM de travail, au sens de libretro.
+const MEMORY_SYSTEM_RAM: c_uint = 2;
 const PIXEL_FORMAT_XRGB8888: c_uint = 1;
 const RETRO_DEVICE_JOYPAD: c_uint = 1;
 
@@ -61,6 +63,25 @@ struct Variable {
     key: *const c_char,
     value: *const c_char,
 }
+
+/// La taille de la RAM de travail que ce cœur expose.
+///
+/// Deux kilooctets, comme la NES : assez pour éprouver les bornes, assez peu
+/// pour qu'une épreuve puisse la parcourir en entier.
+pub const RAM_TAILLE: usize = 2048;
+
+/// L'octet que le cœur incrémente à chaque trame.
+///
+/// C'est lui qui démasque une valeur maintenue d'une valeur posée une seule
+/// fois : sans triche il monte sans fin, et avec une triche il repart de la
+/// même valeur à chaque trame pour ne monter que d'un cran.
+pub const RAM_COMPTEUR: usize = 0;
+
+/// Ce que le cœur écrit quand on lui pose une triche, pour qu'on sache qu'elle
+/// est bien arrivée jusqu'à lui — et dans quel ordre.
+pub const DIT_TRICHE: &str = "triche posée : ";
+/// Et quand on les lui retire toutes.
+pub const DIT_OUBLI: &str = "triches oubliées";
 
 /// L'interface de journal que libretro tend au cœur.
 ///
@@ -184,6 +205,8 @@ static FRAME: AtomicU64 = AtomicU64::new(0);
 
 static mut FRAMEBUFFER: Vec<u32> = Vec::new();
 static mut AUDIO: Vec<i16> = Vec::new();
+/// La RAM de travail, celle que les triches ont le droit d'écrire.
+static mut RAM: Vec<u8> = Vec::new();
 
 /// Contenu accepté : le cœur n'en fait rien mais vérifie qu'on le lui passe.
 static CONTENT_SIZE: AtomicU64 = AtomicU64::new(0);
@@ -392,6 +415,9 @@ pub unsafe extern "C" fn retro_init() {
     FRAME.store(0, Ordering::SeqCst);
     FRAMEBUFFER = vec![0; (STRIDE * HEIGHT) as usize];
     AUDIO = vec![0; AUDIO_FRAMES * 2];
+    // Allouée une fois pour toutes : l'hôte garde le pointeur qu'on lui rend,
+    // et une réallocation le laisserait pendre.
+    RAM = vec![0; RAM_TAILLE];
 
     // Un vrai cœur annonce son format dès l'initialisation ; on fait pareil,
     // ce qui vérifie au passage que l'hôte le retient.
@@ -491,6 +517,14 @@ pub unsafe extern "C" fn retro_run() {
     // main. Rien de ce qui suit n'a alors lieu, pas même une trame.
     if buttons & SABOTAGE == SABOTAGE {
         saboter(buttons);
+    }
+
+    // Le jeu vit sa vie dans sa mémoire : il compte ses trames. Une valeur
+    // maintenue par une triche le ramène à son point de départ juste avant,
+    // et le compteur cesse alors de monter.
+    let ram = &mut *std::ptr::addr_of_mut!(RAM);
+    if let Some(octet) = ram.get_mut(RAM_COMPTEUR) {
+        *octet = octet.wrapping_add(1);
     }
 
     let frame = FRAME.load(Ordering::SeqCst);
@@ -596,15 +630,24 @@ pub extern "C" fn retro_get_region() -> c_uint {
 /// # Safety
 /// Appelé par l'hôte selon l'ABI libretro.
 #[no_mangle]
-pub extern "C" fn retro_get_memory_data(_id: c_uint) -> *mut c_void {
-    std::ptr::null_mut()
+pub unsafe extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
+    // La RAM de travail, et rien d'autre. La mémoire de sauvegarde reste
+    // absente à dessein : une triche qui la trouverait pourrait coûter une
+    // partie, et l'épreuve doit voir l'hôte s'en passer.
+    if id != MEMORY_SYSTEM_RAM {
+        return std::ptr::null_mut();
+    }
+    (*std::ptr::addr_of_mut!(RAM)).as_mut_ptr().cast::<c_void>()
 }
 
 /// # Safety
 /// Appelé par l'hôte selon l'ABI libretro.
 #[no_mangle]
-pub extern "C" fn retro_get_memory_size(_id: c_uint) -> usize {
-    0
+pub unsafe extern "C" fn retro_get_memory_size(id: c_uint) -> usize {
+    if id != MEMORY_SYSTEM_RAM {
+        return 0;
+    }
+    (*std::ptr::addr_of!(RAM)).len()
 }
 
 /// # Safety
@@ -621,9 +664,22 @@ pub unsafe extern "C" fn retro_load_game_special(
 /// # Safety
 /// Appelé par l'hôte selon l'ABI libretro.
 #[no_mangle]
-pub extern "C" fn retro_cheat_reset() {}
+pub unsafe extern "C" fn retro_cheat_reset() {
+    dire(DIT_OUBLI);
+}
 
 /// # Safety
 /// Appelé par l'hôte selon l'ABI libretro.
+///
+/// Un vrai cœur décoderait le code dans le dialecte de sa console. Celui-ci se
+/// contente de dire ce qu'il a reçu : ce qu'on veut éprouver, c'est que la
+/// chaîne porte la chaîne de caractères sans y toucher, pas qu'on sache la lire
+/// — justement, on ne veut surtout pas savoir la lire.
 #[no_mangle]
-pub unsafe extern "C" fn retro_cheat_set(_index: c_uint, _enabled: bool, _code: *const c_char) {}
+pub unsafe extern "C" fn retro_cheat_set(index: c_uint, enabled: bool, code: *const c_char) {
+    if code.is_null() {
+        return;
+    }
+    let texte = std::ffi::CStr::from_ptr(code).to_string_lossy();
+    dire(&format!("{DIT_TRICHE}{index} {enabled} {texte}"));
+}

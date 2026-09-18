@@ -39,6 +39,8 @@ pub enum Demande {
     ReprendreEtat = 6,
     Decharger = 7,
     Messages = 8,
+    Triches = 9,
+    Memoire = 10,
 }
 
 impl Demande {
@@ -52,6 +54,8 @@ impl Demande {
             6 => Self::ReprendreEtat,
             7 => Self::Decharger,
             8 => Self::Messages,
+            9 => Self::Triches,
+            10 => Self::Memoire,
             _ => return None,
         })
     }
@@ -82,6 +86,11 @@ impl Demande {
             // la main en quelques millisecondes.
             Self::Decharger => Duration::from_secs(20),
             Self::Messages => Duration::from_secs(5),
+            // Poser des triches ne demande au cœur qu'une poignée d'appels, et
+            // relire sa mémoire qu'une recopie. Ni l'un ni l'autre ne fait
+            // tourner une trame : ce qui prend du temps ici est un cœur figé,
+            // et on ne veut pas l'attendre plus qu'une trame ou deux.
+            Self::Triches | Self::Memoire => Duration::from_secs(10),
         }
     }
 }
@@ -106,6 +115,26 @@ pub struct Ouverture {
     /// le chargement pour un champ manquant.
     #[serde(default)]
     pub langue: String,
+}
+
+/// Le morceau de RAM qu'on demande à relire.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct Tranche {
+    pub debut: u32,
+    pub longueur: u32,
+}
+
+impl Tranche {
+    /// Ce morceau-là d'une mémoire, rogné à ce qui existe vraiment.
+    ///
+    /// Rognée et non refusée : une recherche demande volontiers « tout depuis
+    /// ici », sans savoir où la RAM s'arrête, et la borne est précisément ce
+    /// qu'elle vient apprendre.
+    pub fn decouper(&self, ram: &[u8]) -> Vec<u8> {
+        let debut = (self.debut as usize).min(ram.len());
+        let fin = debut.saturating_add(self.longueur as usize).min(ram.len());
+        ram[debut..fin].to_vec()
+    }
 }
 
 /// La requête d'une trame, en octets fixes plutôt qu'en JSON : c'est la seule
@@ -524,8 +553,15 @@ mod tests {
     fn chaque_demande_a_une_echeance_et_aucune_n_est_infinie() {
         // Une commande sans échéance, c'est le figement qui revient par la
         // seule porte restée ouverte.
-        for valeur in 1..=8u32 {
-            let demande = Demande::depuis(valeur).expect("étiquette connue");
+        // On parcourt jusqu'à la première étiquette inconnue, plutôt que
+        // jusqu'à un compte écrit ici : une demande ajoutée sans échéance se
+        // fait prendre toute seule, sans qu'on ait à se souvenir de ce nombre.
+        let mut combien = 0;
+        for valeur in 1..256u32 {
+            let Some(demande) = Demande::depuis(valeur) else {
+                break;
+            };
+            combien += 1;
             let echeance = demande.echeance();
             assert!(echeance.as_secs() >= 5, "{demande:?} : échéance trop courte");
             assert!(
@@ -533,8 +569,14 @@ mod tests {
                 "{demande:?} : échéance sans fin déguisée"
             );
         }
-        assert_eq!(Demande::depuis(0), None);
-        assert_eq!(Demande::depuis(9), None);
+
+        assert!(combien >= 8, "seulement {combien} demandes reconnues");
+        assert_eq!(Demande::depuis(0), None, "zéro n'est pas une demande");
+        assert_eq!(
+            Demande::depuis(combien + 1),
+            None,
+            "les étiquettes doivent se suivre sans trou"
+        );
     }
 
     #[test]

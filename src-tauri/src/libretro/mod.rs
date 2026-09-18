@@ -19,8 +19,10 @@ pub mod gl;
 pub mod host;
 pub mod langues;
 pub mod session;
+pub mod triches;
 
 pub use abi::JOYPAD_BUTTONS;
 pub use core::{AvInfo, Core, CoreInfo};
 pub use host::VideoFrame;
+pub use triches::{Consignes, Poke};
 pub use session::{FramePayload, Session};

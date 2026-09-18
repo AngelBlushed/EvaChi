@@ -25,7 +25,7 @@ use windows_sys::Win32::System::Threading::{GetCurrentProcess, TerminateProcess}
 use super::super::core::Core;
 use super::super::host;
 use super::partage::Segment;
-use super::protocole::{self, Demande, Ouverture, Rendu, Requete, BON, MAUVAIS};
+use super::protocole::{self, Demande, Ouverture, Rendu, Requete, Tranche, BON, MAUVAIS};
 
 /// Code de sortie que ce processus se donne quand le cœur a fauté.
 ///
@@ -149,6 +149,21 @@ fn traiter(
             let identite = charge_.info().clone();
             *coeur = Some(charge_);
             serde_json::to_vec(&identite).map_err(|erreur| erreur.to_string())
+        }
+
+        Demande::Triches => {
+            let consignes: crate::libretro::triches::Consignes =
+                serde_json::from_slice(charge).map_err(|erreur| erreur.to_string())?;
+            let coeur = coeur.as_mut().ok_or("aucun cœur chargé")?;
+            let etat = coeur.poser_triches(&consignes);
+            serde_json::to_vec(&etat).map_err(|erreur| erreur.to_string())
+        }
+
+        Demande::Memoire => {
+            let tranche: Tranche =
+                serde_json::from_slice(charge).map_err(|erreur| erreur.to_string())?;
+            let coeur = coeur.as_ref().ok_or("aucun cœur chargé")?;
+            Ok(tranche.decouper(coeur.ram()))
         }
 
         Demande::ChargerContenu => {

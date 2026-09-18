@@ -92,6 +92,15 @@ enum Request {
         data: Vec<u8>,
         reply: Reply<()>,
     },
+    Triches {
+        consignes: super::triches::Consignes,
+        reply: Reply<super::triches::Etat>,
+    },
+    Memoire {
+        debut: u32,
+        longueur: u32,
+        reply: Reply<Vec<u8>>,
+    },
     Unload {
         reply: Reply<()>,
     },
@@ -185,6 +194,27 @@ impl Locale {
                             let _ = reply.send(match core.as_mut() {
                                 Some(core) => {
                                     core.load_state(&data).map_err(|error| error.to_string())
+                                }
+                                None => Err("aucun cœur chargé".into()),
+                            });
+                        }
+
+                        Request::Triches { consignes, reply } => {
+                            let _ = reply.send(match core.as_mut() {
+                                Some(core) => Ok(core.poser_triches(&consignes)),
+                                None => Err("aucun cœur chargé".into()),
+                            });
+                        }
+
+                        Request::Memoire {
+                            debut,
+                            longueur,
+                            reply,
+                        } => {
+                            let _ = reply.send(match core.as_ref() {
+                                Some(core) => {
+                                    Ok(super::distant::protocole::Tranche { debut, longueur }
+                                        .decouper(core.ram()))
                                 }
                                 None => Err("aucun cœur chargé".into()),
                             });
@@ -626,6 +656,54 @@ impl Session {
             Tenant::Distant(_) => {
                 use super::distant::protocole::Demande;
                 self.demander(&mut tenant, Demande::SauverEtat, &[])
+            }
+        }
+    }
+
+    /// Pose les triches et les valeurs à maintenir, et dit ce qui a été retenu.
+    ///
+    /// Tout part d'un coup, à chaque changement : une liste complète se
+    /// remplace sans qu'on ait à suivre ce qui a été coché ou décoché, et le
+    /// cœur oublie les précédentes avant de reprendre les nouvelles. Décocher
+    /// arrête donc l'écriture à l'instant, ce qui est la seule chose qui
+    /// compte quand une triche a mal tourné.
+    pub fn poser_triches(
+        &self,
+        consignes: super::triches::Consignes,
+    ) -> Result<super::triches::Etat, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::Triches { consignes, reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                let charge = serde_json::to_vec(&consignes)
+                    .map_err(|erreur| format!("consignes illisibles : {erreur}"))?;
+                let brut = self.demander(&mut tenant, Demande::Triches, &charge)?;
+                serde_json::from_slice(&brut)
+                    .map_err(|erreur| format!("réponse aux triches illisible : {erreur}"))
+            }
+        }
+    }
+
+    /// Une tranche de la RAM de travail, pour la recherche de valeurs.
+    ///
+    /// Bornée par le cœur lui-même : une tranche qui dépasserait est rognée,
+    /// jamais lue plus loin.
+    pub fn lire_memoire(&self, debut: u32, longueur: u32) -> Result<Vec<u8>, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::Memoire {
+                debut,
+                longueur,
+                reply,
+            }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::{Demande, Tranche};
+                let charge = serde_json::to_vec(&Tranche { debut, longueur })
+                    .map_err(|erreur| erreur.to_string())?;
+                self.demander(&mut tenant, Demande::Memoire, &charge)
             }
         }
     }
