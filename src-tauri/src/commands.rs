@@ -1122,6 +1122,90 @@ pub fn system_files(paths: State<'_, Paths>) -> Vec<crate::bios::SystemFile> {
     crate::bios::survey(&paths.system, &installed)
 }
 
+/// Une ligne de crédit, telle que la fenêtre l'affiche.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Credit {
+    pub nom: String,
+    /// Les auteurs, un par entrée.
+    pub auteurs: Vec<String>,
+    pub licence: String,
+    pub systeme: String,
+    /// « coeur » ou « externe » : les premiers tournent dans EvaChi, les seconds
+    /// dans leur propre fenêtre.
+    pub genre: &'static str,
+    /// Vrai si la licence porte une clause non commerciale.
+    pub restreint: bool,
+    /// Page du projet, quand on en connaît une.
+    pub site: String,
+    /// Vrai si l'émulateur est posé sur cette machine.
+    pub installe: bool,
+}
+
+/// À qui l'on doit chaque émulateur, et sous quelles conditions.
+///
+/// EvaChi n'écrit aucun émulateur et n'en redistribue aucun : elle va les
+/// chercher chez leurs auteurs, à la demande. Leur travail est pourtant partout
+/// dans ce qu'elle donne à voir, et il doit se voir aussi. Cette liste est le
+/// seul endroit où on le lit.
+#[tauri::command]
+pub fn credits(paths: State<'_, Paths>) -> Vec<Credit> {
+    let poses: Vec<String> = scan_cores(&paths.cores)
+        .unwrap_or_default()
+        .iter()
+        .filter_map(|path| path.file_stem().and_then(|s| s.to_str()).map(str::to_owned))
+        .collect();
+
+    let decouper = |auteurs: &str| -> Vec<String> {
+        auteurs
+            .split('|')
+            .map(str::trim)
+            .filter(|nom| !nom.is_empty())
+            .map(str::to_owned)
+            .collect()
+    };
+
+    let mut lignes: Vec<Credit> = crate::credits::COEURS
+        .iter()
+        .map(|credit| Credit {
+            nom: credit.nom.to_owned(),
+            auteurs: decouper(credit.auteurs),
+            licence: credit.licence.to_owned(),
+            systeme: credit.systeme.to_owned(),
+            genre: "coeur",
+            restreint: credit.restreint(),
+            site: String::new(),
+            installe: poses.iter().any(|pose| pose == credit.id),
+        })
+        .collect();
+
+    // Un émulateur autonome est « posé » quand une console le désigne dans les
+    // réglages : c'est la même mesure que celle de la fenêtre d'installation,
+    // et non un second avis qui pourrait la contredire.
+    let declares = read_config(&paths).external;
+
+    // Les émulateurs autonomes portent déjà leur licence dans leur propre
+    // tableau : on l'y lit plutôt que de la recopier, pour qu'il n'y ait jamais
+    // deux vérités.
+    lignes.extend(crate::emulators::STANDALONES.iter().map(|externe| Credit {
+        nom: externe.label.to_owned(),
+        auteurs: Vec::new(),
+        licence: externe.license.to_owned(),
+        systeme: externe.system.to_owned(),
+        genre: "externe",
+        restreint: false,
+        site: if externe.site.is_empty() {
+            format!("https://github.com/{}", externe.repository)
+        } else {
+            externe.site.to_owned()
+        },
+        installe: declares.iter().any(|systeme| systeme.name == externe.system),
+    }));
+
+    lignes.sort_by_key(|ligne| ligne.nom.to_lowercase());
+    lignes
+}
+
 /// Cherche, dans ce que le cœur vient de dire, un fichier système réclamé.
 ///
 /// La liste des fichiers attendus sait d'avance ce que réclament les trente
@@ -2069,12 +2153,21 @@ fn wait_with_deadline(
     mut child: std::process::Child,
     limit: std::time::Duration,
 ) -> Option<std::process::Output> {
-    let started = std::time::Instant::now();
+    // Les deux sorties sont vidées pendant l'attente, et c'est le point
+    // essentiel. Un tuyau que personne ne lit se remplit — soixante-quatre
+    // kilo-octets — et la prochaine écriture du cœur y reste bloquée. Azahar et
+    // PCSX2 étaient écartés pour cette seule raison : EvaChi leur tend un
+    // journal, ils s'en servent abondamment dès leur initialisation, et ils se
+    // figeaient en écrivant dedans. Le cœur n'y était pour rien ; c'est nous
+    // qui ne lisions pas.
+    let sortie = vider(child.stdout.take());
+    let erreurs = vider(child.stderr.take());
 
-    loop {
+    let started = std::time::Instant::now();
+    let issue = loop {
         match child.try_wait() {
             // Terminé de lui-même : on récupère ce qu'il a écrit.
-            Ok(Some(_)) => return child.wait_with_output().ok(),
+            Ok(Some(status)) => break Some(status),
             Ok(None) if started.elapsed() < limit => {
                 std::thread::sleep(std::time::Duration::from_millis(25));
             }
@@ -2082,10 +2175,52 @@ fn wait_with_deadline(
             _ => {
                 let _ = child.kill();
                 let _ = child.wait();
-                return None;
+                break None;
             }
         }
-    }
+    };
+
+    let recolter = |fil: Option<std::thread::JoinHandle<Vec<u8>>>| {
+        fil.and_then(|fil| fil.join().ok()).unwrap_or_default()
+    };
+
+    issue.map(|status| std::process::Output {
+        status,
+        stdout: recolter(sortie),
+        stderr: recolter(erreurs),
+    })
+}
+
+/// Au-delà, on cesse de garder ce qu'un processus écrit — mais on continue de
+/// le lire.
+///
+/// La nuance est tout : garder moins protège la mémoire, lire toujours protège
+/// le processus d'en face. Un cœur bavard en écrit des milliers de lignes par
+/// seconde, et seules les premières nous apprennent quelque chose.
+const MAX_SORTIE: usize = 256 * 1024;
+
+/// Lit un tuyau jusqu'au bout, sur un fil à lui.
+fn vider<L: std::io::Read + Send + 'static>(
+    source: Option<L>,
+) -> Option<std::thread::JoinHandle<Vec<u8>>> {
+    let mut source = source?;
+    std::thread::Builder::new()
+        .name("evachi-vidange".into())
+        .spawn(move || {
+            let mut garde = Vec::new();
+            let mut tampon = [0u8; 8 * 1024];
+            while let Ok(lus) = source.read(&mut tampon) {
+                if lus == 0 {
+                    break;
+                }
+                if garde.len() < MAX_SORTIE {
+                    let place = MAX_SORTIE - garde.len();
+                    garde.extend_from_slice(&tampon[..lus.min(place)]);
+                }
+            }
+            garde
+        })
+        .ok()
 }
 
 /// Les cœurs installés, avec ce qu'ils déclarent.

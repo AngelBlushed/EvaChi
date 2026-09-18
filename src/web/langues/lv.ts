@@ -360,4 +360,7 @@ export const lv: readonly string[] = [
   /* 351 */ "nolikt malā neizdevās — {0}",
   /* 352 */ "jāliek šeit: {0}",
   /* 353 */ "trūkst sistēmas faila: {0}",
+  /* 354 */ "Pateicības",
+  /* 355 */ "Nekomerciāla licence, ko der zināt pirms šā darba pārņemšanas: {0}.",
+  /* 356 */ "EvaChi neraksta nevienu emulatoru: tā tos izmitina. Katrs no tiem ir pilnvērtīgs brīvs projekts, ko sarakstījuši citi un ko EvaChi pēc vajadzības atnes no pašu autoriem — šeit nav pārkopēta neviena viņu koda rindiņa, nav tālāk izplatīts neviens baits. Zemāk redzamie nosaukumi un licences ir tie, ko katrs projekts paziņo pats.",
 ];

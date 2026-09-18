@@ -361,4 +361,7 @@ export const ca: readonly string[] = [
   /* 351 */ "no s'ha pogut apartar — {0}",
   /* 352 */ "s'ha de deixar aquí: {0}",
   /* 353 */ "falta un fitxer de sistema: {0}",
+  /* 354 */ "Crèdits",
+  /* 355 */ "Llicència no comercial, a saber abans de reprendre aquest treball: {0}.",
+  /* 356 */ "EvaChi no escriu cap emulador: n'allotja. Cadascun és un projecte lliure de ple dret, escrit per altres, que EvaChi va a buscar als seus autors a petició — aquí no s'ha copiat ni una línia del seu codi, ni s'ha redistribuït ni un sol byte. Els noms i les llicències de sota són els que cada projecte declara ell mateix.",
 ];

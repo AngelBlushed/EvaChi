@@ -360,4 +360,7 @@ export const ro: readonly string[] = [
   /* 351 */ "nu s-a putut lăsa deoparte — {0}",
   /* 352 */ "de pus aici: {0}",
   /* 353 */ "lipsește un fișier de sistem: {0}",
+  /* 354 */ "Credite",
+  /* 355 */ "Licență necomercială, de știut înainte de orice preluare: {0}.",
+  /* 356 */ "EvaChi nu scrie niciun emulator: ea îi găzduiește. Fiecare e un proiect liber de sine stătător, scris de alții, pe care EvaChi îl aduce de la autorii lui la cerere — nicio linie din codul lor nu e recopiată aici, niciun octet nu e redistribuit. Numele și licențele de mai jos sunt cele pe care fiecare proiect le declară el însuși.",
 ];

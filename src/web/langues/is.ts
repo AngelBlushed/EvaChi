@@ -360,4 +360,7 @@ export const is: readonly string[] = [
   /* 351 */ "tókst ekki að leggja til hliðar — {0}",
   /* 352 */ "leggist hér: {0}",
   /* 353 */ "vantar kerfisskrá: {0}",
+  /* 354 */ "Þakkir",
+  /* 355 */ "Leyfi sem heimilar ekki viðskiptanotkun, vert að vita áður en byggt er á þessu verki: {0}.",
+  /* 356 */ "EvaChi skrifar engan hermi: hún hýsir þá. Hver og einn er sjálfstætt frjálst verkefni, skrifað af öðrum, sem EvaChi sækir til höfunda sinna þegar á þarf að halda — ekki ein lína af kóða þeirra er afrituð hingað, engu bæti er dreift áfram. Nöfnin og leyfin hér að neðan eru þau sem hvert verkefni gefur upp sjálft.",
 ];

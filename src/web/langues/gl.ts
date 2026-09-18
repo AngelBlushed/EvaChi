@@ -360,4 +360,7 @@ export const gl: readonly string[] = [
   /* 351 */ "non se puido apartar — {0}",
   /* 352 */ "hai que poñelo aquí: {0}",
   /* 353 */ "falta un ficheiro de sistema: {0}",
+  /* 354 */ "Créditos",
+  /* 355 */ "Licenza non comercial, que convén saber antes de retomar o traballo: {0}.",
+  /* 356 */ "EvaChi non escribe ningún emulador: alóxaos. Cada un é un proxecto libre de seu, escrito por outras persoas, e que EvaChi vai buscar aos seus autores baixo demanda — nin unha liña do código deles se copia aquí, nin un byte se redistribúe. Os nomes e as licenzas de embaixo son os que cada proxecto declara por si mesmo.",
 ];

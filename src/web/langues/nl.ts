@@ -361,4 +361,7 @@ export const nl: readonly string[] = [
   /* 351 */ "opzijzetten mislukt — {0}",
   /* 352 */ "hier neerzetten: {0}",
   /* 353 */ "er ontbreekt een systeembestand: {0}",
+  /* 354 */ "Credits",
+  /* 355 */ "Niet-commerciële licentie, goed om te weten voordat iemand dit werk overneemt: {0}.",
+  /* 356 */ "EvaChi schrijft geen enkele emulator: ze biedt er onderdak aan. Elk ervan is een volwaardig vrij project, geschreven door anderen, dat EvaChi op verzoek bij de makers zelf ophaalt — geen regel van hun code staat hier overgeschreven, geen byte wordt opnieuw verspreid. De namen en de licenties hieronder zijn wat elk project zelf opgeeft.",
 ];

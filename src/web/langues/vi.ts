@@ -360,4 +360,7 @@ export const vi: readonly string[] = [
   /* 351 */ "không ngưng dùng được — {0}",
   /* 352 */ "đặt vào đây: {0}",
   /* 353 */ "thiếu một tệp hệ thống: {0}",
+  /* 354 */ "Ghi công",
+  /* 355 */ "Giấy phép phi thương mại, cần biết trước khi lấy về dùng lại: {0}.",
+  /* 356 */ "EvaChi không viết trình giả lập nào: nó chỉ chứa chúng. Mỗi cái là một dự án tự do trọn vẹn, do người khác viết, và EvaChi đi lấy từ chính tác giả của nó khi cần — không một dòng mã nào của họ được chép lại ở đây, không một byte nào được phát tán lại. Tên và giấy phép dưới đây là những gì mỗi dự án tự công bố.",
 ];

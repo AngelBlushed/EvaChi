@@ -363,4 +363,7 @@ export const hu: readonly string[] = [
   /* 351 */ "nem sikerült a félretétel — {0}",
   /* 352 */ "ide kell tenni: {0}",
   /* 353 */ "hiányzik egy rendszerfájl: {0}",
+  /* 354 */ "Köszönetnyilvánítás",
+  /* 355 */ "Nem kereskedelmi licenc, tudnivaló minden továbbhasznosítás előtt: {0}.",
+  /* 356 */ "Az EvaChi egyetlen emulátort sem ír: helyet ad nekik. Mindegyikük teljes értékű, önálló szabad projekt, amelyet mások írtak, és amelyet az EvaChi kérésre a szerzőitől hoz el — egyetlen soruk sincs ide másolva, egyetlen bájtjukat sem terjeszti tovább. Az alábbi nevek és licencek azok, amelyeket az egyes projektek maguk adnak meg.",
 ];

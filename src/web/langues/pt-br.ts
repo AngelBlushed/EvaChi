@@ -360,4 +360,7 @@ export const ptBR: readonly string[] = [
   /* 351 */ "não deu para dispensar — {0}",
   /* 352 */ "colocar aqui: {0}",
   /* 353 */ "falta um arquivo de sistema: {0}",
+  /* 354 */ "Créditos",
+  /* 355 */ "Licença não comercial, bom saber antes de reaproveitar este trabalho: {0}.",
+  /* 356 */ "O EvaChi não escreve nenhum emulador: ele os hospeda. Cada um é um projeto livre por inteiro, escrito por outras pessoas, que o EvaChi vai buscar com os próprios autores sob demanda — nem uma linha do código deles é copiada aqui, nem um byte é redistribuído. Os nomes e as licenças abaixo são os que cada projeto declara por si mesmo.",
 ];

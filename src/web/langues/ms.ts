@@ -360,4 +360,7 @@ export const ms: readonly string[] = [
   /* 351 */ "gagal mengetepikan — {0}",
   /* 352 */ "letakkan di sini: {0}",
   /* 353 */ "fail sistem hilang: {0}",
+  /* 354 */ "Penghargaan",
+  /* 355 */ "Lesen bukan komersial, yang perlu diketahui sebelum sesiapa menyambung kerja ini: {0}.",
+  /* 356 */ "EvaChi tidak menulis satu pun emulator: ia menempatkannya. Setiap satu ialah projek bebas yang berdiri sendiri, ditulis oleh orang lain, dan yang diambil oleh EvaChi daripada pembuatnya apabila diperlukan — tiada satu baris pun kod mereka disalin ke sini, tiada satu bait pun diedarkan semula. Nama dan lesen di bawah ialah yang diisytiharkan sendiri oleh setiap projek.",
 ];

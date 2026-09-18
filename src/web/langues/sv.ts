@@ -361,4 +361,7 @@ export const sv: readonly string[] = [
   /* 351 */ "gick inte att ställa undan — {0}",
   /* 352 */ "läggs här: {0}",
   /* 353 */ "en systemfil saknas: {0}",
+  /* 354 */ "Erkännanden",
+  /* 355 */ "Icke-kommersiell licens, värt att veta innan någon tar arbetet vidare: {0}.",
+  /* 356 */ "EvaChi skriver ingen emulator: den ger dem husrum. Var och en är ett fritt projekt i egen rätt, skrivet av andra, som EvaChi hämtar hos upphovsmännen vid behov — inte en rad av deras kod är kopierad hit, inte en byte sprids vidare. Namnen och licenserna nedan är de som varje projekt själv anger.",
 ];

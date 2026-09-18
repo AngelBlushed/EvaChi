@@ -363,4 +363,7 @@ export const tr: readonly string[] = [
   /* 351 */ "kenara alınamadı — {0}",
   /* 352 */ "buraya konacak: {0}",
   /* 353 */ "bir sistem dosyası eksik: {0}",
+  /* 354 */ "Emeği geçenler",
+  /* 355 */ "Ticari olmayan lisans, devralmadan önce bilinmesi gereken: {0}.",
+  /* 356 */ "EvaChi hiçbir emülatör yazmaz: onlara ev sahipliği eder. Her biri başkalarının yazdığı, başlı başına özgür bir projedir; EvaChi onları gerektiğinde yazarlarının kendi kaynağından alır — kodlarının tek satırı buraya kopyalanmaz, tek baytı yeniden dağıtılmaz. Aşağıdaki adlar ve lisanslar, her projenin kendi bildirdikleridir.",
 ];

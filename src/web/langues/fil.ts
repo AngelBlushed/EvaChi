@@ -360,4 +360,7 @@ export const fil: readonly string[] = [
   /* 351 */ "hindi maisantabi — {0}",
   /* 352 */ "ilagay dito: {0}",
   /* 353 */ "may kulang na system file: {0}",
+  /* 354 */ "Mga kredito",
+  /* 355 */ "Lisensyang hindi pangkomersyo, mabuting malaman bago ituloy ang gawaing ito: {0}.",
+  /* 356 */ "Walang isinusulat na emulator ang EvaChi: pinatutuloy niya sila. Bawat isa ay isang ganap na malayang proyekto, isinulat ng iba, na kinukuha ng EvaChi sa mga may-akda nito kapag kailangan — walang isang linya ng kanilang code ang kinopya rito, walang isang byte ang ipinamamahaging muli. Ang mga pangalan at lisensyang nasa ibaba ay ang mismong idinedeklara ng bawat proyekto.",
 ];

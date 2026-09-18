@@ -360,4 +360,7 @@ export const id: readonly string[] = [
   /* 351 */ "gagal menyingkirkan — {0}",
   /* 352 */ "letakkan di sini: {0}",
   /* 353 */ "ada berkas sistem yang kurang: {0}",
+  /* 354 */ "Kredit",
+  /* 355 */ "Lisensi nonkomersial, perlu diketahui sebelum karya ini diteruskan: {0}.",
+  /* 356 */ "EvaChi tidak menulis satu pun emulator: ia menampungnya. Masing-masing adalah proyek bebas yang berdiri sendiri, ditulis oleh orang lain, dan diambil EvaChi dari para pembuatnya saat diminta — tak satu baris pun kode mereka disalin ke sini, tak satu byte pun diedarkan ulang. Nama dan lisensi di bawah ini adalah yang dinyatakan sendiri oleh tiap proyek.",
 ];

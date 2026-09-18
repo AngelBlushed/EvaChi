@@ -1328,6 +1328,32 @@
         color: var(--ink);
         word-break: normal;
       }
+
+      /* Les crédits se lisent comme les raccourcis — le nom à gauche, ce qu'on
+         lui doit à droite — mais la colonne de gauche est plus étroite : ce
+         sont des noms de projets, pas des combinaisons de boutons. */
+      .credits {
+        display: grid;
+        grid-template-columns: minmax(96px, auto) 1fr;
+        gap: 4px 16px;
+        align-items: baseline;
+        margin: 0 0 8px;
+      }
+      .credits dt {
+        font-size: 12px;
+        color: var(--ink);
+        white-space: nowrap;
+      }
+      /* Ce qui est posé sur la machine se distingue de ce qu'on propose. */
+      .credits dt.pose { color: var(--accent); }
+      .credits dd {
+        margin: 0;
+        font-family: inherit;
+        font-size: 11px;
+        color: var(--muted);
+        word-break: normal;
+      }
+      .credits dd.restreint { color: var(--warn); }
     </style>
   </head>
   <body>
@@ -1921,6 +1947,17 @@
 
         <h3 class="section">Installation</h3>
         <dl class="about" id="about-body"></dl>
+
+        <h3 class="section">Crédits</h3>
+        <p class="hint-text" data-i18n-html>
+          EvaChi n'écrit aucun émulateur : elle en héberge. Chacun est un projet
+          libre à part entière, écrit par d'autres, et qu'EvaChi va chercher
+          chez ses auteurs à la demande — pas une ligne de leur code n'est
+          recopiée ici, pas un octet n'est redistribué. Les noms et les licences
+          ci-dessous sont ceux que chaque projet déclare lui-même.
+        </p>
+        <dl class="about credits" id="credits-body"></dl>
+        <p class="hint-text" id="credits-note"></p>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>

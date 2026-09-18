@@ -361,4 +361,7 @@ export const nb: readonly string[] = [
   /* 351 */ "kunne ikke settes til side — {0}",
   /* 352 */ "legges her: {0}",
   /* 353 */ "det mangler en systemfil: {0}",
+  /* 354 */ "Anerkjennelser",
+  /* 355 */ "Ikke-kommersiell lisens, verdt å vite før noen bygger videre på dette arbeidet: {0}.",
+  /* 356 */ "EvaChi skriver ingen emulator: den huser dem. Hver eneste er et fritt prosjekt i egen rett, skrevet av andre, og EvaChi henter det hos forfatterne når det trengs — ikke én linje av koden deres er kopiert inn her, ikke én byte videreformidlet. Navnene og lisensene nedenfor er dem hvert prosjekt selv oppgir.",
 ];

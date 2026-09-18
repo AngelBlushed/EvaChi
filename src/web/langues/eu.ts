@@ -361,4 +361,7 @@ export const eu: readonly string[] = [
   /* 351 */ "ezin izan da baztertu — {0}",
   /* 352 */ "hemen utzi: {0}",
   /* 353 */ "sistema-fitxategi bat falta da: {0}",
+  /* 354 */ "Kredituak",
+  /* 355 */ "Lizentzia ez komertziala, lan hau berrerabili aurretik jakin beharrekoa: {0}.",
+  /* 356 */ "EvaChi-k ez du emulagailurik idazten: ostatu ematen die. Bakoitza berez proiektu libre oso bat da, beste batzuek idatzia, eta EvaChi-k bere egileengana jotzen du bila, eskatu ahala — haien kodearen lerro bakar bat ere ez dago hemen kopiatuta, byte bakar bat ere ez da birbanatzen. Beheko izenak eta lizentziak proiektu bakoitzak berak aitortzen dituenak dira.",
 ];

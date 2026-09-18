@@ -361,4 +361,7 @@ export const da: readonly string[] = [
   /* 351 */ "kunne ikke fravælge — {0}",
   /* 352 */ "lægges her: {0}",
   /* 353 */ "der mangler en systemfil: {0}",
+  /* 354 */ "Anerkendelser",
+  /* 355 */ "Ikke-kommerciel licens, værd at vide, før nogen bygger videre på dette arbejde: {0}.",
+  /* 356 */ "EvaChi skriver ingen emulatorer: den huser dem. Hver enkelt er et fuldgyldigt frit projekt, skrevet af andre, som EvaChi henter hos forfatterne, når der er brug for det — ikke en linje af deres kode er kopieret ind her, ikke en byte bliver videredistribueret. Navnene og licenserne nedenfor er dem, som hvert projekt selv oplyser.",
 ];

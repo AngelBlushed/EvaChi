@@ -29,6 +29,7 @@ import {
   coverIndex,
   COEUR_TOMBE,
   claimedSystemFile,
+  credits,
   coverOriginal,
   decodeBase64,
   encodeBase64,
@@ -74,7 +75,7 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import type { Shot, StateSlot } from '../libretro/client.ts';
+import type { Credit, Shot, StateSlot } from '../libretro/client.ts';
 import {
   FAVORIS,
   collapseDiscs,
@@ -189,6 +190,8 @@ const keypadBox = $<HTMLDivElement>('keypad');
 const padStatus = $<HTMLElement>('pad-status');
 const folderList = $<HTMLUListElement>('folder-list');
 const aboutBody = $<HTMLDListElement>('about-body');
+const creditsBody = $<HTMLDListElement>('credits-body');
+const creditsNote = $<HTMLElement>('credits-note');
 const raccourcisClavier = $<HTMLDListElement>('raccourcis-clavier');
 const presetList = $<HTMLUListElement>('preset-list');
 const installOffer = $<HTMLButtonElement>('placeholder-install');
@@ -5029,6 +5032,56 @@ function renderAbout(): void {
     dd.textContent = detail;
     aboutBody.append(dt, dd);
   }
+
+  void renderCredits();
+}
+
+/**
+ * Dit à qui l'on doit chaque émulateur, et sous quelle licence.
+ *
+ * EvaChi n'en écrit aucun : elle en héberge. Leur travail est partout dans ce
+ * qu'elle donne à voir, et c'est ici — et nulle part ailleurs — qu'il se lit.
+ *
+ * Les noms, les auteurs et les licences ne se traduisent pas : ce sont des noms
+ * propres et des déclarations, et les réécrire serait les trahir.
+ */
+async function renderCredits(): Promise<void> {
+  if (!inShell) return;
+
+  let lignes: Credit[] = [];
+  try {
+    lignes = await credits();
+  } catch {
+    return;
+  }
+
+  creditsBody.replaceChildren();
+  for (const ligne of lignes) {
+    const dt = document.createElement('dt');
+    dt.textContent = ligne.nom;
+    // Ce qui est posé sur la machine se distingue de ce qu'on propose : la
+    // liste sert autant à savoir ce qu'on a qu'à créditer ce qu'on doit.
+    dt.classList.toggle('pose', ligne.installe);
+
+    const dd = document.createElement('dd');
+    const morceaux = [ligne.systeme, ligne.licence, ligne.auteurs.join(' · ')];
+    dd.textContent = morceaux.filter(Boolean).join(' — ');
+    if (ligne.restreint) dd.classList.add('restreint');
+
+    creditsBody.append(dt, dd);
+  }
+
+  // Une licence non commerciale n'empêche rien ici — EvaChi ne redistribue
+  // aucun émulateur, elle va les chercher chez leurs auteurs. Mais qui
+  // reprendrait ce travail pour en faire un produit doit le savoir, et
+  // l'application est le seul endroit où il le lira.
+  const restreints = lignes.filter((ligne) => ligne.restreint).map((ligne) => ligne.nom);
+  creditsNote.textContent = restreints.length
+    ? dit(
+        'Licence non commerciale, à savoir avant toute reprise : {0}.',
+        restreints.join(', '),
+      )
+    : '';
 }
 
 // --- Réglages ---------------------------------------------------------------

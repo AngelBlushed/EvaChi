@@ -360,4 +360,7 @@ export const et: readonly string[] = [
   /* 351 */ "kõrvale panek ei õnnestunud — {0}",
   /* 352 */ "pange siia: {0}",
   /* 353 */ "süsteemifail on puudu: {0}",
+  /* 354 */ "Tunnustused",
+  /* 355 */ "Mittekaubanduslik litsents, hea teada enne selle töö ülevõtmist: {0}.",
+  /* 356 */ "EvaChi ei kirjuta ühtki emulaatorit: ta majutab neid. Igaüks neist on omaette vaba projekt, mille on kirjutanud teised ja mille EvaChi toob vajaduse korral selle autorite juurest — nende koodist ei ole siia ümber kirjutatud ainsatki rida, edasi ei levitata ainsatki baiti. Allpool olevad nimed ja litsentsid on need, mille iga projekt ise teatab.",
 ];

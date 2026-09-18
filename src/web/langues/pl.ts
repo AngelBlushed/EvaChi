@@ -361,4 +361,7 @@ export const pl: readonly string[] = [
   /* 351 */ "nie udało się odstawić — {0}",
   /* 352 */ "połóż tutaj: {0}",
   /* 353 */ "brakuje pliku systemowego: {0}",
+  /* 354 */ "Podziękowania",
+  /* 355 */ "Licencja niekomercyjna, o czym warto wiedzieć przed przejęciem tego projektu: {0}.",
+  /* 356 */ "EvaChi nie pisze żadnego emulatora: gości je u siebie. Każdy z nich to pełnoprawny wolny projekt, napisany przez kogoś innego, po który EvaChi sięga do jego autorów na żądanie — ani jedna linijka ich kodu nie jest tu przepisana, ani jeden bajt nie jest rozpowszechniany dalej. Nazwy i licencje poniżej to te, które każdy projekt podaje sam.",
 ];

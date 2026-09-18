@@ -11,7 +11,7 @@
  * Ajouter une phrase demande donc une ligne par langue, pas une traduction
  * entière. L'ordre n'est plus alphabétique pour cette raison.
  *
- * 7 d'entre elles portent des balises : ce sont les paragraphes dont le
+ * 8 d'entre elles portent des balises : ce sont les paragraphes dont le
  * français mêle texte et mise en forme, traduits d'un seul tenant parce que
  * l'ordre des mots change d'une langue à l'autre.
  *
@@ -374,6 +374,9 @@ export const CLES: readonly string[] = [
   "mise à l'écart impossible — {0}",
   "à déposer ici : {0}",
   "il manque un fichier système : {0}",
+  "Crédits",
+  "Licence non commerciale, à savoir avant toute reprise : {0}.",
+  "EvaChi n'écrit aucun émulateur : elle en héberge. Chacun est un projet libre à part entière, écrit par d'autres, et qu'EvaChi va chercher chez ses auteurs à la demande — pas une ligne de leur code n'est recopiée ici, pas un octet n'est redistribué. Les noms et les licences ci-dessous sont ceux que chaque projet déclare lui-même.",
 ];
 
 /**

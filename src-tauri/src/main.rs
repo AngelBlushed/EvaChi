@@ -18,6 +18,7 @@ mod b64;
 mod bios;
 mod commands;
 mod covers;
+mod credits;
 mod emulators;
 mod install;
 mod manual;
@@ -181,6 +182,7 @@ fn main() {
             commands::install_core,
             commands::system_files,
             commands::claimed_system_file,
+            commands::credits,
             commands::reveal_system_dir,
             commands::pick_system_file,
             commands::adopt_system_file,

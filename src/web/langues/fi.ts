@@ -360,4 +360,7 @@ export const fi: readonly string[] = [
   /* 351 */ "käytöstä poistaminen ei onnistu — {0}",
   /* 352 */ "pantava tähän: {0}",
   /* 353 */ "järjestelmätiedosto puuttuu: {0}",
+  /* 354 */ "Tekijät",
+  /* 355 */ "Ei-kaupallinen lisenssi, hyvä tietää ennen työn jatkamista: {0}.",
+  /* 356 */ "EvaChi ei kirjoita yhtään emulaattoria: se isännöi niitä. Jokainen on täysin oma vapaa projektinsa, muiden kirjoittama, jonka EvaChi hakee tekijöiltään tarvittaessa — riviäkään heidän koodistaan ei ole kopioitu tänne, tavuakaan ei levitetä edelleen. Alla olevat nimet ja lisenssit ovat ne, jotka kukin projekti itse ilmoittaa.",
 ];

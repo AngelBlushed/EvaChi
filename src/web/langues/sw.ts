@@ -360,4 +360,7 @@ export const sw: readonly string[] = [
   /* 351 */ "kuweka kando kumeshindikana — {0}",
   /* 352 */ "iwekwe hapa: {0}",
   /* 353 */ "faili ya mfumo haipo: {0}",
+  /* 354 */ "Shukrani",
+  /* 355 */ "Leseni isiyo ya kibiashara, jambo la kujua kabla ya kuendeleza kazi hii: {0}.",
+  /* 356 */ "EvaChi haiandiki emulata yoyote: inaziweka tu kwake. Kila moja ni mradi huru kamili, ulioandikwa na wengine, ambao EvaChi huuchukua kwa waandishi wake inapohitajika — hakuna hata mstari mmoja wa msimbo wao ulionakiliwa hapa, wala baiti moja inayosambazwa tena. Majina na leseni hapa chini ni zile ambazo kila mradi hutangaza wenyewe.",
 ];

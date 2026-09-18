@@ -360,4 +360,7 @@ export const af: readonly string[] = [
   /* 351 */ "kon nie opsy sit nie — {0}",
   /* 352 */ "sit dit hier neer: {0}",
   /* 353 */ "'n stelsellêer ontbreek: {0}",
+  /* 354 */ "Erkennings",
+  /* 355 */ "Nie-kommersiële lisensie, goed om te weet voor enige oorname: {0}.",
+  /* 356 */ "EvaChi skryf geen emulator nie: sy huisves hulle. Elkeen is 'n volwaardige vrye projek, deur ander geskryf, wat EvaChi op aanvraag by sy makers gaan haal — nie 'n enkele reël van hul kode word hier oorgeskryf nie, nie 'n enkele greep word herversprei nie. Die name en lisensies hieronder is dié wat elke projek self opgee.",
 ];

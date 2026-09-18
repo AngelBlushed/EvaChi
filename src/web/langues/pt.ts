@@ -360,4 +360,7 @@ export const pt: readonly string[] = [
   /* 351 */ "não foi possível pôr de parte — {0}",
   /* 352 */ "a pôr aqui: {0}",
   /* 353 */ "falta um ficheiro de sistema: {0}",
+  /* 354 */ "Créditos",
+  /* 355 */ "Licença não comercial, a saber antes de qualquer reaproveitamento deste trabalho: {0}.",
+  /* 356 */ "O EvaChi não escreve nenhum emulador: alberga-os. Cada um é um projeto livre por inteiro, escrito por outros, que o EvaChi vai buscar aos próprios autores quando é preciso — nem uma linha do código deles é aqui copiada, nem um byte é redistribuído. Os nomes e as licenças abaixo são os que cada projeto declara por si próprio.",
 ];

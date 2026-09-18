@@ -361,4 +361,7 @@ export const sk: readonly string[] = [
   /* 351 */ "nedá sa vyradiť — {0}",
   /* 352 */ "položte sem: {0}",
   /* 353 */ "chýba systémový súbor: {0}",
+  /* 354 */ "Zásluhy",
+  /* 355 */ "Nekomerčná licencia, dobré vedieť pred akýmkoľvek prevzatím: {0}.",
+  /* 356 */ "EvaChi nepíše žiadny emulátor: hostí ich u seba. Každý z nich je samostatný slobodný projekt, napísaný inými, ktorý si EvaChi na vyžiadanie vyzdvihne u jeho autorov — ani riadok ich kódu tu nie je prepísaný, ani bajt sa nešíri ďalej. Názvy a licencie nižšie sú tie, ktoré si každý projekt uvádza sám.",
 ];

@@ -360,4 +360,7 @@ export const lt: readonly string[] = [
   /* 351 */ "nepavyko atidėti — {0}",
   /* 352 */ "dėkite čia: {0}",
   /* 353 */ "trūksta sisteminio failo: {0}",
+  /* 354 */ "Padėkos",
+  /* 355 */ "Nekomercinė licencija — verta žinoti prieš perimant šį darbą: {0}.",
+  /* 356 */ "EvaChi nerašo nė vieno emuliatoriaus: ji juos priglaudžia. Kiekvienas iš jų yra savarankiškas laisvas projektas, parašytas kitų, ir EvaChi jį prireikus parsisiunčia iš pačių autorių — nė viena jų kodo eilutė čia nenukopijuota, nė vienas baitas iš naujo neplatinamas. Toliau nurodyti pavadinimai ir licencijos yra tie, kuriuos kiekvienas projektas skelbia pats.",
 ];

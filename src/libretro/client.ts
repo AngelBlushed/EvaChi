@@ -205,6 +205,31 @@ export async function claimedSystemFile(lignes: readonly string[]): Promise<Recl
   return invoke<Reclamation | null>('claimed_system_file', { lines: lignes });
 }
 
+/** À qui l'on doit un émulateur, et sous quelles conditions. */
+export interface Credit {
+  readonly nom: string;
+  readonly auteurs: readonly string[];
+  readonly licence: string;
+  readonly systeme: string;
+  /** `coeur` s'il tourne dans EvaChi, `externe` s'il a sa propre fenêtre. */
+  readonly genre: string;
+  /** Vrai si la licence porte une clause non commerciale. */
+  readonly restreint: boolean;
+  readonly site: string;
+  readonly installe: boolean;
+}
+
+/**
+ * À qui l'on doit chaque émulateur.
+ *
+ * EvaChi n'en écrit aucun et n'en redistribue aucun : elle va les chercher chez
+ * leurs auteurs, à la demande. Leur travail est pourtant partout dans ce
+ * qu'elle donne à voir, et cette liste est le seul endroit où il se lit.
+ */
+export async function credits(): Promise<Credit[]> {
+  return invoke<Credit[]>('credits');
+}
+
 /** Ouvre le dossier des fichiers système dans l'explorateur. */
 export async function revealSystemDir(): Promise<string> {
   return invoke<string>('reveal_system_dir');

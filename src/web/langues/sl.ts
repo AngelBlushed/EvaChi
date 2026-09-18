@@ -361,4 +361,7 @@ export const sl: readonly string[] = [
   /* 351 */ "umik ni mogoč — {0}",
   /* 352 */ "odložite sem: {0}",
   /* 353 */ "manjka sistemska datoteka: {0}",
+  /* 354 */ "Zasluge",
+  /* 355 */ "Nekomercialna licenca, dobro vedeti pred vsakim prevzemom: {0}.",
+  /* 356 */ "EvaChi ne piše nobenega emulatorja: gosti jih. Vsak je samostojen prost projekt, ki so ga napisali drugi in ga EvaChi po potrebi prinese od njegovih avtorjev — niti vrstica njihove kode ni prepisana sem, niti bajt se ne razširja naprej. Imena in licence spodaj so tisti, ki jih vsak projekt navede sam.",
 ];

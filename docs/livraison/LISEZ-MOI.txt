@@ -39,6 +39,10 @@ Ce qui est nouveau depuis la 0.3.0
 - Fermer la fenêtre en pleine partie ne coûte plus la sauvegarde du jeu :
   l'émulateur a le temps de l'écrire avant qu'on le range.
 - Quitter EvaChi normalement n'annonce plus un plantage au lancement suivant.
+- Le code source complet est dans le dossier « code-source », et CREDITS.txt
+  nomme chaque émulateur, ses auteurs et sa licence.
+- Quand un émulateur réclame un micrologiciel qu'il n'a pas, EvaChi le dit :
+  le nom du fichier, et où le déposer.
 
 
 Ce qui était nouveau dans la 0.3.0
@@ -138,6 +142,23 @@ buildbot.libretro.com, les émulateurs autonomes sur la forge de chaque projet.
 Chacun garde sa licence et son auteur.
 
 
+À qui l'on doit les émulateurs
+------------------------------
+
+EvaChi n'en écrit aucun. Chacun est un projet libre à part entière, mené par
+d'autres, et sans eux cette application n'afficherait rien.
+
+Le fichier CREDITS.txt, à côté de celui-ci, les nomme tous : le nom que le
+projet se donne, les personnes qu'il crédite, la licence qu'il annonce. Ces
+renseignements sont relevés dans les fiches que les projets publient eux-mêmes,
+pas écrits de mémoire. La même liste se lit dans l'application, sous
+« Aide » → « À propos ».
+
+Plusieurs de ces cœurs portent une licence non commerciale. Cela ne change rien à
+l'usage qu'on en fait ici — EvaChi ne les redistribue pas et ne se vend pas —
+mais CREDITS.txt les signale, pour qui voudrait reprendre ce travail.
+
+
 Licence
 -------
 
@@ -145,14 +166,15 @@ EvaChi est un logiciel libre sous GNU GPL version 3 ou ultérieure. Le texte
 complet est dans le fichier LICENSE, à côté de ce fichier-ci.
 
 La GPL donne le droit d'utiliser, d'étudier, de modifier et de redistribuer ce
-programme, à la condition d'en transmettre le code source. Le code source de
-cette version est publié à l'adresse suivante :
+programme, à la condition d'en transmettre le code source. Il est ici :
 
-  <ADRESSE DU DÉPÔT À COMPLÉTER>
+  code-source\
 
-Cette ligne doit être remplie avant toute redistribution : sans elle, la
-condition de la GPL n'est pas remplie.
+Le dossier contient l'intégralité du code, tel qu'il était au moment où cet
+exécutable a été construit — le numéro exact du commit est en bas de
+CREDITS.txt. Rien à télécharger, rien à demander : qui a ce dossier a la
+source, et la condition de la GPL est remplie.
 
 Les émulateurs qu'EvaChi télécharge ne sont pas couverts par cette licence.
 Chacun a la sienne, annoncée dans la fenêtre d'installation avant le
-téléchargement.
+téléchargement, et rappelée dans CREDITS.txt.

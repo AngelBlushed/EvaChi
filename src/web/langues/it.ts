@@ -360,4 +360,7 @@ export const it: readonly string[] = [
   /* 351 */ "esclusione impossibile — {0}",
   /* 352 */ "da mettere qui: {0}",
   /* 353 */ "manca un file di sistema: {0}",
+  /* 354 */ "Riconoscimenti",
+  /* 355 */ "Licenza non commerciale, da sapere prima di riprendere questo lavoro: {0}.",
+  /* 356 */ "EvaChi non scrive nessun emulatore: li ospita. Ognuno è un progetto libero a sé stante, scritto da altri, che EvaChi va a prendere dai suoi autori su richiesta — non una riga del loro codice è copiata qui, non un byte è ridistribuito. I nomi e le licenze qui sotto sono quelli che ogni progetto dichiara da sé.",
 ];
