@@ -89,7 +89,7 @@ export const CLES: readonly string[] = [
   "Liaisons d'origine",
   "Lissage",
   "Mettre le jeu en favori, ou l'en retirer",
-  "Musique du menu animé",
+  "Musique des menus animés",
   "Nom",
   "Ouvrir la barre de menus",
   "Ouvrir le dossier",
@@ -251,7 +251,7 @@ export const CLES: readonly string[] = [
   "page web : seuls les cœurs internes sont disponibles, sans bibliothèque",
   "Papier",
   "par défaut",
-  "Parcourir la grille et le menu animé",
+  "Parcourir la grille et les menus animés",
   "plein écran refusé — {0}",
   "pressez le bouton voulu sur la manette",
   "pressez une touche…",
@@ -354,7 +354,7 @@ export const CLES: readonly string[] = [
   "Cinq consoles à la fois",
   "Croix directionnelle",
   "D'une initiale à la suivante",
-  "Dans le menu animé, cinq jeux à la fois",
+  "Dans les menus animés, cinq jeux à la fois",
   "Vitesse du jeu",
   "Annuler",
   "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop serrée. À la manette, les directions déplacent et les gâchettes règlent la taille.",
@@ -377,6 +377,8 @@ export const CLES: readonly string[] = [
   "Crédits",
   "Licence non commerciale, à savoir avant toute reprise : {0}.",
   "EvaChi n'écrit aucun émulateur : elle en héberge. Chacun est un projet libre à part entière, écrit par d'autres, et qu'EvaChi va chercher chez ses auteurs à la demande — pas une ligne de leur code n'est recopiée ici, pas un octet n'est redistribué. Les noms et les licences ci-dessous sont ceux que chaque projet déclare lui-même.",
+  "Carrousel",
+  "Les jaquettes de face, les consoles en pile, une poussière qui monte. Façon présentoir.",
 ];
 
 /**

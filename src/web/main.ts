@@ -141,6 +141,8 @@ import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } f
 import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
+import { fenetre, place } from './carrousel.ts';
+import { dessiner as dessinerPoussiere } from './poussiere.ts';
 import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
 import { SELECTEUR_ACTIF, gestePour, premierUtile, tourne } from './focus.ts';
 
@@ -177,6 +179,17 @@ const xmbLettre = $<HTMLDivElement>('xmb-lettre');
 const xmbRail = $<HTMLDivElement>('xmb-rail');
 const xmbAfficheInitiale = $<HTMLElement>('xmb-affiche-initiale');
 const xmbAfficheImage = $<HTMLImageElement>('xmb-affiche-image');
+const carrView = $<HTMLDivElement>('carrousel');
+const carrFond = $<HTMLCanvasElement>('carrousel-fond');
+const carrPile = $<HTMLDivElement>('carrousel-pile');
+const carrConsoles = $<HTMLDivElement>('carrousel-consoles');
+const carrCartes = $<HTMLDivElement>('carrousel-cartes');
+const carrConsole = $<HTMLElement>('carrousel-console');
+const carrHeure = $<HTMLElement>('carrousel-heure');
+const carrTitre = $<HTMLElement>('carrousel-titre');
+const carrDetail = $<HTMLElement>('carrousel-detail');
+const carrPied = $<HTMLElement>('carrousel-pied');
+const carrLettre = $<HTMLDivElement>('carrousel-lettre');
 const placeholder = $<HTMLDivElement>('placeholder');
 const placeholderPath = $<HTMLElement>('placeholder-path');
 const searchInput = $<HTMLInputElement>('search');
@@ -451,7 +464,7 @@ function renderLangues(): void {
   }
 }
 
-/** Les deux façons de présenter la bibliothèque. */
+/** Les quatre façons de présenter la bibliothèque. */
 const MENUS = [
   {
     id: 'liste',
@@ -468,6 +481,13 @@ const MENUS = [
     label: aTraduire('Menu animé'),
     detail: aTraduire(
       'Les consoles en rangée, les jeux en colonne, un fond qui ondule. Façon console de salon.',
+    ),
+  },
+  {
+    id: 'carrousel',
+    label: aTraduire('Carrousel'),
+    detail: aTraduire(
+      'Les jaquettes de face, les consoles en pile, une poussière qui monte. Façon présentoir.',
     ),
   },
 ] as const;
@@ -1617,10 +1637,11 @@ async function jouerItem(item: Playable): Promise<void> {
 function jeuVise(): Playable | undefined {
   if (enGrille()) return tuiles[choisie];
   if (enXmb()) return voletsXmb[colonneXmb]?.games[entreeXmb];
+  if (enCarrousel()) return voletsCarr[etageCarr]?.games[carteCarr];
   return undefined;
 }
 
-/** Vrai quand le menu animé doit avoir sa musique. */
+/** Vrai quand un menu de salon doit avoir sa musique. */
 function musiqueVoulue(): boolean {
   return retenu(RETENU.musique) !== 'non';
 }
@@ -1634,7 +1655,7 @@ musiqueCase.addEventListener('change', () => {
   retenir(RETENU.musique, musiqueCase.checked ? 'oui' : 'non');
   // Décochée en cours d'écoute, la musique doit se taire tout de suite ;
   // recochée, repartir sans qu'on ait à quitter le menu.
-  if (musiqueCase.checked && enXmb() && !libraryView.hidden) demarrerMusique();
+  if (musiqueCase.checked && enMenuAnime() && !libraryView.hidden) demarrerMusique();
   else arreterMusique();
 });
 
@@ -2683,12 +2704,23 @@ const croix = {
 const rails = { avant: new Held(320, 130), arriere: new Held(320, 130) };
 const valider = new Held(1000, 1000);
 
+/** Les présentations qui se parcourent à la manette. */
+type Vue = 'grille' | 'xmb' | 'carrousel';
+
 /** Vrai quand une vue manette est à l'écran et qu'elle a de quoi montrer. */
-function vueManette(): 'grille' | 'xmb' | null {
+function vueManette(): Vue | null {
   if (libraryView.hidden) return null;
   if (enGrille() && tuiles.length > 0) return 'grille';
   if (enXmb() && voletsXmb.length > 0) return 'xmb';
+  if (enCarrousel() && voletsCarr.length > 0) return 'carrousel';
   return null;
+}
+
+/** Lance ce que la vue en cours tient sous son repère. */
+function jouerVue(vue: Vue): Promise<void> {
+  if (vue === 'grille') return jouerChoisie();
+  if (vue === 'xmb') return jouerXmb();
+  return jouerCarr();
 }
 
 /** Les filtres d'appui des boutons autres que les directions. */
@@ -2761,7 +2793,7 @@ function naviguerMenu(): void {
   const b = boutons.b.update(appuye(BOUTON.b), maintenant).pressed;
   const start = boutons.start.update(appuye(BOUTON.start), maintenant).pressed;
 
-  const enMenu = !libraryView.hidden && !document.querySelector('dialog[open]') && enXmb();
+  const enMenu = !libraryView.hidden && !document.querySelector('dialog[open]') && enMenuAnime();
 
   const pas: Direction[] = [];
   for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
@@ -2774,32 +2806,42 @@ function naviguerMenu(): void {
   }
 
   if (enMenu) {
-    for (const sens of ['haut', 'bas'] as Direction[]) {
+    // Les deux menus de salon ont les mêmes commandes, sur des axes échangés :
+    // les jeux se parcourent en colonne dans l'un, en rangée dans l'autre, et
+    // les consoles l'inverse. Tout le reste est écrit une fois pour les deux.
+    const carrousel = enCarrousel();
+    const bouger = carrousel ? deplacerCarr : deplacerXmb;
+    /** L'axe des jeux : c'est là que la croix enjambe cinq crans. */
+    const jeux: Direction[] = carrousel ? ['gauche', 'droite'] : ['haut', 'bas'];
+    /** Celui des consoles : la croix y reste fine, les gâchettes y enjambent.
+        Deux commandes pour le même saut se gêneraient. */
+    const consoles: Direction[] = carrousel ? ['haut', 'bas'] : ['gauche', 'droite'];
+
+    for (const sens of jeux) {
       const etat = croix[sens].update(dpad[sens], maintenant);
       if (etat.pressed || etat.repeat) {
         tic();
-        deplacerXmb(sens, ENJAMBEE);
+        bouger(sens, ENJAMBEE);
       }
     }
-    // À gauche et à droite la croix reste fine : les gâchettes font déjà le
-    // saut de cinq consoles, et deux commandes pour la même chose se gênent.
-    for (const sens of ['gauche', 'droite'] as Direction[]) {
+    for (const sens of consoles) {
       const etat = croix[sens].update(dpad[sens], maintenant);
       if (etat.pressed || etat.repeat) {
         tic();
-        deplacerXmb(sens);
+        bouger(sens);
       }
     }
 
+    const [arriere, avant] = consoles;
     const filer = rails.avant.update(!select0 && appuye(5), maintenant);
     const revenir = rails.arriere.update(!select0 && appuye(4), maintenant);
     if (filer.pressed || filer.repeat) {
       tic();
-      deplacerXmb('droite', ENJAMBEE);
+      bouger(avant, ENJAMBEE);
     }
     if (revenir.pressed || revenir.repeat) {
       tic();
-      deplacerXmb('gauche', ENJAMBEE);
+      bouger(arriere, ENJAMBEE);
     }
   }
 
@@ -2862,7 +2904,7 @@ function naviguerMenu(): void {
 
   if (a) {
     tic(true);
-    void (vue === 'grille' ? jouerChoisie() : jouerXmb());
+    void jouerVue(vue);
   }
 
   // Les gâchettes hautes sautent d'initiale — sauf quand Select est tenu,
@@ -3197,6 +3239,25 @@ let molettePrecedente = 0;
  */
 const CRAN = 100;
 
+/**
+ * Les crans qu'une rotation vaut, une fois le seuil atteint.
+ *
+ * Deux rotations séparées par un silence ne s'additionnent pas : sans cela un
+ * reliquat oublié ferait sauter un cran au coup d'après. Un seul compteur pour
+ * les deux menus de salon : ils ne sont jamais à l'écran ensemble, et deux
+ * compteurs finiraient par se partager une même rotation.
+ */
+function cransDeMolette(deltaY: number): number {
+  const maintenant = performance.now();
+  if (maintenant - molettePrecedente > 400) molette = 0;
+  molettePrecedente = maintenant;
+
+  molette += deltaY;
+  const crans = Math.trunc(molette / CRAN);
+  molette -= crans * CRAN;
+  return crans;
+}
+
 xmbView.addEventListener(
   'wheel',
   (event) => {
@@ -3204,16 +3265,8 @@ xmbView.addEventListener(
     if (document.querySelector('dialog[open]')) return;
     event.preventDefault();
 
-    // Deux rotations séparées par un silence ne s'additionnent pas : sans cela
-    // un reliquat oublié ferait sauter un cran au coup d'après.
-    const maintenant = performance.now();
-    if (maintenant - molettePrecedente > 400) molette = 0;
-    molettePrecedente = maintenant;
-
-    molette += event.deltaY;
-    const crans = Math.trunc(molette / CRAN);
+    const crans = cransDeMolette(event.deltaY);
     if (crans === 0) return;
-    molette -= crans * CRAN;
 
     const rail = xmbRail.getBoundingClientRect();
     const surLesConsoles = event.clientY >= rail.top && event.clientY <= rail.bottom;
@@ -3245,7 +3298,7 @@ xmbView.addEventListener(
 let lettreMinuterie = 0;
 
 function montrerLettre(texte: string): void {
-  const boite = enGrille() ? grilleLettre : xmbLettre;
+  const boite = enGrille() ? grilleLettre : enCarrousel() ? carrLettre : xmbLettre;
   clearTimeout(lettreMinuterie);
   boite.textContent = texte;
   boite.hidden = false;
@@ -3260,8 +3313,13 @@ function montrerLettre(texte: string): void {
 }
 
 /** Les initiales des jeux de la vue en cours, dans l'ordre affiché. */
-function initialesVue(vue: 'grille' | 'xmb'): string[] {
-  const liste = vue === 'grille' ? tuiles : (voletsXmb[colonneXmb]?.games ?? []);
+function initialesVue(vue: Vue): string[] {
+  const liste =
+    vue === 'grille'
+      ? tuiles
+      : vue === 'xmb'
+        ? (voletsXmb[colonneXmb]?.games ?? [])
+        : (voletsCarr[etageCarr]?.games ?? []);
   return liste.map((item) => initiale(gameLabel(item.rom.name)));
 }
 
@@ -3272,23 +3330,25 @@ function initialesVue(vue: 'grille' | 'xmb'): string[] {
  * un clavier qu'on n'a pas manette en main, et cinq cents jeux ne se
  * parcourent pas case par case.
  */
-function sauterLettre(vue: 'grille' | 'xmb', sens: 1 | -1): void {
+function sauterLettre(vue: Vue, sens: 1 | -1): void {
   const initiales = initialesVue(vue);
   if (initiales.length === 0) return;
 
-  const depuis = vue === 'grille' ? choisie : entreeXmb;
+  const depuis = vue === 'grille' ? choisie : vue === 'xmb' ? entreeXmb : carteCarr;
   const vers = sautInitiale(depuis, initiales, sens);
   if (vers === depuis) return;
 
   if (vue === 'grille') choisir(vers);
-  else allerEntree(vers);
+  else if (vue === 'xmb') allerEntree(vers);
+  else allerCarte(vers);
   montrerLettre(initiales[vers]);
 }
 
 /** Déplace la sélection de la vue en cours. */
-function pousser(vue: 'grille' | 'xmb', sens: Direction): void {
+function pousser(vue: Vue, sens: Direction): void {
   if (vue === 'grille') choisir(voisin(choisie, boitesGrille, sens));
-  else deplacerXmb(sens);
+  else if (vue === 'xmb') deplacerXmb(sens);
+  else deplacerCarr(sens);
 }
 
 /**
@@ -3373,7 +3433,7 @@ document.addEventListener('keydown', (event) => {
   if (event.key === 'Enter' && !dansLaRecherche) {
     event.preventDefault();
     bruit(true);
-    void (vue === 'grille' ? jouerChoisie() : jouerXmb());
+    void jouerVue(vue);
   }
 });
 
@@ -3408,10 +3468,15 @@ const XMB = { colonne: 86, entree: 54, ancre: 0 };
  * vingt jeux.
  */
 let echelleXmb = 1;
+/** Le sien pour le carrousel : les deux vues ne sont jamais montrées ensemble,
+ *  mais chacune se mesure sur sa propre hauteur. */
+let echelleCarr = 1;
 
 function poserEchelle(): void {
   echelleXmb = echelle(xmbView.clientHeight);
   xmbView.style.setProperty('--ech', String(echelleXmb));
+  echelleCarr = echelle(carrView.clientHeight);
+  carrView.style.setProperty('--ech', String(echelleCarr));
 }
 
 /** Les volets tels que le menu animé les montre. */
@@ -3449,6 +3514,20 @@ function initiales(label: string): string {
     .toUpperCase();
 }
 
+/**
+ * Ce qu'on inscrit dans la pastille d'un volet.
+ *
+ * Les favoris portent une étoile plutôt que des initiales : c'est le seul
+ * volet qu'on ne reconnaît pas à sa console. La galerie et « Reprendre » de
+ * même — ce ne sont pas des machines.
+ */
+function symboleVolet(shelf: Shelf): string {
+  if (shelf.key === FAVORIS) return '★';
+  if (shelf.key === GALERIE) return '📷';
+  if (shelf.key === REPRENDRE) return '▶';
+  return initiales(shelf.label);
+}
+
 /** Redessine la rangée des consoles. */
 function renderColonnesXmb(): void {
   xmbColonnes.replaceChildren();
@@ -3461,16 +3540,7 @@ function renderColonnesXmb(): void {
 
     const rond = document.createElement('span');
     rond.className = 'rond';
-    // Les favoris portent une étoile plutôt que des initiales : c'est le seul
-    // volet qu'on ne reconnaît pas à sa console.
-    rond.textContent =
-      shelf.key === FAVORIS
-        ? '★'
-        : shelf.key === GALERIE
-          ? '📷'
-          : shelf.key === REPRENDRE
-            ? '▶'
-            : initiales(shelf.label);
+    rond.textContent = symboleVolet(shelf);
 
     const etiquette = document.createElement('span');
     etiquette.className = 'etiquette';
@@ -3485,6 +3555,43 @@ function renderColonnesXmb(): void {
     });
     xmbColonnes.append(pastille);
   }
+}
+
+/**
+ * Ce qu'on dit d'un jeu sous son titre.
+ *
+ * Trois volets, trois réponses : dans la galerie c'est la date de la capture,
+ * dans « Reprendre » la dernière fois et le temps passé, ailleurs l'émulateur
+ * et la taille. Écrite une fois pour les deux menus de salon — la même ligne y
+ * répond à la même question, et deux copies finiraient par se contredire.
+ */
+function detailJeu(shelf: Shelf, item: Playable, rang: number): string {
+  if (shelf.key === GALERIE) {
+    const capture = captures[rang];
+    return capture?.taken
+      ? new Date(capture.taken * 1000).toLocaleString(localeCourante(), {
+          day: 'numeric',
+          month: 'long',
+          hour: '2-digit',
+          minute: '2-digit',
+        })
+      : t('capture');
+  }
+
+  if (shelf.key === REPRENDRE) {
+    // Ici on veut savoir quand et combien, pas avec quel émulateur.
+    const vu = detailRecent(item.rom.path);
+    return vu
+      ? `${formatWhen(vu.played, Math.floor(Date.now() / 1000), localeCourante())} · ${formatPlaytime(
+          vu.seconds,
+          localeCourante(),
+          t('moins d’une minute'),
+        )}`
+      : '';
+  }
+
+  const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
+  return `${cœur?.label ?? t('aucun émulateur')} · ${humanSize(item.rom.size)}`;
 }
 
 /** Redessine la colonne des jeux de la console en cours. */
@@ -3539,30 +3646,7 @@ function renderEntreesXmb(): void {
 
     const detail = document.createElement('span');
     detail.className = 'detail';
-    if (shelf.key === GALERIE) {
-      const capture = captures[rang];
-      detail.textContent = capture?.taken
-        ? new Date(capture.taken * 1000).toLocaleString(localeCourante(), {
-            day: 'numeric',
-            month: 'long',
-            hour: '2-digit',
-            minute: '2-digit',
-          })
-        : t('capture');
-    } else if (shelf.key === REPRENDRE) {
-      // Ici on veut savoir quand et combien, pas avec quel émulateur.
-      const vu = detailRecent(item.rom.path);
-      detail.textContent = vu
-        ? `${formatWhen(vu.played, Math.floor(Date.now() / 1000), localeCourante())} · ${formatPlaytime(
-            vu.seconds,
-            localeCourante(),
-            t('moins d’une minute'),
-          )}`
-        : '';
-    } else {
-      const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
-      detail.textContent = `${cœur?.label ?? t('aucun émulateur')} · ${humanSize(item.rom.size)}`;
-    }
+    detail.textContent = detailJeu(shelf, item, rang);
 
     texte.append(titre, detail);
     entree.append(vignette, texte);
@@ -3788,15 +3872,17 @@ function renderXmb(shelves: Shelf[]): void {
  * à la demi-minute, et seulement quand le menu est là.
  */
 function poserHeure(): void {
-  if (xmbView.hidden) return;
+  if (xmbView.hidden && carrView.hidden) return;
   const maintenant = new Date();
-  xmbHeure.textContent = maintenant.toLocaleString(localeCourante(), {
+  const heure = maintenant.toLocaleString(localeCourante(), {
     weekday: 'short',
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
     minute: '2-digit',
   });
+  xmbHeure.textContent = heure;
+  carrHeure.textContent = heure;
 }
 setInterval(poserHeure, 30_000);
 
@@ -3813,10 +3899,22 @@ window.addEventListener('resize', () => {
     releverBoites();
     choisir(choisie);
   }
-  if (xmbView.hidden) return;
-  poserEchelle();
-  placerXmb();
+  replacerMenus();
 });
+
+/**
+ * Remet les menus de salon à l'échelle, et replace ce qu'elle décale.
+ *
+ * Poser l'échelle ne suffit pas : les décalages des pistes et la position de
+ * chaque jaquette sont calculés en pixels, donc à partir d'elle. Changer l'une
+ * sans refaire les autres laisse la sélection à côté de son repère — et dans
+ * le carrousel, les jaquettes empilées les unes sur les autres.
+ */
+function replacerMenus(): void {
+  poserEchelle();
+  if (!xmbView.hidden) placerXmb();
+  if (!carrView.hidden) placerCarr();
+}
 
 /** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
 function viderXmb(): void {
@@ -3891,6 +3989,414 @@ function animerFond(): void {
     }
 
     dessinerRubans(contexte, xmbFond.width, xmbFond.height, temps / 1000, encre);
+    requestAnimationFrame(trame);
+  };
+
+  requestAnimationFrame(trame);
+}
+
+// --- Carrousel ---------------------------------------------------------------
+
+/**
+ * La présentation en présentoir : les consoles en pile, les jaquettes de face.
+ *
+ * C'est le menu animé tourné d'un quart. Rien n'y défile non plus : la pile
+ * des consoles est translatée sous un repère fixe, et les jaquettes viennent à
+ * la sélection, qui ne bouge jamais du milieu de l'écran.
+ *
+ * Deux choses changent, et elles suffisent à en faire autre chose. Les axes
+ * d'abord — les jeux se parcourent de gauche à droite, les consoles de haut en
+ * bas, l'inverse du menu animé. Le relief ensuite : les voisines sont
+ * réellement tournées et reculées dans l'espace, si bien qu'on voit d'un coup
+ * d'œil laquelle serait lancée, sans avoir à chercher un liseré.
+ */
+
+/**
+ * Hauteur d'une plaque de console, largeur d'une jaquette, et à quel rang de
+ * la pile se tient la console en cours.
+ *
+ * Les deux premières valeurs doivent suivre la feuille de style : c'est d'elles
+ * que se déduisent le décalage de la pile et la place de chaque jaquette.
+ *
+ * L'ancre est à deux : la console en cours a deux voisines au-dessus d'elle,
+ * assez pour qu'on voie d'où l'on vient, assez peu pour que la pile ait de la
+ * place sous elle.
+ */
+const CARR = { plaque: 46, carte: 200, ancre: 2 };
+
+/** Les volets tels que le carrousel les montre. */
+let voletsCarr: Shelf[] = [];
+/** La console en cours, et le jeu en cours dans cette console. */
+let etageCarr = 0;
+let carteCarr = 0;
+/** Le rang retenu pour chaque console : on y revient là où on l'avait laissée. */
+const rangsCarr = new Map<string, number>();
+/** Les jaquettes construites, dans l'ordre des jeux. */
+let cartesCarr: HTMLElement[] = [];
+/** Celles qui sont posées en ce moment, et qu'il faudra donc retirer. */
+const poseesCarr = new Set<number>();
+
+/** Vrai quand la bibliothèque s'affiche en carrousel. */
+function enCarrousel(): boolean {
+  return menuActuel() === 'carrousel';
+}
+
+/** Vrai quand l'une des deux présentations de salon est à l'écran. */
+function enMenuAnime(): boolean {
+  return enXmb() || enCarrousel();
+}
+
+/** Redessine la pile des consoles. */
+function renderConsolesCarr(): void {
+  carrConsoles.replaceChildren();
+
+  for (const [rang, shelf] of voletsCarr.entries()) {
+    const plaque = document.createElement('button');
+    plaque.type = 'button';
+    plaque.className = 'carr-console';
+    plaque.title = `${t(shelf.label)} — ${plural(shelf.games.length, 'jeu', 'jeux')}`;
+
+    const carre = document.createElement('span');
+    carre.className = 'plaque';
+    carre.textContent = symboleVolet(shelf);
+
+    const etiquette = document.createElement('span');
+    etiquette.className = 'etiquette';
+    etiquette.textContent = t(shelf.label);
+
+    plaque.append(carre, etiquette);
+    // Le même cran qu'à la manette : choisir une console d'un clic est le même
+    // geste, et le silence donnait l'impression que le clic n'avait pas porté.
+    plaque.addEventListener('click', () => {
+      if (rang !== etageCarr && sonsVoulus()) ticDeplacement();
+      allerEtage(rang);
+    });
+    carrConsoles.append(plaque);
+  }
+}
+
+/**
+ * Construit les jaquettes de la console en cours.
+ *
+ * Toutes sont bâties, aucune n'est posée : c'est `placerCarr` qui montre celles
+ * du voisinage. Six cents jaquettes affichées d'un coup, ce seraient six cents
+ * images demandées au serveur pour en montrer treize — et l'observateur qui les
+ * guette ne voit rien tant qu'elles sont retirées de la mise en page.
+ */
+function renderCartesCarr(): void {
+  carrCartes.replaceChildren();
+  cartesCarr = [];
+  poseesCarr.clear();
+
+  const shelf = voletsCarr[etageCarr];
+  if (!shelf) return;
+
+  for (const [rang, item] of shelf.games.entries()) {
+    const carte = document.createElement('button');
+    carte.type = 'button';
+    carte.className = 'carr-carte';
+    carte.title = item.rom.path;
+    carte.hidden = true;
+
+    const boite = document.createElement('span');
+    boite.className = 'boite';
+
+    const marque = document.createElement('span');
+    marque.className = 'initiale';
+    marque.textContent = item.rom.name.slice(0, 1).toUpperCase();
+    boite.append(marque);
+
+    if (shelf.key === GALERIE) {
+      const image = document.createElement('img');
+      image.alt = '';
+      image.loading = 'lazy';
+      image.className = 'vue';
+      image.src = captures[rang]?.data ?? '';
+      image.addEventListener('load', () => {
+        marque.hidden = true;
+      });
+      boite.append(image);
+    } else if (jaquettesVoulues()) {
+      const jaquette = document.createElement('img');
+      jaquette.alt = '';
+      jaquette.loading = 'lazy';
+      jaquette.dataset.console = item.rom.folder;
+      jaquette.dataset.jeu = item.rom.name;
+      jaquette.dataset.chemin = item.rom.path;
+      jaquette.addEventListener('load', () => {
+        marque.hidden = true;
+      });
+      boite.append(jaquette);
+      regarderJaquette(jaquette);
+    }
+
+    if (estFavori(item.rom.path)) {
+      const etoile = document.createElement('span');
+      etoile.className = 'etoile';
+      etoile.textContent = '★';
+      etoile.title = t('Favori');
+      boite.append(etoile);
+    }
+
+    carte.append(boite);
+    carte.addEventListener('click', () => {
+      if (rang === carteCarr) {
+        if (sonsVoulus()) ticValidation();
+        void jouerCarr();
+      } else {
+        if (sonsVoulus()) ticDeplacement();
+        allerCarte(rang);
+      }
+    });
+    carte.addEventListener('contextmenu', (event) => {
+      allerCarte(rang);
+      ouvrirContextuel(event, item);
+    });
+
+    cartesCarr.push(carte);
+    carrCartes.append(carte);
+  }
+}
+
+/**
+ * Fait tourner le présentoir jusqu'à la sélection.
+ *
+ * Seul le voisinage est touché : treize jaquettes replacées par pas, et non six
+ * cents. Une jaquette qui sort de ce voisinage est retirée de la mise en page,
+ * ce qui empêche l'observateur d'aller chercher son image — c'est ce qui permet
+ * de tenir une console de six cents jeux sans rien demander au réseau.
+ */
+function placerCarr(): void {
+  const shelf = voletsCarr[etageCarr];
+
+  const plaques = [...carrConsoles.children] as HTMLElement[];
+  for (const [rang, plaque] of plaques.entries()) {
+    plaque.setAttribute('aria-selected', String(rang === etageCarr));
+  }
+  // La console en cours vient se placer sous deux autres, en haut de la pile.
+  carrConsoles.style.transform = `translateY(${
+    (CARR.ancre - etageCarr) * CARR.plaque * echelleCarr
+  }px)`;
+
+  const jeux = shelf?.games ?? [];
+  const large = CARR.carte * echelleCarr;
+  const voulus = fenetre(carteCarr, jeux.length);
+  const garder = new Set(voulus);
+
+  for (const rang of [...poseesCarr]) {
+    if (garder.has(rang)) continue;
+    const partie = cartesCarr[rang];
+    if (partie) partie.hidden = true;
+    poseesCarr.delete(rang);
+  }
+
+  for (const rang of voulus) {
+    const carte = cartesCarr[rang];
+    const ou = place(rang - carteCarr);
+    if (!carte || !ou) continue;
+
+    carte.hidden = false;
+    poseesCarr.add(rang);
+    carte.setAttribute('aria-selected', String(rang === carteCarr));
+    carte.style.transform =
+      `translate3d(${ou.x * large}px, 0, ${ou.z * large}px)` +
+      ` rotateY(${ou.rotation}deg) scale(${ou.echelle})`;
+    carte.style.opacity = String(ou.opacite);
+    carte.style.zIndex = String(ou.plan);
+    // Le rang de réserve ne se voit pas : il ne doit pas se cliquer non plus.
+    // Un bouton invisible qui répond au clic est un piège, pas une commande.
+    carte.style.pointerEvents = ou.opacite === 0 ? 'none' : '';
+  }
+
+  const item = jeux[carteCarr];
+  const galerie = shelf?.key === GALERIE;
+
+  carrConsole.textContent = shelf ? t(shelf.label) : '—';
+  carrTitre.textContent = item ? gameLabel(item.rom.name) : '';
+  carrDetail.textContent = shelf && item ? detailJeu(shelf, item, carteCarr) : '';
+
+  const quoi = galerie ? (['capture', 'captures'] as const) : (['jeu', 'jeux'] as const);
+  carrPied.textContent = shelf
+    ? `${plural(shelf.games.length, quoi[0], quoi[1])} · ${dit(
+        '{0} sur {1}',
+        carteCarr + 1,
+        shelf.games.length,
+      )}${item && !galerie ? ` · ${item.rom.extension}` : ''}`
+    : '';
+}
+
+/** Change de console, en retrouvant le jeu où on l'avait laissé. */
+function allerEtage(rang: number): void {
+  const precedente = voletsCarr[etageCarr];
+  if (precedente) rangsCarr.set(precedente.key, carteCarr);
+
+  etageCarr = step(rang, voletsCarr.length, 0);
+  const suivante = voletsCarr[etageCarr];
+  carteCarr = suivante
+    ? Math.min(rangsCarr.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
+    : 0;
+
+  renderCartesCarr();
+  placerCarr();
+}
+
+/** Fait tourner le carrousel jusqu'à un jeu de la console en cours. */
+function allerCarte(rang: number): void {
+  const shelf = voletsCarr[etageCarr];
+  carteCarr = step(rang, shelf?.games.length ?? 0, 0);
+  placerCarr();
+}
+
+/**
+ * Un pas dans le carrousel.
+ *
+ * Les axes sont l'inverse de ceux du menu animé : les jeux se parcourent de
+ * gauche à droite — c'est le sens du présentoir — et les consoles de haut en
+ * bas, c'est-à-dire dans le sens de leur pile.
+ */
+function deplacerCarr(sens: Direction, pas = 1): void {
+  const shelf = voletsCarr[etageCarr];
+  if (sens === 'haut' || sens === 'bas') {
+    allerEtage(step(etageCarr, voletsCarr.length, sens === 'bas' ? pas : -pas));
+  } else {
+    allerCarte(step(carteCarr, shelf?.games.length ?? 0, sens === 'droite' ? pas : -pas));
+  }
+}
+
+/** Lance la jaquette qui est de face. */
+async function jouerCarr(): Promise<void> {
+  const shelf = voletsCarr[etageCarr];
+  const item = shelf?.games[carteCarr];
+  if (!shelf || !item) return;
+
+  // Dans la galerie, valider ouvre la galerie : il n'y a rien à lancer.
+  if (shelf.key === GALERIE) {
+    await ouvrirGalerie();
+    return;
+  }
+  const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
+  if (cœur) await play(cœur, item.rom);
+}
+
+/** Dessine tout le carrousel à partir des volets déjà classés. */
+function renderCarrousel(shelves: Shelf[]): void {
+  // On retient la console d'avant pour y revenir : mettre un jeu en favori
+  // insère un volet en tête, et la sélection glisserait alors d'un cran.
+  const avant = voletsCarr[etageCarr]?.key;
+
+  voletsCarr = shelves;
+  const retrouve = avant === undefined ? -1 : shelves.findIndex((shelf) => shelf.key === avant);
+  if (retrouve >= 0) etageCarr = retrouve;
+  etageCarr = step(etageCarr, shelves.length, 0);
+  const shelf = shelves[etageCarr];
+  carteCarr = step(carteCarr, shelf?.games.length ?? 0, 0);
+
+  poserEchelle();
+  if (musiqueVoulue()) demarrerMusique();
+  renderConsolesCarr();
+  renderCartesCarr();
+  placerCarr();
+  poserHeure();
+  animerPoussiere();
+}
+
+/** Range le carrousel : plus de jaquettes, plus de sélection, plus de fond. */
+function viderCarrousel(): void {
+  arreterMusique();
+  carrView.hidden = true;
+  carrConsoles.replaceChildren();
+  carrCartes.replaceChildren();
+  cartesCarr = [];
+  poseesCarr.clear();
+  voletsCarr = [];
+}
+
+/**
+ * La molette dans le carrousel.
+ *
+ * Au-dessus de la pile des consoles elle change de console ; partout ailleurs
+ * elle fait tourner le présentoir. C'est la règle du menu animé, sur l'autre
+ * axe : la molette agit sur ce que l'on survole.
+ */
+carrView.addEventListener(
+  'wheel',
+  (event) => {
+    if (carrView.hidden || libraryView.hidden) return;
+    if (document.querySelector('dialog[open]')) return;
+    event.preventDefault();
+
+    const crans = cransDeMolette(event.deltaY);
+    if (crans === 0) return;
+
+    const pile = carrPile.getBoundingClientRect();
+    const surLaPile = event.clientX >= pile.left && event.clientX <= pile.right;
+    const sens: Direction = surLaPile
+      ? crans > 0
+        ? 'bas'
+        : 'haut'
+      : crans > 0
+        ? 'droite'
+        : 'gauche';
+
+    // Jamais plus de huit crans d'un coup : une roulette lancée traverserait
+    // la console entière, et il faudrait revenir.
+    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) {
+      deplacerCarr(sens);
+    }
+    // Le même bruit qu'à la manette : c'est le même déplacement.
+    bruit();
+  },
+  { passive: false },
+);
+
+/**
+ * La poussière monte tant qu'on la regarde, et pas une trame de plus.
+ *
+ * Même règle que les rubans du menu animé : une boucle qui tournerait pendant
+ * la partie volerait des trames au jeu, et sur un portable elle viderait la
+ * batterie devant un menu fermé.
+ */
+let poussiereEnCours = false;
+
+function animerPoussiere(): void {
+  if (poussiereEnCours) return;
+  const contexte = carrFond.getContext('2d');
+  if (!contexte) return;
+
+  poussiereEnCours = true;
+  let encre = encreDuFond();
+  let derniereMesure = 0;
+  let dernierDessin = 0;
+
+  const trame = (temps: number): void => {
+    if (carrView.hidden || libraryView.hidden) {
+      poussiereEnCours = false;
+      return;
+    }
+
+    // Trente images par seconde suffisent : le grain le plus rapide met une
+    // demi-minute à traverser l'écran.
+    if (temps - dernierDessin < 32) {
+      requestAnimationFrame(trame);
+      return;
+    }
+    dernierDessin = temps;
+
+    // Le canevas est redimensionné et la couleur relue deux fois par seconde :
+    // les lire à chaque trame obligerait le navigateur à recalculer la mise en
+    // page pour des valeurs qui ne bougent pas.
+    if (temps - derniereMesure > 500) {
+      derniereMesure = temps;
+      encre = encreDuFond();
+      const largeur = carrView.clientWidth;
+      const hauteur = carrView.clientHeight;
+      if (carrFond.width !== largeur || carrFond.height !== hauteur) {
+        carrFond.width = largeur;
+        carrFond.height = hauteur;
+      }
+    }
+
+    dessinerPoussiere(contexte, carrFond.width, carrFond.height, temps / 1000, encre);
     requestAnimationFrame(trame);
   };
 
@@ -4099,7 +4605,7 @@ function renderGames(): void {
   // « Reprendre » d'abord : c'est ce qu'on vient chercher en ouvrant l'app.
   // Puis la galerie, puis les favoris, puis les consoles.
   const reprendre = needle ? null : voletReprendre(classes);
-  const galerie = enXmb() && !needle ? voletGalerie() : null;
+  const galerie = enMenuAnime() && !needle ? voletGalerie() : null;
   const shelves = [
     ...(reprendre ? [reprendre] : []),
     ...(galerie ? [galerie] : []),
@@ -4126,6 +4632,7 @@ function renderGames(): void {
     shelvesBox.hidden = true;
     viderGrille();
     viderXmb();
+    viderCarrousel();
     placeholder.hidden = false;
 
     const heading = placeholder.querySelector('strong');
@@ -4162,12 +4669,13 @@ function renderGames(): void {
 
   placeholder.hidden = true;
 
-  // Les deux vues partagent le même classement ; seul le dessin diffère. On ne
-  // dessine que celle qu'on regarde : six cents lignes construites pour rester
-  // masquées coûtent exactement le même temps que six cents lignes affichées.
+  // Les quatre vues partagent le même classement ; seul le dessin diffère. On
+  // ne dessine que celle qu'on regarde : six cents lignes construites pour
+  // rester masquées coûtent exactement le même temps que six cents affichées.
   if (enGrille()) {
     shelvesBox.hidden = true;
     viderXmb();
+    viderCarrousel();
     grilleView.hidden = false;
     renderGrille(shelves);
     return;
@@ -4176,13 +4684,24 @@ function renderGames(): void {
   if (enXmb()) {
     shelvesBox.hidden = true;
     viderGrille();
+    viderCarrousel();
     xmbView.hidden = false;
     renderXmb(shelves);
     return;
   }
 
+  if (enCarrousel()) {
+    shelvesBox.hidden = true;
+    viderGrille();
+    viderXmb();
+    carrView.hidden = false;
+    renderCarrousel(shelves);
+    return;
+  }
+
   viderGrille();
   viderXmb();
+  viderCarrousel();
   shelvesBox.hidden = false;
 
   const collapsed = readCollapsed();
@@ -4877,10 +5396,10 @@ let tempsPleinEcran: number = PLEIN.fenetre;
 function poserPleinEcran(temps: number): void {
   tempsPleinEcran = temps;
   appView.classList.toggle('depouille', temps === PLEIN.depouille);
-  // La scène et le menu animé se dimensionnent sur la place disponible, qui
-  // vient de changer sans qu'aucune fenêtre ne soit redimensionnée.
+  // La scène et les menus de salon se dimensionnent sur la place disponible,
+  // qui vient de changer sans qu'aucune fenêtre ne soit redimensionnée.
   fitScreen();
-  poserEchelle();
+  replacerMenus();
 }
 
 /**
@@ -4994,7 +5513,7 @@ menubar.addEventListener('click', (event) => {
  * finiront par se contredire.
  */
 const RACCOURCIS_CLAVIER: readonly (readonly [string, string])[] = [
-  [aTraduire('Flèches'), aTraduire('Parcourir la grille et le menu animé')],
+  [aTraduire('Flèches'), aTraduire('Parcourir la grille et les menus animés')],
   [aTraduire('Entrée'), aTraduire('Lancer le jeu choisi')],
   ['P', aTraduire('Plein écran')],
   ['F5', aTraduire('Actualiser la bibliothèque')],
@@ -5220,10 +5739,12 @@ window.addEventListener('gamepaddisconnected', () => void currentPad());
  * que la manette n'était pas reconnue — alors que le jeu, lui, l'aurait vue.
  */
 function pollControls(): void {
-  // La musique appartient au menu animé et à lui seul. Surveillé ici plutôt
-  // qu'au lancement d'un jeu : il y a plusieurs façons de quitter le menu, et
-  // une seule d'entre elles oubliée laisserait la musique jouer sous la partie.
-  if (musiqueEnCours() && (libraryView.hidden || xmbView.hidden)) arreterMusique();
+  // La musique appartient aux menus de salon et à eux seuls. Surveillé ici
+  // plutôt qu'au lancement d'un jeu : il y a plusieurs façons de quitter un
+  // menu, et une seule oubliée laisserait la musique jouer sous la partie.
+  if (musiqueEnCours() && (libraryView.hidden || (xmbView.hidden && carrView.hidden))) {
+    arreterMusique();
+  }
 
   // Tout est enveloppé : une exception ici romprait la chaîne des trames, et
   // la manette cesserait de répondre jusqu'au prochain lancement — sans rien

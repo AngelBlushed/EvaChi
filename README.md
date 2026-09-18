@@ -35,7 +35,7 @@ Les quarante-huit dossiers sont déjà là, vides.
 
 |   |   |
 |---|---|
-| **Trois présentations** | un menu animé à la manette, une grille de jaquettes, une liste dense |
+| **Quatre présentations** | un menu animé, un carrousel de jaquettes, une grille, une liste dense |
 | **Les jaquettes toutes seules** | trouvées sur le serveur du projet libretro, recadrables à la main si elles tombent mal |
 | **Cinquante langues** | chacune dans son alphabet, avec ses pluriels, ses dates et ses unités |
 | **Tout à la manette** | y compris le plein écran, les captures, les sauvegardes d'état et l'avance rapide |
@@ -155,7 +155,7 @@ l'ABI [libretro](https://www.libretro.com).
 
 ```bash
 npm install
-npm run test:all          # 576 épreuves côté fenêtre, 229 côté Rust
+npm run test:all          # 599 épreuves côté fenêtre, 229 côté Rust
 npm run app:build         # l'exécutable, dans src-tauri/target/release/
 node outils/livraison.mjs <dossier>   # monte une livraison complète
 ```

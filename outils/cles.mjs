@@ -209,6 +209,18 @@ if (fs.existsSync(cheminCles)) {
  * alignés, et il n'y a qu'une ligne à retraduire au lieu de tout.
  */
 const RENOMMEES = new Map([
+  // Le carrousel a rendu ces trois phrases fausses : la musique, le saut de
+  // cinq jeux et les flèches valent pour les deux menus de salon, pas pour un
+  // seul.
+  ['Musique du menu animé', 'Musique des menus animés'],
+  [
+    'Dans le menu animé, cinq jeux à la fois',
+    'Dans les menus animés, cinq jeux à la fois',
+  ],
+  [
+    'Parcourir la grille et le menu animé',
+    'Parcourir la grille et les menus animés',
+  ],
   [
     'A lancer · X favori · L1/R1 consoles · L2/R2 lettre · B retour · Start',
     'A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour',

@@ -765,6 +765,285 @@
         .xmb-entree[aria-selected="true"] { transform: none; }
       }
 
+      /* --- Carrousel --- */
+
+      /*
+       * Le même principe que le menu animé, tourné d'un quart : les consoles
+       * en pile à gauche, les jeux de front au centre. Rien ne défile non plus
+       * — les jaquettes viennent à la sélection, qui ne bouge jamais.
+       *
+       * La différence tient à la troisième dimension. Les voisines sont
+       * réellement tournées et reculées dans l'espace, et c'est la perspective
+       * qui range les plans : une pile d'images à plat donne un éventail, pas
+       * un présentoir.
+       */
+      .carr {
+        /* Comme le menu animé : toutes les tailles sont multipliées par --ech,
+           que le script recalcule à chaque changement de taille de fenêtre. */
+        --ech: 1;
+        /* La largeur d'une jaquette. Toute la géométrie du carrousel s'y
+           rapporte, et le script la relit pour placer les voisines au pixel :
+           c'est la seule mesure que la feuille de style et le script
+           partagent. */
+        --carte: 240px;
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        user-select: none;
+      }
+      .carr[hidden] { display: none; }
+
+      .carr-fond {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+
+      .carr-tete,
+      .carr-pied { position: absolute; left: 0; right: 0; z-index: 3; }
+
+      .carr-tete {
+        top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: calc(16px * var(--ech)) calc(28px * var(--ech));
+        font-size: calc(13px * var(--ech));
+        color: var(--muted);
+      }
+      .carr-tete strong {
+        color: var(--ink);
+        font-size: calc(15px * var(--ech));
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
+
+      /* La pile des consoles : une colonne translatée sous un repère fixe,
+         comme la rangée du menu animé. C'est la pile qui monte et descend,
+         jamais la sélection. Le dégradé la détache des jaquettes qui passent
+         derrière elle, sans lui donner un bord franc. */
+      .carr-pile {
+        position: absolute;
+        left: 0;
+        top: calc(56px * var(--ech));
+        bottom: calc(46px * var(--ech));
+        width: calc(196px * var(--ech));
+        overflow: hidden;
+        z-index: 2;
+        background: linear-gradient(to right, var(--bg) 45%, transparent);
+        -webkit-mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+        mask-image: linear-gradient(transparent, #000 14%, #000 86%, transparent);
+      }
+      .carr-colonne {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        transition: transform 140ms cubic-bezier(0.22, 0.61, 0.36, 1);
+      }
+
+      /* Une plaque, et non une pastille ronde : c'est ce qui distingue cette
+         pile de la rangée du menu animé au premier coup d'œil. */
+      .carr-console {
+        height: calc(46px * var(--ech));
+        width: 100%;
+        border: 0;
+        background: none;
+        padding: 0 calc(12px * var(--ech)) 0 calc(20px * var(--ech));
+        cursor: pointer;
+        font: inherit;
+        color: var(--muted);
+        display: flex;
+        align-items: center;
+        gap: calc(12px * var(--ech));
+        text-align: left;
+        opacity: 0.5;
+        transform-origin: left center;
+        transition: opacity 120ms ease, transform 120ms ease, color 120ms ease;
+      }
+      .carr-console .plaque {
+        flex: 0 0 calc(38px * var(--ech));
+        height: calc(30px * var(--ech));
+        border-radius: calc(7px * var(--ech));
+        display: grid;
+        place-items: center;
+        font-size: calc(12px * var(--ech));
+        font-weight: 600;
+        background: var(--raised);
+        color: var(--ink);
+      }
+      .carr-console .etiquette {
+        font-size: calc(12px * var(--ech));
+        line-height: 1.2;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .carr-console[aria-selected="true"] {
+        opacity: 1;
+        color: var(--ink);
+        transform: translateX(calc(5px * var(--ech)));
+      }
+      .carr-console[aria-selected="true"] .plaque {
+        background: var(--accent-soft);
+        box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
+      }
+      .carr-console[aria-selected="true"] .etiquette { font-weight: 600; }
+
+      /* La scène. La perspective est portée par elle et non par les jaquettes :
+         un point de fuite par image donnerait à chacune sa propre profondeur,
+         et l'arc se lirait comme un alignement d'images de travers. */
+      .carr-scene {
+        position: absolute;
+        left: calc(196px * var(--ech));
+        right: 0;
+        top: calc(52px * var(--ech));
+        bottom: calc(128px * var(--ech));
+        perspective: calc(1100px * var(--ech));
+        perspective-origin: 50% 50%;
+      }
+      /* Le socle : une ellipse de lumière sous les jaquettes. Elle ne dit rien,
+         mais sans elle les images flottent dans le vide. */
+      .carr-scene::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        z-index: 0;
+        width: calc(var(--carte) * var(--ech) * 3.2);
+        height: calc(44px * var(--ech));
+        transform: translate(-50%, calc(var(--carte) * var(--ech) * 0.62));
+        background: radial-gradient(ellipse at center, var(--accent), transparent 70%);
+        opacity: 0.17;
+        pointer-events: none;
+      }
+      .carr-piste {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        transform-style: preserve-3d;
+      }
+
+      /* Chaque jaquette est centrée sur la scène, puis déplacée par sa seule
+         transformation : aucune mise en page à refaire quand le carrousel
+         tourne, et c'est ce qui permet de l'animer soixante fois par seconde. */
+      .carr-carte {
+        position: absolute;
+        inset: 0;
+        margin: auto;
+        width: calc(var(--carte) * var(--ech));
+        height: calc(var(--carte) * var(--ech) * 4 / 3);
+        border: 0;
+        padding: 0;
+        background: none;
+        font: inherit;
+        cursor: pointer;
+        transform-style: preserve-3d;
+        transition: transform 180ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 180ms ease;
+      }
+      .carr-carte[hidden] { display: none; }
+      .carr-carte .boite {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        border-radius: calc(9px * var(--ech));
+        overflow: hidden;
+        background: var(--raised);
+        box-shadow: 0 calc(18px * var(--ech)) calc(38px * var(--ech)) rgba(0, 0, 0, 0.5);
+      }
+      .carr-carte .boite > * { grid-area: 1 / 1; }
+      .carr-carte .initiale {
+        font-size: calc(54px * var(--ech));
+        font-weight: 600;
+        color: var(--muted);
+        opacity: 0.4;
+      }
+      .carr-carte img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 260ms ease;
+      }
+      .carr-carte img.vue { opacity: 1; }
+      .carr-carte .boite.recadree { background: transparent; box-shadow: none; }
+      .carr-carte .etoile {
+        place-self: start end;
+        margin: calc(8px * var(--ech));
+        color: var(--accent);
+        font-size: calc(17px * var(--ech));
+        text-shadow: 0 1px 3px rgba(0, 0, 0, 0.85);
+      }
+      /* Seule celle qu'on regarde porte le liseré : posé sur toutes, il
+         quadrillerait le carrousel. */
+      .carr-carte[aria-selected="true"] .boite {
+        box-shadow:
+          0 0 0 calc(2px * var(--ech)) var(--accent),
+          0 calc(26px * var(--ech)) calc(54px * var(--ech)) rgba(0, 0, 0, 0.62);
+      }
+
+      /* Le nom du jeu sous la jaquette, et non dessus : une image porte déjà
+         son titre, et l'écrire par-dessus cache ce qu'on est venu voir. */
+      .carr-legende {
+        position: absolute;
+        left: calc(196px * var(--ech));
+        right: 0;
+        bottom: calc(50px * var(--ech));
+        display: grid;
+        justify-items: center;
+        gap: calc(3px * var(--ech));
+        padding: 0 calc(24px * var(--ech));
+        text-align: center;
+        z-index: 3;
+        pointer-events: none;
+      }
+      .carr-legende strong {
+        max-width: 100%;
+        font-size: calc(19px * var(--ech));
+        font-weight: 600;
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .carr-legende span {
+        font-size: calc(12px * var(--ech));
+        color: var(--muted);
+      }
+
+      .carr-pied {
+        bottom: 0;
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: calc(14px * var(--ech)) calc(28px * var(--ech));
+        font-size: calc(11px * var(--ech));
+        color: var(--muted);
+      }
+      /* Le rappel des boutons, comme sur une console : discret, toujours là. */
+      .carr-touches { opacity: 0.7; white-space: nowrap; }
+
+      /* Fenêtre étroite : les noms des consoles s'en vont les premiers. La
+         pile, elle, reste — sans elle on ne pourrait plus changer de console,
+         et c'est la seule chose qu'on ne peut pas retrouver ailleurs. */
+      @media (max-width: 820px) {
+        .carr-pile { width: calc(74px * var(--ech)); }
+        .carr-console { padding-right: 0; }
+        .carr-console .etiquette { display: none; }
+        .carr-scene,
+        .carr-legende { left: calc(74px * var(--ech)); }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .carr-colonne,
+        .carr-carte,
+        .carr-console { transition: none; }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         .tuile { transition: none; }
         .tuile[aria-selected="true"] { transform: none; }
@@ -1091,12 +1370,19 @@
          gagner. Les libellés, eux, gardent leur sens de lecture propre —
          `plaintext` le décide d'après la première lettre, ce qui range bien un
          titre arabe à côté d'un nom de jeu japonais. */
-      #xmb { direction: ltr; }
+      #xmb,
+      #carrousel { direction: ltr; }
       #xmb-console,
       #xmb-pied,
       #xmb-colonnes,
       #xmb-entrees,
-      .xmb-touches { unicode-bidi: plaintext; }
+      .xmb-touches,
+      #carrousel-console,
+      #carrousel-pied,
+      #carrousel-titre,
+      #carrousel-detail,
+      #carrousel-consoles,
+      .carr-touches { unicode-bidi: plaintext; }
 
       /* --- Recadrage d'une jaquette --- */
 
@@ -1496,6 +1782,32 @@
             </div>
           </div>
 
+          <!-- Le carrousel. Même principe que le menu animé, tourné d'un
+               quart : les consoles en pile à gauche, les jaquettes de front au
+               centre, et une poussière qui monte derrière. -->
+          <div class="carr" id="carrousel" hidden>
+            <canvas class="carr-fond" id="carrousel-fond"></canvas>
+            <div class="carr-tete">
+              <strong id="carrousel-console">—</strong>
+              <span id="carrousel-heure"></span>
+            </div>
+            <div class="carr-pile" id="carrousel-pile">
+              <div class="carr-colonne" id="carrousel-consoles"></div>
+            </div>
+            <div class="carr-scene">
+              <div class="carr-piste" id="carrousel-cartes"></div>
+            </div>
+            <div class="carr-legende">
+              <strong id="carrousel-titre"></strong>
+              <span id="carrousel-detail"></span>
+            </div>
+            <div class="lettre" id="carrousel-lettre" hidden></div>
+            <div class="carr-pied">
+              <span id="carrousel-pied"></span>
+              <span class="carr-touches">A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour</span>
+            </div>
+          </div>
+
           <div class="placeholder" id="placeholder">
             <strong>Aucun jeu</strong>
             <span>Indiquez le dossier où se trouvent vos jeux.</span>
@@ -1672,7 +1984,7 @@
         <label class="field bascule">
           <input type="checkbox" id="musique" checked />
           <span>
-            Musique du menu animé
+            Musique des menus animés
             <small>
               Quelques accords tenus et des notes éparses, composés à mesure
               plutôt qu'enregistrés : le morceau ne repasse jamais au même
@@ -1923,7 +2235,7 @@
           <dt>Directions / stick gauche</dt>
           <dd>Parcourir la bibliothèque, les fenêtres et la barre de menus</dd>
           <dt>Croix directionnelle</dt>
-          <dd>Dans le menu animé, cinq jeux à la fois</dd>
+          <dd>Dans les menus animés, cinq jeux à la fois</dd>
           <dt>L1 / R1</dt>
           <dd>Cinq consoles à la fois</dd>
           <dt>L2 / R2</dt>
