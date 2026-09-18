@@ -210,9 +210,9 @@ pub fn installer(
         let url = format!("{FICHIERS}/{}/{}.cht", encode(systeme), encode(nom));
         match aller_chercher(&url, MAX_FICHE) {
             Ok(corps) => {
-                // Le nom d'origine ouvre le fichier : celui du disque est
-                // aplati, et c'est le vrai qu'il faudra pour s'y retrouver.
-                let mut contenu = format!("# {nom}\n").into_bytes();
+                // Les deux noms d'origine ouvrent le fichier : ceux du
+                // disque sont aplatis, et un nom aplati ne se remonte pas.
+                let mut contenu = format!("# {systeme}\t{nom}\n").into_bytes();
                 contenu.extend_from_slice(&corps);
                 if let Err(erreur) = std::fs::write(chemin(dossier, systeme, nom), contenu) {
                     plaintes.push(format!("{nom} : {erreur}"));
@@ -255,18 +255,12 @@ pub fn posees(dossier: &Path) -> BTreeMap<String, Vec<String>> {
 /// été aplatis, et un nom aplati ne se remonte pas.
 fn entete(fichier: &Path) -> Option<(String, String)> {
     let texte = std::fs::read_to_string(fichier).ok()?;
-    let nom = texte.lines().next()?.strip_prefix("# ")?.trim().to_owned();
-    if nom.is_empty() {
+    let ligne = texte.lines().next()?.strip_prefix("# ")?;
+    let (systeme, nom) = ligne.split_once('\t')?;
+    if systeme.is_empty() || nom.is_empty() {
         return None;
     }
-    // La console est le dossier parent, dont le nom a été aplati aussi : on la
-    // retrouve en relisant l'index, mais pour l'usage courant le nom du dossier
-    // suffit — il ne sert qu'à regrouper.
-    let console = fichier
-        .parent()
-        .and_then(|parent| parent.file_name())
-        .map(|nom| nom.to_string_lossy().into_owned())?;
-    Some((console, nom))
+    Some((systeme.to_owned(), nom.to_owned()))
 }
 
 /// Le contenu d'une fiche posée, sans sa ligne d'en-tête.
@@ -349,11 +343,14 @@ mod tests {
         std::fs::create_dir_all(bac.0.join("fiches").join(sous_nom(systeme))).expect("dossier");
         std::fs::write(
             chemin(&bac.0, systeme, nom),
-            format!("# {nom}\ncheat0_code = \"ABCD\"\n"),
+            format!("# {systeme}\t{nom}\ncheat0_code = \"ABCD\"\n"),
         )
         .expect("écriture");
 
+        // La console revient sous son vrai nom, et non sous celui du dossier :
+        // c'est lui qu'il faudra pour retrouver la fiche dans l'inventaire.
         let toutes = posees(&bac.0);
+        assert_eq!(toutes.keys().collect::<Vec<_>>(), vec![&systeme.to_owned()]);
         let noms: Vec<&String> = toutes.values().flatten().collect();
         assert_eq!(noms, vec![&nom.to_owned()]);
 

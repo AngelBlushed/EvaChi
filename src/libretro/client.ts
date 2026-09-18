@@ -59,6 +59,84 @@ export interface RomEntry {
   readonly folder: string;
 }
 
+// --- Les triches ------------------------------------------------------------
+
+/** Une valeur qu'on maintient en mémoire, réécrite avant chaque trame. */
+export interface Poke {
+  /** Décalage depuis le début de la RAM de travail. */
+  readonly adresse: number;
+  /** Largeur en octets : 1, 2 ou 4. */
+  readonly taille: number;
+  readonly valeur: number;
+}
+
+/** Ce qu'on demande au cœur de faire tourner. */
+export interface Consignes {
+  /** Les codes des fiches, dans le dialecte de la console. Nul ne les lit. */
+  readonly codes: string[];
+  /** Les valeurs qu'on maintient soi-même. */
+  readonly pokes: Poke[];
+}
+
+/** Ce que le cœur a fait des consignes. */
+export interface EtatTriches {
+  /** Combien de valeurs sont réellement maintenues. */
+  readonly retenus: number;
+  /** La taille de sa RAM de travail, zéro s'il ne l'ouvre pas. */
+  readonly ram: number;
+}
+
+/**
+ * Ce que le dépôt publie comme fiches, pour ces consoles-là.
+ *
+ * Une seule demande au réseau pour toute une bibliothèque, puis plus rien :
+ * l'inventaire reste sur le disque. `rafraichir` y retourne quand même.
+ */
+export async function trichesCatalogue(
+  systemes: readonly string[],
+  rafraichir = false,
+): Promise<Record<string, string[]>> {
+  return invoke<Record<string, string[]>>('triches_catalogue', {
+    systemes: [...systemes],
+    rafraichir,
+  });
+}
+
+/** Va chercher des fiches et les pose. Rend ce qui n'a pas pu l'être. */
+export async function trichesInstaller(systeme: string, noms: readonly string[]): Promise<string[]> {
+  return invoke<string[]>('triches_installer', { systeme, noms: [...noms] });
+}
+
+/** Les fiches déjà posées, console par console. */
+export async function trichesPosees(): Promise<Record<string, string[]>> {
+  return invoke<Record<string, string[]>>('triches_posees');
+}
+
+/** Le contenu d'une fiche posée. C'est la fenêtre qui la découpe. */
+export async function trichesContenu(systeme: string, nom: string): Promise<string> {
+  return invoke<string>('triches_contenu', { systeme, nom });
+}
+
+/** Retire une fiche du disque. */
+export async function trichesRetirer(systeme: string, nom: string): Promise<void> {
+  await invoke('triches_retirer', { systeme, nom });
+}
+
+/**
+ * Pose les triches actives sur le cœur en cours.
+ *
+ * Tout part d'un coup : le cœur oublie les précédentes puis reprend les
+ * nouvelles. Décocher arrête donc l'écriture à l'instant.
+ */
+export async function poserTriches(consignes: Consignes): Promise<EtatTriches> {
+  return invoke<EtatTriches>('poser_triches', { consignes });
+}
+
+/** Une tranche de la RAM de travail, pour la recherche de valeurs. */
+export async function lireMemoire(debut: number, longueur: number): Promise<Uint8Array> {
+  return new Uint8Array(await invoke<ArrayBuffer>('lire_memoire', { debut, longueur }));
+}
+
 /** Énumère les fichiers déposés dans le dossier des jeux. */
 export async function listRoms(): Promise<RomEntry[]> {
   return invoke<RomEntry[]>('list_roms');

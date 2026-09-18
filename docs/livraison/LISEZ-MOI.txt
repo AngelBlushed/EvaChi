@@ -23,7 +23,29 @@ Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
 sert pas peuvent être supprimés.
 
 
-Ce qui est nouveau depuis la 0.4.0
+Ce qui est nouveau depuis la 0.5.0
+----------------------------------
+
+- Un panneau de triches. Deux moments, deux panneaux : « Émulation » →
+  « Triches… » cherche, dans la base publiée par le projet libretro, les
+  fiches qui vont à vos jeux, et ne télécharge que celles que vous cochez.
+  En pleine partie, F3 — ou Select + B à la manette — ouvre le panneau qui
+  les allume.
+  Le rapprochement est volontairement sévère : même titre, même région,
+  même révision. Une fiche écrite pour une autre version n'écrirait pas un
+  peu à côté, elle écrirait ailleurs. EvaChi préfère donc dire qu'elle n'a
+  rien trouvé.
+- Et quand aucune fiche n'existe — ce qui est le cas de la plupart des jeux
+  peu connus — le même panneau sait chercher la valeur soi-même, dans la
+  mémoire de la console : « j'ai 47 vies », on filtre, on rejoue, on filtre
+  encore, et l'adresse tombe en quelques passes.
+  Les triches n'écrivent que dans la mémoire de travail, jamais dans la
+  sauvegarde ; décocher arrête l'écriture à l'instant ; et avant la toute
+  première, EvaChi met la partie de côté, pour qu'on puisse revenir en
+  arrière si quelque chose tourne mal.
+
+
+Ce qui était nouveau dans la 0.5.0
 ----------------------------------
 
 - Une quatrième façon de voir la bibliothèque : le carrousel. Les jaquettes

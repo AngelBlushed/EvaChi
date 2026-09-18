@@ -765,6 +765,211 @@
         .xmb-entree[aria-selected="true"] { transform: none; }
       }
 
+      /* --- Triches --- */
+
+      /*
+       * Deux panneaux, deux usages. Celui de la bibliothèque est une fenêtre
+       * ordinaire, avec ses cases à cocher : on y choisit ce qu'on télécharge,
+       * posément. Celui qu'on ouvre en pleine partie est autre chose — on le
+       * regarde une seconde, une manette en main, sans quitter le jeu des yeux.
+       */
+      .triches-barre {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 10px;
+      }
+      .triches-barre .etat { color: var(--muted); font-size: 12px; }
+
+      .triches-liste {
+        max-height: 44vh;
+        overflow-y: auto;
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        background: var(--bg);
+      }
+      .triches-liste:empty { display: none; }
+      .triches-liste label {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 10px;
+        cursor: pointer;
+      }
+      .triches-liste label:nth-child(odd) { background: var(--row); }
+      .triches-liste label:hover { background: var(--accent-soft); }
+      .triches-liste .console {
+        margin-left: auto;
+        color: var(--muted);
+        font-size: 11px;
+        white-space: nowrap;
+      }
+      /* Celles qui sont déjà sur le disque le disent : décocher les retire, et
+         il faut le voir avant de cliquer. */
+      .triches-liste .posee { color: var(--accent); }
+
+      /* --- Le panneau qu'on ouvre en jeu --- */
+
+      /*
+       * Adossé au bord gauche et non centré : on continue de voir le jeu, qui
+       * tourne derrière. C'est ce qui distingue un panneau de triche d'une
+       * fenêtre de réglages — on y regarde l'effet de ce qu'on coche.
+       */
+      dialog.mod {
+        position: fixed;
+        inset: 0 auto 0 0;
+        max-height: 100vh;
+        height: 100vh;
+        width: min(460px, 92vw);
+        margin: 0;
+        border: 0;
+        border-inline-end: 1px solid var(--accent);
+        border-radius: 0;
+        background: var(--panel);
+        flex-direction: column;
+      }
+      /* Sur l'élément ouvert seulement : un `display` posé sans réserve
+         écrase le `display: none` que le navigateur donne à une fenêtre
+         fermée, et le panneau restait à l'écran en permanence. */
+      dialog.mod[open] { display: flex; }
+      dialog.mod::backdrop { background: rgba(0, 0, 0, 0.25); }
+      dialog.mod h2 {
+        margin: 0;
+        padding: 14px 18px;
+        font-size: 14px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--bg);
+        background: var(--accent);
+      }
+      dialog.mod .dialog-body {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        padding: 12px 18px;
+      }
+
+      .mod-onglets {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+      }
+      .mod-onglets button {
+        flex: 1;
+        padding: 7px 10px;
+        font: inherit;
+        color: var(--muted);
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .mod-onglets button[aria-pressed='true'] {
+        color: var(--ink);
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+
+      /* Une triche est une ligne qu'on allume : large, lisible de loin, et
+         franchement différente selon qu'elle est active ou non. */
+      .mod-triche {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        padding: 9px 12px;
+        margin-bottom: 4px;
+        font: inherit;
+        text-align: left;
+        color: var(--muted);
+        background: var(--raised);
+        border: 1px solid transparent;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .mod-triche:hover { border-color: var(--edge); }
+      .mod-triche .voyant {
+        flex: 0 0 34px;
+        height: 16px;
+        border-radius: 8px;
+        background: var(--edge);
+        position: relative;
+        transition: background-color 120ms ease;
+      }
+      .mod-triche .voyant::after {
+        content: "";
+        position: absolute;
+        top: 2px;
+        left: 2px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: var(--panel);
+        transition: transform 120ms ease;
+      }
+      .mod-triche[aria-pressed='true'] {
+        color: var(--ink);
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
+      .mod-triche[aria-pressed='true'] .voyant { background: var(--accent); }
+      .mod-triche[aria-pressed='true'] .voyant::after { transform: translateX(18px); }
+      .mod-triche .nom {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      /* Le chercheur : une ligne de réglages, une rangée de questions, une
+         liste d'adresses. */
+      .mod-reglages {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+      }
+      .mod-reglages input[type='number'] { width: 110px; }
+      .mod-questions {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+        gap: 6px;
+        margin-bottom: 10px;
+      }
+      .mod-questions button { padding: 7px 4px; }
+      .mod-restantes {
+        margin: 0 0 10px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .mod-adresses { display: grid; gap: 4px; }
+      .mod-adresses button {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        width: 100%;
+        padding: 6px 10px;
+        font: inherit;
+        text-align: left;
+        color: var(--ink);
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .mod-adresses button:hover { border-color: var(--accent); }
+      .mod-adresses .adresse {
+        font-family: Consolas, "Courier New", monospace;
+        color: var(--muted);
+      }
+      .mod-adresses .valeur { margin-left: auto; font-weight: 600; }
+
+      @media (prefers-reduced-motion: reduce) {
+        .mod-triche .voyant,
+        .mod-triche .voyant::after { transition: none; }
+      }
+
       /* --- Carrousel --- */
 
       /*
@@ -1694,6 +1899,9 @@
             </button>
             <button type="button" data-action="states" disabled>Emplacements…</button>
             <hr />
+            <button type="button" data-action="triches">Triches…</button>
+            <button type="button" data-action="mod" disabled>Panneau de triches</button>
+            <hr />
             <button type="button" data-action="stop" disabled>Retour à la bibliothèque</button>
           </div>
         </div>
@@ -2293,6 +2501,76 @@
         </p>
         <div id="credits-body"></div>
         <p class="hint-text" id="credits-note"></p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <!-- Le panneau des fiches : ce qu'on télécharge, et ce qu'on retire. Rien
+         ne descend du réseau sans une case cochée ici. -->
+    <dialog id="triches-dialog">
+      <h2>Triches</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Le projet libretro publie des fiches de triche, une par jeu. EvaChi ne
+          retient que celles qui vont exactement au vôtre — même titre, même
+          région, même révision — et préfère ne rien proposer plutôt qu'un
+          à-peu-près : des codes écrits pour une autre version n'écrivent pas un
+          peu à côté, ils écrivent ailleurs.
+        </p>
+        <div class="triches-barre">
+          <button type="button" id="triches-scan">Chercher les fiches</button>
+          <span class="etat" id="triches-etat"></span>
+        </div>
+        <div class="triches-liste" id="triches-liste"></div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="triches-tout">Tout prendre</button>
+        <button type="button" id="triches-appliquer">Installer la sélection</button>
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <!-- Le panneau qu'on ouvre en pleine partie. Adossé au bord : le jeu
+         continue derrière, et c'est là qu'on voit ce qu'une triche fait. -->
+    <dialog class="mod" id="mod-dialog">
+      <h2>Panneau de triches</h2>
+      <div class="dialog-body">
+        <div class="mod-onglets" id="mod-onglets">
+          <button type="button" data-onglet="fiches" aria-pressed="true">Les triches</button>
+          <button type="button" data-onglet="chercher" aria-pressed="false">Chercher une valeur</button>
+        </div>
+
+        <div id="mod-fiches"></div>
+
+        <div id="mod-chercher" hidden>
+          <div class="mod-reglages">
+            <label>
+              Largeur
+              <select id="mod-taille">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="4">4</option>
+              </select>
+            </label>
+            <label>
+              Valeur
+              <input type="number" id="mod-valeur" min="0" step="1" />
+            </label>
+            <button type="button" id="mod-premier">Chercher</button>
+            <button type="button" id="mod-reprendre">Recommencer</button>
+          </div>
+          <div class="mod-questions" id="mod-questions">
+            <button type="button" data-question="egale">Vaut</button>
+            <button type="button" data-question="monte">Plus</button>
+            <button type="button" data-question="baisse">Moins</button>
+            <button type="button" data-question="change">Différent</button>
+            <button type="button" data-question="stable">Identique</button>
+          </div>
+          <p class="mod-restantes" id="mod-restantes"></p>
+          <div class="mod-adresses" id="mod-adresses"></div>
+        </div>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>

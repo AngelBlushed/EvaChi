@@ -39,6 +39,7 @@ Les quarante-huit dossiers sont déjà là, vides.
 | **Les jaquettes toutes seules** | trouvées sur le serveur du projet libretro, recadrables à la main si elles tombent mal |
 | **Cinquante langues** | chacune dans son alphabet, avec ses pluriels, ses dates et ses unités |
 | **La langue des jeux** | réglée à part de celle de l'interface : une cartouche européenne démarre enfin dans la sienne |
+| **Un panneau de triches** | les fiches publiées par libretro, et un chercheur de valeurs en mémoire pour les jeux qui n'en ont pas |
 | **Tout à la manette** | y compris le plein écran, les captures, les sauvegardes d'état et l'avance rapide |
 | **Des thèmes** | et un plein écran « console de salon » qui retire jusqu'aux barres |
 | **Un cœur écrit ici** | CHIP-8, complet, avec ses six écarts de comportement — le reste vient de libretro |
@@ -156,7 +157,7 @@ l'ABI [libretro](https://www.libretro.com).
 
 ```bash
 npm install
-npm run test:all          # 608 épreuves côté fenêtre, 239 côté Rust
+npm run test:all          # 638 épreuves côté fenêtre, 253 côté Rust
 npm run app:build         # l'exécutable, dans src-tauri/target/release/
 node outils/livraison.mjs <dossier>   # monte une livraison complète
 ```

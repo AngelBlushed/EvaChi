@@ -58,6 +58,13 @@ import {
   note,
   takeMessages,
   adoptExternal,
+  lireMemoire,
+  poserTriches,
+  trichesCatalogue,
+  trichesContenu,
+  trichesInstaller,
+  trichesPosees,
+  trichesRetirer,
   externalSystems,
   knownExternals,
   launchExternal,
@@ -75,13 +82,14 @@ import {
   rejectedCores,
 } from './catalog.ts';
 import type { CatalogEntry } from './catalog.ts';
-import type { Credit, Shot, StateSlot } from '../libretro/client.ts';
+import type { Credit, Poke, Shot, StateSlot } from '../libretro/client.ts';
 import {
   FAVORIS,
   collapseDiscs,
   collapseExtracted,
   coresFor,
   effectiveCore,
+  folderLabel,
   gameLabel,
   groupLibrary,
   withFavourites,
@@ -104,6 +112,10 @@ import {
 import type { ButtonLayout } from './input.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
 import { COMME_INTERFACE, PARLERS, langueDemandee, parlerParCode } from './parlers.ts';
+import { fichesPour, lireFiche } from './triches.ts';
+import type { Triche } from './triches.ts';
+import { MONTRABLES, borner, montrer, premierTri, trier } from './chercheur.ts';
+import type { Question, Taille } from './chercheur.ts';
 import {
   aTraduire,
   compte,
@@ -191,6 +203,21 @@ const carrTitre = $<HTMLElement>('carrousel-titre');
 const carrDetail = $<HTMLElement>('carrousel-detail');
 const carrPied = $<HTMLElement>('carrousel-pied');
 const carrLettre = $<HTMLDivElement>('carrousel-lettre');
+const trichesScan = $<HTMLButtonElement>('triches-scan');
+const trichesEtat = $<HTMLElement>('triches-etat');
+const trichesListe = $<HTMLDivElement>('triches-liste');
+const trichesTout = $<HTMLButtonElement>('triches-tout');
+const trichesAppliquer = $<HTMLButtonElement>('triches-appliquer');
+const modOnglets = $<HTMLDivElement>('mod-onglets');
+const modFiches = $<HTMLDivElement>('mod-fiches');
+const modChercher = $<HTMLDivElement>('mod-chercher');
+const modTaille = $<HTMLSelectElement>('mod-taille');
+const modValeur = $<HTMLInputElement>('mod-valeur');
+const modPremier = $<HTMLButtonElement>('mod-premier');
+const modReprendre = $<HTMLButtonElement>('mod-reprendre');
+const modQuestions = $<HTMLDivElement>('mod-questions');
+const modRestantes = $<HTMLElement>('mod-restantes');
+const modAdresses = $<HTMLDivElement>('mod-adresses');
 const placeholder = $<HTMLDivElement>('placeholder');
 const placeholderPath = $<HTMLElement>('placeholder-path');
 const searchInput = $<HTMLInputElement>('search');
@@ -266,6 +293,8 @@ const dialogs = {
   states: $<HTMLDialogElement>('states-dialog'),
   crash: $<HTMLDialogElement>('crash-dialog'),
   crop: $<HTMLDialogElement>('crop-dialog'),
+  triches: $<HTMLDialogElement>('triches-dialog'),
+  mod: $<HTMLDialogElement>('mod-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -1170,6 +1199,10 @@ function clorePartie(): void {
   ecrireRecents();
   departPartie = 0;
   jeuEnCours = null;
+  oublierTriches();
+  // Un panneau resté ouvert sur un jeu qui n'est plus là ne montrerait que des
+  // lignes qui ne commandent plus rien.
+  if (dialogs.mod.open) dialogs.mod.close();
 }
 
 /** Note qu'une partie commence. */
@@ -1948,6 +1981,7 @@ function refreshMenus(): void {
     states: playing,
     shot: playing,
     stop: playing,
+    mod: playing,
   };
 
   for (const [action, on] of Object.entries(enabled)) {
@@ -2349,6 +2383,9 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
   // là où on le connaît, plutôt que cherché plus tard dans la bibliothèque —
   // qui peut avoir changé entre-temps.
   cheminEnCours = path ?? '';
+  // Les triches du jeu précédent n'ont rien à faire sur celui-ci : ses
+  // adresses ne sont pas les mêmes, et ses codes encore moins.
+  oublierTriches();
   if (path) ouvrirPartie({ path, name, folder: dossierDuJeu(path) });
 
   // Le témoin est posé avant l'appel au cœur, pas après : c'est justement
@@ -2886,6 +2923,7 @@ const boutons = {
   recadre: new Held(1000, 1000),
   plein: new Held(1000, 1000),
   capture: new Held(1200, 1200),
+  triches: new Held(1000, 1000),
   // Dans le recadrage, les gâchettes se tiennent pour resserrer d'un trait.
   serrer: new Held(320, 90),
   elargir: new Held(320, 90),
@@ -3004,6 +3042,22 @@ function naviguerMenu(): void {
   // Deux boutons à la fois plutôt qu'un seul : chacun d'eux sert au jeu, et
   // les deux ensemble ne se pressent jamais par hasard.
   if (libraryView.hidden) {
+    // Une fenêtre ouverte pendant une partie prend la manette, comme dans la
+    // bibliothèque : sans cela le panneau de triches s'ouvrirait sans qu'on
+    // puisse le parcourir, et les directions partiraient au jeu derrière.
+    const ouverte = document.querySelector<HTMLDialogElement>('dialog[open]');
+    if (ouverte) {
+      const pas: Direction[] = [];
+      for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
+        const etat = directions[sens].update(pousse[sens], maintenant);
+        if (etat.pressed || etat.repeat) pas.push(sens);
+      }
+      // B referme, sauf quand Select est tenu : c'est alors le raccourci
+      // d'ouverture qu'on relâche.
+      conduireFenetre(ouverte, { pas, a, b: b && !select0 }, tic);
+      return;
+    }
+
     surveillerEtats(pad, maintenant);
     if (boutons.capture.update(appuye(BOUTON.select) && appuye(BOUTON.y), maintenant).pressed) {
       void prendreCapture();
@@ -3013,6 +3067,14 @@ function naviguerMenu(): void {
     if (boutons.plein.update(select0 && appuye(BOUTON.x), maintenant).pressed) {
       void toggleFullscreen();
     }
+    // Select et B ouvrent le panneau de triches, et le referment. Deux
+    // boutons plutôt qu'un : B seul sert au jeu, et il sert beaucoup.
+    if (boutons.triches.update(select0 && appuye(BOUTON.b), maintenant).pressed) {
+      tic();
+      if (dialogs.mod.open) dialogs.mod.close();
+      else void ouvrirPanneauTriches();
+    }
+
     const ensemble = appuye(BOUTON.select) && appuye(BOUTON.start);
     if (boutons.retour.update(ensemble, maintenant).pressed) {
       tic(true);
@@ -3530,6 +3592,13 @@ document.addEventListener(
     if (event.key === 'F12') {
       event.preventDefault();
       void prendreCapture();
+      return;
+    }
+
+    if (event.key === 'F3') {
+      event.preventDefault();
+      if (dialogs.mod.open) dialogs.mod.close();
+      else void ouvrirPanneauTriches();
       return;
     }
 
@@ -4556,6 +4625,472 @@ function animerPoussiere(): void {
 
   requestAnimationFrame(trame);
 }
+
+// --- Triches ----------------------------------------------------------------
+
+/**
+ * Les triches : celles qu'on télécharge, celles qu'on allume, celles qu'on
+ * trouve soi-même.
+ *
+ * Deux panneaux, deux moments. Celui de la bibliothèque cherche les fiches que
+ * le projet libretro publie et pose sur le disque celles qu'on lui désigne ;
+ * il ne télécharge rien tout seul. Celui qu'on ouvre en pleine partie allume
+ * ce qui est posé, et sait chercher une valeur dans la mémoire de la console
+ * quand aucune fiche n'existe — ce qui est le cas le plus fréquent dès qu'on
+ * sort des jeux connus.
+ *
+ * Ce que ce code ne fait jamais : deviner. Une fiche n'est proposée que si elle
+ * va exactement au jeu — [`fichesPour`] s'en assure — et une valeur n'est
+ * écrite qu'à une adresse relevée dans la mémoire de ce cœur-ci, jamais tapée
+ * au clavier. Entre les deux, le cœur refuse encore ce qui déborde.
+ */
+
+/** Un jeu de la bibliothèque et les fiches qui lui vont. */
+interface Trouvaille {
+  /** Le dossier de triches chez libretro. */
+  readonly systeme: string;
+  /** Le nom du fichier, celui sur lequel se fait le rapprochement. */
+  readonly jeu: string;
+  /** Le volet où il se range, pour l'afficher. */
+  readonly console: string;
+  /** Les fiches qui lui vont, de la plus sûre à la moins sûre. */
+  readonly fiches: string[];
+}
+
+let trouvailles: Trouvaille[] = [];
+/** Les fiches déjà posées sur le disque, console par console. */
+let fichesPosees: Record<string, string[]> = {};
+
+/**
+ * Le dossier de triches qui répond à un dossier de ROMs.
+ *
+ * Le projet libretro emploie le même vocabulaire pour ses vignettes et pour ses
+ * triches : « Nintendo - Game Boy », « Sega - 32X ». EvaChi sait déjà le
+ * traduire, et s'en sert deux fois.
+ */
+function systemeDeTriches(dossier: string, connus: readonly string[]): string | null {
+  for (const nom of thumbnailFolders(dossier)) {
+    if (connus.includes(nom)) return nom;
+  }
+  return null;
+}
+
+/** Ouvre le panneau des fiches, avec ce qu'on sait déjà. */
+async function ouvrirPanneauFiches(): Promise<void> {
+  openDialog(dialogs.triches);
+  try {
+    fichesPosees = await trichesPosees();
+  } catch {
+    fichesPosees = {};
+  }
+  if (trouvailles.length === 0) trichesEtat.textContent = '';
+  renderTrouvailles();
+}
+
+/**
+ * Cherche, pour chaque jeu de la bibliothèque, s'il existe une fiche.
+ *
+ * L'inventaire du dépôt descend une fois puis reste sur le disque : une
+ * bibliothèque entière ne coûte qu'une demande au réseau. Ce qu'on en retient,
+ * en revanche, est passé au crible du rapprochement strict — c'est là que la
+ * plupart des fiches approchantes tombent, et c'est voulu.
+ */
+async function scannerTriches(): Promise<void> {
+  trichesScan.disabled = true;
+  trichesEtat.textContent = t('Recherche en cours…');
+
+  try {
+    const dossiers = [...new Set(games.map((rom) => rom.folder))].filter(Boolean);
+    const candidats = [...new Set(dossiers.flatMap((dossier) => thumbnailFolders(dossier)))];
+    const catalogue = await trichesCatalogue(candidats);
+    const connus = Object.keys(catalogue);
+
+    trouvailles = [];
+    for (const rom of games) {
+      const systeme = systemeDeTriches(rom.folder, connus);
+      if (!systeme) continue;
+      const fiches = fichesPour(rom.name, catalogue[systeme] ?? []);
+      if (fiches.length === 0) continue;
+      trouvailles.push({ systeme, jeu: rom.name, console: folderLabel(rom.folder), fiches });
+    }
+
+    fichesPosees = await trichesPosees();
+    trichesEtat.textContent = dit(
+      '{0} jeux sur {1} ont une fiche',
+      trouvailles.length,
+      games.length,
+    );
+  } catch (error) {
+    trichesEtat.textContent = reason(error);
+  } finally {
+    trichesScan.disabled = false;
+    renderTrouvailles();
+  }
+}
+
+/** Vrai si toutes les fiches de ce jeu sont déjà sur le disque. */
+function dejaPosee(trouvaille: Trouvaille): boolean {
+  const posees = fichesPosees[trouvaille.systeme] ?? [];
+  return trouvaille.fiches.every((fiche) => posees.includes(fiche));
+}
+
+/** Dessine la liste des jeux qui ont une fiche. */
+function renderTrouvailles(): void {
+  trichesListe.replaceChildren();
+
+  for (const [rang, trouvaille] of trouvailles.entries()) {
+    const ligne = document.createElement('label');
+
+    const case_ = document.createElement('input');
+    case_.type = 'checkbox';
+    case_.dataset.rang = String(rang);
+    case_.checked = dejaPosee(trouvaille);
+
+    const nom = document.createElement('span');
+    nom.textContent = gameLabel(trouvaille.jeu);
+    if (case_.checked) nom.className = 'posee';
+
+    const ou = document.createElement('span');
+    ou.className = 'console';
+    ou.textContent = trouvaille.console;
+
+    ligne.append(case_, nom, ou);
+    trichesListe.append(ligne);
+  }
+
+  const rien = trouvailles.length === 0;
+  trichesTout.disabled = rien;
+  trichesAppliquer.disabled = rien;
+}
+
+/** Pose ce qui est coché, retire ce qui ne l'est plus. */
+async function appliquerTriches(): Promise<void> {
+  const cases = [...trichesListe.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  trichesAppliquer.disabled = true;
+  trichesEtat.textContent = t('Recherche en cours…');
+
+  let posees = 0;
+  let retirees = 0;
+  const plaintes: string[] = [];
+
+  for (const case_ of cases) {
+    const trouvaille = trouvailles[Number(case_.dataset.rang)];
+    if (!trouvaille) continue;
+    const deja = dejaPosee(trouvaille);
+
+    try {
+      if (case_.checked && !deja) {
+        const manques = await trichesInstaller(trouvaille.systeme, trouvaille.fiches);
+        plaintes.push(...manques);
+        posees += trouvaille.fiches.length - manques.length;
+      } else if (!case_.checked && deja) {
+        for (const fiche of trouvaille.fiches) {
+          await trichesRetirer(trouvaille.systeme, fiche);
+          retirees += 1;
+        }
+      }
+    } catch (error) {
+      plaintes.push(reason(error));
+    }
+  }
+
+  fichesPosees = await trichesPosees();
+  renderTrouvailles();
+  trichesAppliquer.disabled = trouvailles.length === 0;
+  trichesEtat.textContent = dit('{0} fiches posées, {1} retirées', posees, retirees);
+  for (const plainte of plaintes.slice(0, 5)) log(plainte, 'err');
+}
+
+trichesScan.addEventListener('click', () => void scannerTriches());
+trichesAppliquer.addEventListener('click', () => void appliquerTriches());
+trichesTout.addEventListener('click', () => {
+  const cases = [...trichesListe.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
+  const tout = cases.some((case_) => !case_.checked);
+  for (const case_ of cases) case_.checked = tout;
+});
+
+// --- Le panneau qu'on ouvre en jeu -------------------------------------------
+
+/** Les triches lisibles pour le jeu en cours. */
+let trichesDuJeu: Triche[] = [];
+/** Celles qui sont allumées, par leur code. */
+let allumees = new Set<string>();
+/** Les valeurs qu'on maintient, trouvées par la recherche. */
+let figees: Poke[] = [];
+/** La taille de la RAM que le cœur ouvre, zéro quand il la garde pour lui. */
+let ramOuverte = 0;
+
+/**
+ * L'état du jeu avant qu'aucune triche n'ait été posée.
+ *
+ * Gardé en mémoire, et nulle part ailleurs : il ne doit toucher ni la
+ * sauvegarde rapide ni les emplacements, qui appartiennent à l'utilisateur.
+ * C'est le filet — si une triche abîme la partie, on revient à l'instant
+ * d'avant sans avoir rien perdu.
+ */
+let etatAvantTriches: Uint8Array | null = null;
+
+/** Oublie tout ce qui touchait au jeu précédent. */
+function oublierTriches(): void {
+  trichesDuJeu = [];
+  allumees = new Set();
+  figees = [];
+  etatAvantTriches = null;
+  ramOuverte = 0;
+  releveAvant = null;
+  candidats = [];
+}
+
+/** Ouvre le panneau de triches sur le jeu en cours. */
+async function ouvrirPanneauTriches(): Promise<void> {
+  if (!jeuEnCours || !core) return;
+
+  if (trichesDuJeu.length === 0) {
+    try {
+      fichesPosees = await trichesPosees();
+      const systeme = systemeDeTriches(jeuEnCours.folder, Object.keys(fichesPosees));
+      if (systeme) {
+        for (const fiche of fichesPour(jeuEnCours.name, fichesPosees[systeme] ?? [])) {
+          trichesDuJeu.push(...lireFiche(await trichesContenu(systeme, fiche)));
+        }
+      }
+    } catch (error) {
+      log(reason(error), 'err');
+    }
+  }
+
+  renderPanneauTriches();
+  renderChercheur();
+  openDialog(dialogs.mod);
+}
+
+/** Dessine la liste des triches du jeu. */
+function renderPanneauTriches(): void {
+  modFiches.replaceChildren();
+
+  if (trichesDuJeu.length === 0) {
+    const rien = document.createElement('p');
+    rien.className = 'hint-text';
+    rien.textContent = t(
+      'Aucune fiche pour ce jeu. Le panneau « Triches… » du menu Émulation en cherche une ; à défaut, la recherche de valeurs marche sur n’importe quel jeu.',
+    );
+    modFiches.append(rien);
+    return;
+  }
+
+  for (const triche of trichesDuJeu) {
+    const ligne = document.createElement('button');
+    ligne.type = 'button';
+    ligne.className = 'mod-triche';
+    ligne.setAttribute('aria-pressed', String(allumees.has(triche.code)));
+    ligne.title = triche.code;
+
+    const voyant = document.createElement('span');
+    voyant.className = 'voyant';
+
+    const nom = document.createElement('span');
+    nom.className = 'nom';
+    nom.textContent = triche.nom;
+
+    ligne.append(voyant, nom);
+    ligne.addEventListener('click', () => {
+      if (allumees.has(triche.code)) allumees.delete(triche.code);
+      else allumees.add(triche.code);
+      ligne.setAttribute('aria-pressed', String(allumees.has(triche.code)));
+      void appliquerConsignes();
+    });
+    modFiches.append(ligne);
+  }
+}
+
+/**
+ * Envoie au cœur ce qui est allumé.
+ *
+ * Tout part d'un coup, à chaque changement : le cœur oublie les précédentes
+ * puis reprend les nouvelles. Décocher arrête donc l'écriture à l'instant, ce
+ * qui est la seule chose qui compte quand une triche a mal tourné.
+ *
+ * Et avant la toute première, on met la partie de côté. Une triche peut abîmer
+ * ce qui est en mémoire — pas la sauvegarde sur le disque, à laquelle rien ici
+ * ne touche, mais la partie en cours, et personne n'a envie de la refaire.
+ */
+async function appliquerConsignes(): Promise<void> {
+  if (!core) return;
+
+  const rien = allumees.size === 0 && figees.length === 0;
+  if (!rien && !etatAvantTriches) {
+    try {
+      etatAvantTriches = await core.saveState();
+      log(t('Partie mise de côté avant la première triche.'), 'ok');
+    } catch {
+      // Un cœur qui ne sait pas sauver son état ne doit pas empêcher de
+      // tricher ; on le dit en ne proposant pas le retour en arrière.
+      etatAvantTriches = null;
+    }
+  }
+
+  try {
+    const etat = await poserTriches({ codes: [...allumees], pokes: figees });
+    ramOuverte = etat.ram;
+    if (etat.retenus < figees.length) {
+      log(dit('{0} valeurs écartées : hors de la mémoire de ce jeu', figees.length - etat.retenus), 'err');
+    }
+  } catch (error) {
+    log(reason(error), 'err');
+  }
+  renderChercheur();
+}
+
+// --- La recherche d'une valeur ------------------------------------------------
+
+/** Le dernier relevé de la mémoire, pour comparer au suivant. */
+let releveAvant: Uint8Array | null = null;
+/** Les adresses qui tiennent encore. */
+let candidats: number[] = [];
+
+function tailleChoisie(): Taille {
+  const brut = Number(modTaille.value);
+  return brut === 2 || brut === 4 ? brut : 1;
+}
+
+/** La valeur tapée, ou rien quand le champ est vide. */
+function valeurTapee(): number | null {
+  const brut = modValeur.value.trim();
+  if (!brut) return null;
+  const nombre = Number(brut);
+  return Number.isFinite(nombre) ? borner(nombre, tailleChoisie()) : null;
+}
+
+/** Relève toute la mémoire de travail. */
+async function relever(): Promise<Uint8Array | null> {
+  try {
+    return await lireMemoire(0, 0xffff_ffff);
+  } catch (error) {
+    log(reason(error), 'err');
+    return null;
+  }
+}
+
+/** Le premier tri : tout, ou ce qui vaut le chiffre donné. */
+async function chercherDabord(): Promise<void> {
+  const releve = await relever();
+  if (!releve) return;
+  ramOuverte = releve.length;
+
+  releveAvant = releve;
+  candidats = premierTri(releve, tailleChoisie(), valeurTapee());
+  renderChercheur();
+}
+
+/** Les tris suivants : ce qui reste après une nouvelle question. */
+async function affiner(question: Question): Promise<void> {
+  if (!releveAvant) {
+    await chercherDabord();
+    return;
+  }
+  const releve = await relever();
+  if (!releve) return;
+
+  candidats = trier(releveAvant, releve, candidats, tailleChoisie(), question, valeurTapee());
+  releveAvant = releve;
+  renderChercheur();
+}
+
+/** Fige une adresse à la valeur tapée, ou la libère si elle l'était déjà. */
+function basculerFigee(adresse: number): void {
+  const taille = tailleChoisie();
+  const deja = figees.findIndex((poke) => poke.adresse === adresse);
+  if (deja >= 0) {
+    figees = figees.filter((_, rang) => rang !== deja);
+  } else {
+    const voulue = valeurTapee();
+    const actuelle = releveAvant ? (montrer(releveAvant, [adresse], taille)[0]?.valeur ?? 0) : 0;
+    figees = [...figees, { adresse, taille, valeur: voulue ?? actuelle }];
+  }
+  renderChercheur();
+  void appliquerConsignes();
+}
+
+/** Dessine l'état de la recherche. */
+function renderChercheur(): void {
+  modAdresses.replaceChildren();
+
+  // Un cœur n'est pas tenu d'ouvrir sa mémoire, et plusieurs ne le font pas.
+  // Le dire vaut mieux que laisser chercher dans le vide.
+  const ferme = ramOuverte === 0 && releveAvant === null;
+  for (const bouton of [modPremier, modReprendre]) bouton.disabled = false;
+  for (const bouton of modQuestions.querySelectorAll('button')) {
+    bouton.disabled = releveAvant === null;
+  }
+
+  if (ferme) {
+    modRestantes.textContent = '';
+  } else if (releveAvant === null) {
+    modRestantes.textContent = dit('{0} octets de mémoire', ramOuverte);
+  } else {
+    modRestantes.textContent = dit('{0} adresses possibles', candidats.length);
+  }
+
+  if (releveAvant === null) return;
+
+  if (candidats.length > MONTRABLES) {
+    const trop = document.createElement('p');
+    trop.className = 'hint-text';
+    trop.textContent = t('Jouez un peu, puis dites ce que la valeur a fait.');
+    modAdresses.append(trop);
+    return;
+  }
+
+  for (const trouvee of montrer(releveAvant, candidats, tailleChoisie())) {
+    const ligne = document.createElement('button');
+    ligne.type = 'button';
+    const figee = figees.some((poke) => poke.adresse === trouvee.adresse);
+    ligne.setAttribute('aria-pressed', String(figee));
+
+    const adresse = document.createElement('span');
+    adresse.className = 'adresse';
+    adresse.textContent = `0x${trouvee.adresse.toString(16).toUpperCase().padStart(4, '0')}`;
+
+    const quoi = document.createElement('span');
+    quoi.textContent = figee ? t('Figée') : t('Figer');
+
+    const valeur = document.createElement('span');
+    valeur.className = 'valeur';
+    valeur.textContent = String(trouvee.valeur);
+
+    ligne.append(adresse, quoi, valeur);
+    ligne.addEventListener('click', () => basculerFigee(trouvee.adresse));
+    modAdresses.append(ligne);
+  }
+}
+
+modPremier.addEventListener('click', () => void chercherDabord());
+modReprendre.addEventListener('click', () => {
+  releveAvant = null;
+  candidats = [];
+  renderChercheur();
+});
+modQuestions.addEventListener('click', (event) => {
+  const bouton = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-question]');
+  if (!bouton) return;
+  void affiner(bouton.dataset.question as Question);
+});
+modTaille.addEventListener('change', () => {
+  releveAvant = null;
+  candidats = [];
+  renderChercheur();
+});
+
+modOnglets.addEventListener('click', (event) => {
+  const bouton = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-onglet]');
+  if (!bouton) return;
+  for (const autre of modOnglets.querySelectorAll('button')) {
+    autre.setAttribute('aria-pressed', String(autre === bouton));
+  }
+  const fiches = bouton.dataset.onglet === 'fiches';
+  modFiches.hidden = !fiches;
+  modChercher.hidden = fiches;
+});
 
 // --- Jaquettes --------------------------------------------------------------
 
@@ -5645,6 +6180,8 @@ const actions: Record<string, () => void | Promise<void>> = {
     renderTempo();
     openDialog(dialogs.settings);
   },
+  triches: () => void ouvrirPanneauFiches(),
+  mod: () => void ouvrirPanneauTriches(),
   log: () => openDialog(dialogs.log),
   about: () => {
     renderAbout();
@@ -5670,6 +6207,7 @@ const RACCOURCIS_CLAVIER: readonly (readonly [string, string])[] = [
   [aTraduire('Flèches'), aTraduire('Parcourir la grille et les menus animés')],
   [aTraduire('Entrée'), aTraduire('Lancer le jeu choisi')],
   ['P', aTraduire('Plein écran')],
+  ['F3', aTraduire('Panneau de triches')],
   ['F5', aTraduire('Actualiser la bibliothèque')],
   [aTraduire('Échap'), aTraduire('Refermer une fenêtre')],
 ];
