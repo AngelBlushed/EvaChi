@@ -1,4 +1,4 @@
-EvaChi 0.4.0
+EvaChi 0.5.0
 ============
 
 Un hôte d'émulation multi-systèmes : une bibliothèque, un lanceur, et les
@@ -23,7 +23,27 @@ Les quarante-huit dossiers de console sont déjà là, vides. Ceux dont on ne se
 sert pas peuvent être supprimés.
 
 
-Ce qui est nouveau depuis la 0.3.0
+Ce qui est nouveau depuis la 0.4.0
+----------------------------------
+
+- Une quatrième façon de voir la bibliothèque : le carrousel. Les jaquettes
+  de face, tournées en perspective, les consoles en pile à gauche, et une
+  poussière qui monte derrière. Les jeux se parcourent de gauche à droite,
+  les consoles de haut en bas. Menu « Affichage » → « Thèmes… » → section
+  « Présentation ».
+- La langue des jeux se règle à part de celle de l'interface. Beaucoup de
+  cartouches et de disques européens portent leur texte en cinq ou six
+  langues, et choisissent laquelle afficher d'après un réglage de la console ;
+  l'émulateur prenait l'anglais, faute qu'on lui ait jamais rien dit. Menu
+  « Langue » → « Langue des jeux ».
+  Cela vaut pour les émulateurs intégrés. Les émulateurs autonomes — Dolphin,
+  PPSSPP, Azahar, PCSX2 et les autres — gardent leur propre réglage, dans
+  leurs propres menus. Et un jeu qui ne contient que de l'anglais restera en
+  anglais : le réglage choisit parmi les langues que la cartouche porte, il
+  n'en ajoute aucune.
+
+
+Ce qui était nouveau dans la 0.4.0
 ----------------------------------
 
 - Chaque émulateur tourne maintenant dans son propre processus. Celui qui
@@ -68,14 +88,19 @@ La langue
 EvaChi parle cinquante langues. Au premier lancement, elle prend celle de
 Windows si elle la connaît, et le français sinon. Pour en changer :
 
-  Menu « Affichage » → « Thèmes… » → section « Langue »
+  Menu « Langue », tout à droite de la barre → « Langue de l'interface »
 
 Chaque langue y est écrite dans son propre alphabet : on reconnaît la sienne
 sans savoir lire les autres. Le choix est retenu d'un lancement à l'autre.
 
-  To change the language: third menu from the left -> the entry with three
-  dots -> the second list in the window. Every language is written in its own
-  script, so look for yours.
+La seconde ligne du même menu, « Langue des jeux », est tout autre chose :
+c'est la langue qu'on demande aux jeux eux-mêmes, et non à EvaChi. Elle suit
+l'interface tant qu'on n'a rien choisi.
+
+  To change the language: the « Langue » menu, at the right end of the bar ->
+  its first line. Every language is written in its own script, so look for
+  yours. The second line sets the language of the games themselves, which is
+  a different thing.
 
 
 Les BIOS, les clés, les micrologiciels
