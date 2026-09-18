@@ -85,9 +85,33 @@ const credits = lire('src-tauri/src/credits.rs');
 const coeurs = [...credits.matchAll(/Credit \{\s*id: "([^"]*)",\s*nom: "([^"]*)",\s*auteurs: "([^"]*)",\s*licence: "([^"]*)",\s*systeme: "([^"]*)",\s*propose: (\w+),/g)]
   .map((m) => ({ id: m[1], nom: m[2], auteurs: m[3], licence: m[4], systeme: m[5], propose: m[6] === 'true' }));
 
+// Chaque entrée est découpée puis lue champ par champ. Une seule expression
+// couvrant tout le bloc paraissait plus courte — et laissait tomber Ryubing,
+// dont l'entrée porte un commentaire entre deux champs. Un crédit manquant est
+// précisément ce qu'on veut éviter, alors on compte ce qu'on a trouvé.
 const emulateurs = lire('src-tauri/src/emulators.rs');
-const externes = [...emulateurs.matchAll(/system: "([^"]+)",\s*\n\s*label: "([^"]+)",\s*\n\s*repository: "([^"]*)",[\s\S]*?license: "([^"]+)",\s*\n\s*site: "([^"]*)",/g)]
-  .map((m) => ({ systeme: m[1], nom: m[2], depot: m[3], licence: m[4], site: m[5] }));
+const tableau = emulateurs.slice(
+  emulateurs.indexOf('pub const STANDALONES'),
+  emulateurs.indexOf('\n];', emulateurs.indexOf('pub const STANDALONES')),
+);
+
+const champ = (bloc, nom) => (bloc.match(new RegExp(`${nom}: "([^"]*)"`)) ?? [, ''])[1];
+const externes = tableau
+  .split('Standalone {')
+  .slice(1)
+  .map((bloc) => ({
+    systeme: champ(bloc, 'system'),
+    nom: champ(bloc, 'label'),
+    depot: champ(bloc, 'repository'),
+    licence: champ(bloc, 'license'),
+    site: champ(bloc, 'site'),
+  }));
+
+const attendus = (tableau.match(/\blabel: "/g) ?? []).length;
+if (externes.length !== attendus || externes.some((e) => !e.nom || !e.licence)) {
+  console.error(`${externes.length} émulateurs autonomes lus, ${attendus} annoncés`);
+  process.exit(1);
+}
 
 if (coeurs.length < 30 || externes.length < 5) {
   console.error(`crédits suspects : ${coeurs.length} cœurs, ${externes.length} externes`);
