@@ -165,7 +165,13 @@ import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } f
 import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
-import { bandes, fenetre, place } from './carrousel.ts';
+import { fenetre, place } from './carrousel.ts';
+import {
+  ECHANTILLON,
+  PLEIN as JAQUETTE_ENTIERE,
+  cadre as cadrerLisere,
+  contenu,
+} from './liseres.ts';
 import { fenetre as fenetrePaquet, main as mainDuPaquet } from './eventail.ts';
 import { dessinerMoire } from './moire.ts';
 import { NUANCES, Peintre, nuanceParId } from './nuances.ts';
@@ -4792,23 +4798,71 @@ function renderConsolesCarr(): void {
  * guette ne voit rien tant qu'elles sont retirées de la mise en page.
  */
 /**
- * Resserre le liseré de la sélection sur l'image plutôt que sur la case.
+ * Lit une jaquette pour savoir où son dessin s'arrête.
  *
- * Une jaquette recadrée à la main est montrée entière, et laisse donc des
- * bandes vides quand sa forme ne suit pas celle de la case. On les mesure une
- * fois, au chargement de l'image, et le CSS s'en sert pour poser le liseré là
- * où la jaquette s'arrête vraiment.
+ * Sur un échantillon réduit : une marge se trouve aussi bien sur quelques
+ * milliers de points que sur deux millions, et cent fois plus vite. Rend
+ * `null` quand l'image vient d'un autre domaine — le navigateur refuse alors
+ * d'en relire les pixels, et l'on s'en tient à la forme du fichier.
+ */
+function lireJaquette(image: HTMLImageElement): ReturnType<typeof contenu> | null {
+  const large = image.naturalWidth;
+  const haut = image.naturalHeight;
+  if (large === 0 || haut === 0) return null;
+
+  const reduit = Math.min(1, ECHANTILLON / Math.max(large, haut));
+  const l = Math.max(2, Math.round(large * reduit));
+  const h = Math.max(2, Math.round(haut * reduit));
+  const canevas = document.createElement('canvas');
+  canevas.width = l;
+  canevas.height = h;
+  const pinceau = canevas.getContext('2d', { willReadFrequently: true });
+  if (!pinceau) return null;
+
+  try {
+    pinceau.drawImage(image, 0, 0, l, h);
+    return contenu(pinceau.getImageData(0, 0, l, h).data, l, h);
+  } catch {
+    // Une image d'un autre domaine salit le canevas : on ne peut plus la lire,
+    // et c'est normal. Le liseré se contentera de la forme.
+    return null;
+  }
+}
+
+/**
+ * Resserre le liseré de la sélection sur le dessin de la jaquette.
+ *
+ * Deux choses l'éloignent du bord de la case. La forme d'abord : une jaquette
+ * montrée en entier laisse des bandes vides quand elle ne suit pas la forme de
+ * la case. La marge du fichier ensuite — du blanc, du noir ou du transparent
+ * autour du dessin — qui dépend de qui a fait l'image, et qu'on ne peut donc
+ * que constater, jaquette par jaquette.
+ *
+ * Mesuré une fois, au chargement, et rangé dans quatre variables que le CSS
+ * lit. Ceinturer la case entière revenait à entourer du vide.
  */
 function resserrerLisere(boite: HTMLElement, image: HTMLImageElement): void {
-  if (!image.classList.contains('recadree') || image.naturalHeight === 0) {
-    boite.style.removeProperty('--bande-x');
-    boite.style.removeProperty('--bande-y');
+  const rapport = image.naturalHeight === 0 ? 0 : image.naturalWidth / image.naturalHeight;
+  const dessin = rapport === 0 ? null : (lireJaquette(image) ?? JAQUETTE_ENTIERE);
+  if (!dessin) {
+    for (const cote of COTES) boite.style.removeProperty(`--marge-${cote}`);
     return;
   }
-  const { x, y } = bandes(image.naturalWidth / image.naturalHeight);
-  boite.style.setProperty('--bande-x', `${(x * 100).toFixed(3)}%`);
-  boite.style.setProperty('--bande-y', `${(y * 100).toFixed(3)}%`);
+
+  // La case fait la forme que le CSS lui donne ; on la mesure plutôt que de la
+  // supposer, le paquet et le carrousel n'ayant pas la même.
+  const boiteRect = boite.getBoundingClientRect();
+  const rapportCase = boiteRect.height === 0 ? 0.75 : boiteRect.width / boiteRect.height;
+  const remplit = getComputedStyle(image).objectFit !== 'contain';
+  const marges = cadrerLisere(dessin, rapport, rapportCase, remplit);
+
+  for (const cote of COTES) {
+    boite.style.setProperty(`--marge-${cote}`, `${(marges[cote] * 100).toFixed(3)}%`);
+  }
 }
+
+/** Les quatre côtés, dans l'ordre où le CSS les attend. */
+const COTES = ['haut', 'droite', 'bas', 'gauche'] as const;
 
 function renderCartesCarr(): void {
   carrCartes.replaceChildren();

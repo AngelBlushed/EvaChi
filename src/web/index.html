@@ -585,7 +585,8 @@
       .paq-carte .boite::after {
         content: "";
         position: absolute;
-        inset: var(--bande-y, 0) var(--bande-x, 0);
+        inset: var(--marge-haut, 0) var(--marge-droite, 0) var(--marge-bas, 0)
+          var(--marge-gauche, 0);
         border-radius: calc(9px * var(--ech));
         box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
         opacity: 0;
@@ -1587,7 +1588,8 @@
       .carr-carte .boite::after {
         content: "";
         position: absolute;
-        inset: var(--bande-y, 0) var(--bande-x, 0);
+        inset: var(--marge-haut, 0) var(--marge-droite, 0) var(--marge-bas, 0)
+          var(--marge-gauche, 0);
         border-radius: calc(9px * var(--ech));
         box-shadow: inset 0 0 0 calc(2px * var(--ech)) var(--accent);
         opacity: 0;
