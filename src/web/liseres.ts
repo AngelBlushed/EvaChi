@@ -83,3 +83,102 @@ export function cadre(
     bas: serre(1 - (y + dessin.bas * hauteur)),
   };
 }
+
+/** Au-delà, sur les trois canaux, un point est tenu pour blanc. */
+export const SEUIL_BLANC = 236;
+
+/** En deçà, un point est tenu pour transparent. */
+export const SEUIL_TRANSPARENT = 24;
+
+/**
+ * Part d'un côté au-delà de laquelle on renonce à rogner — et l'on y renonce
+ * alors tout à fait.
+ *
+ * Une marge d'un quart n'est plus une marge : c'est qu'on n'a pas compris
+ * l'image. Rogner quand même donnerait un liseré arbitraire, et rogner deux
+ * côtés opposés jusqu'au plafond le réduirait à une bande au milieu du dessin.
+ * Mieux vaut ne rien faire que faire n'importe quoi.
+ */
+export const ROGNAGE_MAX = 0.25;
+
+/**
+ * La marge claire enregistrée dans une jaquette, s'il y en a une.
+ *
+ * Beaucoup de jaquettes sont enregistrées sur un fond blanc ou détourées sur
+ * du transparent : le dessin ne va pas jusqu'au bord du fichier, et un liseré
+ * posé sur le fichier entoure du vide. C'est le cas de FIFA 96 sur Mega Drive,
+ * et de toutes celles qui lui ressemblent.
+ *
+ * On ne cherche que du blanc et du transparent, jamais une couleur quelconque.
+ * Une version précédente prenait la couleur des quatre coins pour celle de la
+ * marge : sur une jaquette cernée de noir, les rangées sombres du haut et du
+ * bas passaient pour du vide, le rognage montait jusqu'à son plafond, et le
+ * liseré se réduisait à une bande au milieu de l'image. Une bordure sombre est
+ * un élément du dessin ; une marge blanche n'en est pas un.
+ *
+ * @param pixels quatre octets par point, comme les rend un canevas.
+ */
+export function margeClaire(
+  pixels: Uint8ClampedArray,
+  largeur: number,
+  hauteur: number,
+): Contenu {
+  if (largeur < 8 || hauteur < 8 || pixels.length < largeur * hauteur * 4) return JAQUETTE;
+
+  const clair = (x: number, y: number): boolean => {
+    const rang = (y * largeur + x) * 4;
+    if (pixels[rang + 3] < SEUIL_TRANSPARENT) return true;
+    return (
+      pixels[rang] >= SEUIL_BLANC &&
+      pixels[rang + 1] >= SEUIL_BLANC &&
+      pixels[rang + 2] >= SEUIL_BLANC
+    );
+  };
+
+  // Les quatre coins doivent l'être : un seul qui ne l'est pas, et le dessin
+  // touche le bord quelque part.
+  if (
+    !clair(0, 0) ||
+    !clair(largeur - 1, 0) ||
+    !clair(0, hauteur - 1) ||
+    !clair(largeur - 1, hauteur - 1)
+  ) {
+    return JAQUETTE;
+  }
+
+  const ligneClaire = (y: number): boolean => {
+    for (let x = 0; x < largeur; x += 1) if (!clair(x, y)) return false;
+    return true;
+  };
+  const colonneClaire = (x: number): boolean => {
+    for (let y = 0; y < hauteur; y += 1) if (!clair(x, y)) return false;
+    return true;
+  };
+
+  let haut = 0;
+  while (haut < hauteur && ligneClaire(haut)) haut += 1;
+  // Tout est clair : il n'y a pas de dessin à trouver.
+  if (haut === hauteur) return JAQUETTE;
+  let bas = 0;
+  while (bas < hauteur && ligneClaire(hauteur - 1 - bas)) bas += 1;
+  let gauche = 0;
+  while (gauche < largeur && colonneClaire(gauche)) gauche += 1;
+  let droite = 0;
+  while (droite < largeur && colonneClaire(largeur - 1 - droite)) droite += 1;
+
+  if (
+    haut > hauteur * ROGNAGE_MAX ||
+    bas > hauteur * ROGNAGE_MAX ||
+    gauche > largeur * ROGNAGE_MAX ||
+    droite > largeur * ROGNAGE_MAX
+  ) {
+    return JAQUETTE;
+  }
+
+  return {
+    gauche: gauche / largeur,
+    haut: haut / hauteur,
+    droite: 1 - droite / largeur,
+    bas: 1 - bas / hauteur,
+  };
+}

@@ -166,7 +166,8 @@ import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 import { fenetre, place } from './carrousel.ts';
-import { JAQUETTE, cadre as cadrerLisere } from './liseres.ts';
+import { JAQUETTE, cadre as cadrerLisere, margeClaire } from './liseres.ts';
+import type { Contenu } from './liseres.ts';
 import { fenetre as fenetrePaquet, main as mainDuPaquet } from './eventail.ts';
 import { dessinerMoire } from './moire.ts';
 import { NUANCES, Peintre, nuanceParId } from './nuances.ts';
@@ -4807,6 +4808,11 @@ function renderConsolesCarr(): void {
  * au milieu de l'image. Un liseré un peu large vaut mieux qu'un liseré faux.
  */
 function resserrerLisere(boite: HTMLElement, image: HTMLImageElement): void {
+  poserLisere(boite, image, margesConnues.get(image.getAttribute('src') ?? '') ?? JAQUETTE);
+}
+
+/** Pose les quatre retraits, sachant où le dessin s'arrête dans le fichier. */
+function poserLisere(boite: HTMLElement, image: HTMLImageElement, dessin: Contenu): void {
   const rapport = image.naturalHeight === 0 ? 0 : image.naturalWidth / image.naturalHeight;
   if (rapport === 0) {
     for (const cote of COTES) boite.style.removeProperty(`--marge-${cote}`);
@@ -4818,11 +4824,97 @@ function resserrerLisere(boite: HTMLElement, image: HTMLImageElement): void {
   const boiteRect = boite.getBoundingClientRect();
   const rapportCase = boiteRect.height === 0 ? 0.75 : boiteRect.width / boiteRect.height;
   const remplit = getComputedStyle(image).objectFit !== 'contain';
-  const marges = cadrerLisere(JAQUETTE, rapport, rapportCase, remplit);
+  const marges = cadrerLisere(dessin, rapport, rapportCase, remplit);
 
   for (const cote of COTES) {
     boite.style.setProperty(`--marge-${cote}`, `${(marges[cote] * 100).toFixed(3)}%`);
   }
+}
+
+/** Ce qu'on a déjà mesuré, par adresse de jaquette. */
+const margesConnues = new Map<string, Contenu>();
+
+/** Le temps d'arrêt avant de lire une jaquette, et le compte à rebours. */
+const AVANT_MESURE = 180;
+let minuterieMesure = 0;
+
+/**
+ * Lit la jaquette choisie pour resserrer son liseré sur le dessin.
+ *
+ * Beaucoup de jaquettes sont enregistrées sur du blanc, ou détourées sur du
+ * transparent : le dessin ne va pas jusqu'au bord du fichier, et un liseré
+ * posé sur le fichier entoure du vide. Cela ne se déduit d'aucune mesure — il
+ * faut regarder l'image.
+ *
+ * Seulement celle qui porte le liseré, et seulement une fois : les autres n'en
+ * ont pas besoin, et une jaquette du serveur doit repasser par le cœur natif
+ * pour être lisible — le navigateur refuse de relire une image venue d'un
+ * autre domaine, et c'est le même détour que celui du recadrage.
+ *
+ * Avec un temps d'arrêt : traverser une console en tenant la direction
+ * demanderait autrement une image par jeu traversé.
+ */
+function affinerLisere(boite: HTMLElement | null, image: HTMLImageElement | null): void {
+  clearTimeout(minuterieMesure);
+  if (!boite || !image) return;
+  const adresse = image.getAttribute('src');
+  if (!adresse) return;
+
+  const deja = margesConnues.get(adresse);
+  if (deja) {
+    poserLisere(boite, image, deja);
+    return;
+  }
+
+  minuterieMesure = window.setTimeout(() => {
+    void (async () => {
+      try {
+        const lisible = adresse.startsWith('data:') ? adresse : await coverImage(adresse);
+        const dessin = await lireDessin(lisible);
+        margesConnues.set(adresse, dessin);
+        // La sélection a pu repartir : on ne repose que si la carte montre
+        // toujours la même jaquette.
+        if (image.getAttribute('src') === adresse) poserLisere(boite, image, dessin);
+      } catch {
+        // Une jaquette qu'on ne peut pas lire garde le liseré de sa forme, qui
+        // est juste — seulement moins fin.
+        margesConnues.set(adresse, JAQUETTE);
+      }
+    })();
+  }, AVANT_MESURE);
+}
+
+/** Où le dessin s'arrête dans une image qu'on peut relire. */
+async function lireDessin(adresse: string): Promise<Contenu> {
+  const image = new Image();
+  await new Promise<void>((tenir, rompre) => {
+    image.addEventListener('load', () => tenir(), { once: true });
+    image.addEventListener('error', () => rompre(new Error('jaquette illisible')), { once: true });
+    image.src = adresse;
+  });
+
+  // Sur un échantillon réduit : une marge se trouve aussi bien sur quelques
+  // milliers de points que sur deux millions, et cent fois plus vite.
+  const cote = 160;
+  const reduit = Math.min(1, cote / Math.max(image.naturalWidth, image.naturalHeight));
+  const l = Math.max(8, Math.round(image.naturalWidth * reduit));
+  const h = Math.max(8, Math.round(image.naturalHeight * reduit));
+  const canevas = document.createElement('canvas');
+  canevas.width = l;
+  canevas.height = h;
+  const pinceau = canevas.getContext('2d', { willReadFrequently: true });
+  if (!pinceau) return JAQUETTE;
+  pinceau.drawImage(image, 0, 0, l, h);
+  return margeClaire(pinceau.getImageData(0, 0, l, h).data, l, h);
+}
+
+/** La carte du paquet qui porte le liseré, et sa jaquette. */
+function affinerPaquet(): void {
+  const carte = cartesPaq.get(cartePaq);
+  affinerLisere(
+    carte?.querySelector<HTMLElement>('.boite') ?? null,
+    carte?.querySelector('img') ?? null,
+  );
 }
 
 /** Les quatre côtés, dans l'ordre où le CSS les attend. */
@@ -5755,6 +5847,7 @@ function renderPaquet(shelves: Shelf[]): void {
   paqMain.replaceChildren();
   renderCartes();
   ecrireLegendePaq();
+  affinerPaquet();
   poserHeure();
   animerPaquet();
 }
@@ -5967,6 +6060,7 @@ function allerConsolePaq(rang: number): void {
   paqMain.classList.add('distribue');
   renderCartes();
   ecrireLegendePaq();
+  affinerPaquet();
 }
 
 /** Va droit à une carte de la console en cours. */
@@ -5975,6 +6069,7 @@ function allerCartePaq(rang: number): void {
   cartePaq = step(rang, shelf?.games.length ?? 0, 0);
   renderCartes();
   ecrireLegendePaq();
+  affinerPaquet();
 }
 
 /** Un pas de manette sur le paquet. */
