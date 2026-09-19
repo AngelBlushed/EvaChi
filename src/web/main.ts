@@ -5603,6 +5603,27 @@ modOnglets.addEventListener('click', (event) => {
 });
 
 
+/**
+ * Règle le canevas d'un fond, sans dépasser une certaine largeur.
+ *
+ * Un fond, ici, ce sont des anneaux à sept centièmes d'opacité et une
+ * poussière floue : rien qui demande la définition d'un grand écran. Au-delà,
+ * on peint quatre fois plus de pixels pour un décor qu'on ne regarde pas, et
+ * c'est sur les grandes dalles que le menu se met à hoqueter. Le CSS étire le
+ * canevas à la taille de la vue ; l'œil n'y voit rien, la carte graphique si.
+ */
+const FOND_LARGEUR_MAX = 1200;
+
+function mesurerFond(canevas: HTMLCanvasElement, largeur: number, hauteur: number): void {
+  const reduit = Math.min(1, FOND_LARGEUR_MAX / Math.max(1, largeur));
+  const points = Math.max(1, Math.round(largeur * reduit));
+  const lignes = Math.max(1, Math.round(hauteur * reduit));
+  if (canevas.width !== points || canevas.height !== lignes) {
+    canevas.width = points;
+    canevas.height = lignes;
+  }
+}
+
 /** Vrai quand la molette est passée sur l'un de ces éléments. */
 function survole(event: WheelEvent, selecteur: string): boolean {
   return event.target instanceof Element && event.target.closest(selecteur) !== null;
@@ -5786,6 +5807,7 @@ function construireCarte(item: Playable, rang: number): HTMLElement {
     jaquette.dataset.chemin = item.rom.path;
     jaquette.addEventListener('load', () => {
       marque.hidden = true;
+      resserrerLisere(boite, jaquette);
     });
     boite.append(jaquette);
     habillerPlusTard(jaquette);
@@ -5888,12 +5910,7 @@ function animerPaquet(): void {
       if (temps - derniereMesure > 2000) {
         derniereMesure = temps;
         encre = encreDuFond();
-        const largeur = paqView.clientWidth;
-        const hauteur = paqView.clientHeight;
-        if (paqFond.width !== largeur || paqFond.height !== hauteur) {
-          paqFond.width = largeur;
-          paqFond.height = hauteur;
-        }
+        mesurerFond(paqFond, paqView.clientWidth, paqView.clientHeight);
       }
       contexte.clearRect(0, 0, paqFond.width, paqFond.height);
       dessinerMoire(contexte, paqFond.width, paqFond.height, temps / 1000, encre);
@@ -5992,8 +6009,15 @@ function enSeance(): boolean {
 /** La largeur d'une lamelle du panier, avant mise à l'échelle. */
 const LARGEUR_LAMELLE = 46;
 
-/** Le temps qu'une vue doit rester en place avant d'être projetée. */
-const AVANT_PROJECTION = 150;
+/**
+ * Le temps qu'une vue doit rester en place avant d'être projetée.
+ *
+ * Assez court pour qu'un pas isolé paraisse immédiat, assez long pour qu'une
+ * direction tenue ne demande pas une image par jeu traversé. En dessous de
+ * cinquante millisecondes, le chargeur repart à chaque cran ; au-dessus de
+ * cent, on attend la diapositive.
+ */
+const AVANT_PROJECTION = 80;
 
 let voletsSea: Shelf[] = [];
 let consoleSea = 0;
@@ -6261,7 +6285,8 @@ function animerSalle(): void {
   // pendant ce temps le canevas garde sa taille d'origine, étirée sur tout
   // l'écran.
   let derniereMesure = Number.NEGATIVE_INFINITY;
-  let dernierDessin = 0;
+  let derniere = 0;
+  let dernierFond = 0;
   let demi = 0.2;
 
   const trame = (temps: number): void => {
@@ -6269,36 +6294,38 @@ function animerSalle(): void {
       salleEnCours = false;
       return;
     }
-    if (temps - dernierDessin < 32) {
-      requestAnimationFrame(trame);
-      return;
-    }
-    const ms = dernierDessin === 0 ? 16.7 : Math.min(96, temps - dernierDessin);
-    dernierDessin = temps;
+    const ms = derniere === 0 ? 16.7 : Math.min(96, temps - derniere);
+    derniere = temps;
 
-    if (temps - derniereMesure > 2000) {
-      derniereMesure = temps;
-      encre = encreDuFond();
-      const largeur = seaView.clientWidth;
-      const hauteur = seaView.clientHeight;
-      if (seaFaisceau.width !== largeur || seaFaisceau.height !== hauteur) {
-        seaFaisceau.width = largeur;
-        seaFaisceau.height = hauteur;
-      }
-      // Le cône s'arrête aux bords de l'écran, qu'on mesure : le faisceau doit
-      // porter l'image, pas déborder autour.
-      if (largeur > 0) demi = seaEcran.getBoundingClientRect().width / 2 / largeur;
-    }
-
+    // Le panier à chaque trame. Il partageait la cadence du faisceau, et l'on
+    // voyait les lamelles avancer par crans de trente millisecondes — pire
+    // encore quand la peinture du fond tombait sur la même trame qu'un pas.
     const avant = Math.round(plateauSea);
-    plateauSea = avancer(plateauSea, lameSea, ms, 105, 0.002);
+    plateauSea = avancer(plateauSea, lameSea, ms, 82, 0.002);
     if (Math.round(plateauSea) !== avant) renderLamelles();
     placerPanier();
 
-    contexte.clearRect(0, 0, seaFaisceau.width, seaFaisceau.height);
-    // Le moiré d'abord : c'est le mur du fond, et la lumière passe devant.
-    dessinerMoire(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre);
-    dessinerFaisceau(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre, demi);
+    // Le faisceau deux fois moins souvent : la poussière met une dizaine de
+    // secondes à remonter le cône, elle n'a que faire de soixante images.
+    if (temps - dernierFond > 33) {
+      dernierFond = temps;
+      if (temps - derniereMesure > 2000) {
+        derniereMesure = temps;
+        encre = encreDuFond();
+        const largeur = seaView.clientWidth;
+        mesurerFond(seaFaisceau, largeur, seaView.clientHeight);
+        // Le cône s'arrête aux bords de l'écran, qu'on mesure : le faisceau
+        // doit porter l'image, pas déborder autour. En fractions de la vue, et
+        // non en pixels : le canevas peut être plus petit qu'elle.
+        if (largeur > 0) demi = seaEcran.getBoundingClientRect().width / 2 / largeur;
+      }
+
+      contexte.clearRect(0, 0, seaFaisceau.width, seaFaisceau.height);
+      // Le moiré d'abord : c'est le mur du fond, et la lumière passe devant.
+      dessinerMoire(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre);
+      dessinerFaisceau(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre, demi);
+    }
+
     requestAnimationFrame(trame);
   };
   requestAnimationFrame(trame);

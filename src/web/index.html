@@ -559,8 +559,21 @@
       }
       .paq-carte .boite { position: absolute; inset: 0; display: grid; }
       .paq-carte .boite > * { grid-area: 1 / 1; }
-      /* Recadrée ou non, la jaquette remplit la carte : une carte à bandes
-         n'est plus une carte, et un paquet dépareillé ne se tient pas. */
+      /* Le liseré de la sélection, posé sur l'image et non sur la carte.
+         Une jaquette recadrée est montrée entière : si sa forme ne suit pas
+         celle de la carte, il reste des bandes vides que le code mesure et
+         reporte ici. Ceinturer la carte entière revenait à entourer du noir. */
+      .paq-carte .boite::after {
+        content: "";
+        position: absolute;
+        inset: var(--bande-y, 0) var(--bande-x, 0);
+        border-radius: calc(9px * var(--ech));
+        box-shadow: inset 0 0 0 calc(2px * var(--ech)) var(--accent);
+        opacity: 0;
+        transition: opacity 140ms ease;
+        pointer-events: none;
+      }
+      .paq-carte[aria-selected="true"] .boite::after { opacity: 1; }
       .paq-carte img {
         width: 100%;
         height: 100%;
@@ -578,9 +591,7 @@
         opacity: 0.4;
       }
       .paq-carte[aria-selected="true"] {
-        box-shadow:
-          0 0 0 calc(2px * var(--ech)) var(--accent),
-          0 calc(18px * var(--ech)) calc(38px * var(--ech)) rgba(0, 0, 0, 0.65);
+        box-shadow: 0 calc(18px * var(--ech)) calc(38px * var(--ech)) rgba(0, 0, 0, 0.65);
       }
       .paq-carte .etoile {
         position: absolute;
@@ -659,12 +670,14 @@
         color: var(--muted);
         opacity: 0.35;
       }
-      /* La diapositive tombe dans la fenêtre du projecteur, comme au chargeur. */
-      .sea-ecran .boite.tombe { animation: sea-chute 380ms cubic-bezier(0.2, 0.8, 0.3, 1); }
+      /* La diapositive tombe dans la fenêtre du projecteur, comme au chargeur.
+         Rien qu'un mouvement : la faire aussi apparaître en fondu vidait la
+         fenêtre le temps du fondu, et c'est ce vide qu'on voyait. Elle est
+         déjà chargée quand elle tombe, elle tombe donc opaque, et vite. */
+      .sea-ecran .boite.tombe { animation: sea-chute 170ms cubic-bezier(0.16, 0.9, 0.3, 1); }
       @keyframes sea-chute {
-        from { transform: translateY(-16%); opacity: 0; }
-        60% { opacity: 1; }
-        to { transform: translateY(0); opacity: 1; }
+        from { transform: translateY(-13%); }
+        to { transform: translateY(0); }
       }
 
       /* Le panier : un plateau posé à plat, qu'on regarde de biais. */
