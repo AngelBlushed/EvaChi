@@ -74,6 +74,13 @@ pub const FOLDERS: &[&str] = &[
 pub fn seed(roms: &Path) -> Result<usize, String> {
     std::fs::create_dir_all(roms).map_err(|error| format!("{} : {error}", roms.display()))?;
 
+    // Le dépôt, à côté des consoles : c'est là qu'on jette ce qu'on n'a pas
+    // envie de ranger, et EvaChi s'en charge au lancement suivant.
+    let depot = roms.join(crate::tri::DEPOT);
+    if !depot.exists() {
+        std::fs::create_dir(&depot).map_err(|error| format!("{} : {error}", depot.display()))?;
+    }
+
     let mut created = 0;
     for folder in FOLDERS {
         let path = roms.join(folder);
@@ -115,7 +122,9 @@ mod tests {
         let _ = std::fs::remove_dir_all(&base);
 
         assert_eq!(created, FOLDERS.len());
-        assert_eq!(present, FOLDERS.len());
+        // Un de plus : le dépôt, qui n'est pas une console mais vit à côté
+        // d'elles.
+        assert_eq!(present, FOLDERS.len() + 1);
     }
 
     #[test]

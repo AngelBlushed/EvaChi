@@ -432,6 +432,46 @@ export async function deleteStateSlot(romPath: string, slot: number): Promise<vo
 }
 
 /**
+ * Un fichier qui attend dans le dépôt.
+ *
+ * `dossiers` dit ce qu'on sait en faire : vide quand l'extension n'est
+ * reconnue par personne, un seul quand le rangement est évident, plusieurs
+ * quand il faut demander.
+ */
+export interface Depose {
+  readonly nom: string;
+  readonly chemin: string;
+  readonly taille: number;
+  readonly dossiers: string[];
+  /** Le fichier de même nom déjà rangé, s'il y en a un. */
+  readonly double: string | null;
+}
+
+/** Ce qui attend dans le dépôt, du plus évident au moins évident. */
+export async function listDrops(): Promise<Depose[]> {
+  return invoke<Depose[]>('list_drops');
+}
+
+/** Range un fichier déposé, ou le jette. Rend son nouveau chemin. */
+export async function fileDrop(
+  file: string,
+  folder: string,
+  action: 'ranger' | 'remplacer' | 'jeter',
+): Promise<string> {
+  return invoke<string>('file_drop', { file, folder, action });
+}
+
+/** Retire du dépôt les dossiers restés vides. */
+export async function sweepDrop(): Promise<number> {
+  return invoke<number>('sweep_drop');
+}
+
+/** Les dossiers de consoles que l'ossature crée, dans l'ordre. */
+export async function knownFolders(): Promise<string[]> {
+  return invoke<string[]>('known_folders');
+}
+
+/**
  * Un fichier de sauvegarde écrit par le jeu lui-même.
  *
  * C'est la pile de la cartouche, pas un emplacement : le jeu y note ses

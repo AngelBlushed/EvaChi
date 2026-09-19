@@ -438,6 +438,53 @@
         border-color: var(--accent);
       }
 
+      /* Le rangement du dépôt : une barre qui avance, puis ce qui reste à
+         décider. La barre n'est pas un ornement — ranger deux cents fichiers
+         prend le temps que ça prend, et sans elle on croit l'application
+         figée. */
+      .jauge {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        overflow: hidden;
+      }
+      .jauge .part {
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        transition: width 120ms linear;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .jauge .part { transition: none; }
+      }
+      .tri-etat {
+        margin: 6px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tri-questions { display: grid; gap: 8px; margin-top: 14px; }
+      .tri-ligne {
+        display: grid;
+        gap: 4px;
+        padding: 8px 10px;
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 5px;
+      }
+      .tri-ligne .nom {
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .tri-ligne .deja { font-size: 11px; color: var(--warn); }
+      .tri-ligne .choix { display: flex; flex-wrap: wrap; gap: 6px; }
+      .tri-ligne select { max-width: 100%; }
+
       /* La galerie : des vignettes que l'on parcourt, pas une liste. */
       dialog.large { width: min(92vw, 1000px); max-width: none; }
       .galerie {
@@ -1787,45 +1834,73 @@
       .field input[type="range"] { accent-color: var(--accent); }
       #chip8-options[hidden] { display: none; }
 
-      .pad {
+      /* Deux présentations pour la même chose. Un pavé hexadécimal est un
+         objet réel, avec ses seize touches en carré : on le dessine. Une
+         manette n'a pas de forme unique — chaque console y projette la sienne
+         — alors on la range par zones, comme on la tient en main. */
+      .pad.grille {
         display: grid;
-        grid-template-columns: repeat(4, 56px);
+        grid-template-columns: repeat(4, 62px);
         gap: 5px;
         justify-content: center;
       }
+      .pad.zones { display: grid; gap: 14px; }
+      .pad .zone h4 {
+        margin: 0 0 6px;
+        font-size: 10px;
+        font-weight: 600;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .pad .rangee { display: flex; flex-wrap: wrap; gap: 6px; }
+
+      /* Une case par commande : ce qu'elle fait, la touche du clavier qui la
+         tient, et le bouton de manette qui la tient. Chacun des deux se lit
+         d'un coup d'œil, et le second se change d'un clic. */
       .key {
-        aspect-ratio: 1;
+        width: 62px;
         display: grid;
-        place-content: center;
-        gap: 2px;
+        gap: 0;
         border: 1px solid var(--edge);
         border-radius: 4px;
         background: var(--row);
-        padding: 0;
-        cursor: pointer;
+        overflow: hidden;
         user-select: none;
+      }
+      .key .touche {
+        display: grid;
+        place-content: center;
+        gap: 2px;
+        min-height: 44px;
+        padding: 4px 2px;
+        border: 0;
+        background: none;
         color: var(--ink);
         font: inherit;
+        cursor: pointer;
       }
       .key .label { font-size: 12px; }
       .key .phys { font-size: 9px; color: var(--muted); }
-      /* Rien ne doit sortir d'une case : elle est carrée et petite, et un
-         débordement se pose sur la voisine plutôt que de s'arrêter. */
-      .key { overflow: hidden; }
-      .key .pad {
+      .key .attribution {
+        padding: 3px 2px;
+        border: 0;
+        border-top: 1px solid var(--edge);
+        background: var(--raised);
+        font: inherit;
         font-size: 9px;
         font-weight: 600;
         color: var(--accent);
-        min-height: 11px;
+        cursor: pointer;
         max-width: 100%;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
+      .key .attribution:hover { background: var(--accent-soft); }
+      .key .attribution.vide { color: var(--muted); }
       .key.down { background: var(--accent-soft); border-color: var(--accent); }
-      /* En réassignation la grille ne joue plus : le curseur le dit, et la
-         touche qui attend son bouton clignote pour qu'on ne la cherche pas. */
-      .pad.remappage .key { cursor: crosshair; }
+      /* La case qui attend son bouton clignote, pour qu'on ne la cherche pas. */
       .key.attente {
         border-color: var(--accent);
         border-style: dashed;
@@ -1925,6 +2000,7 @@
             <button type="button" data-action="open">Ouvrir un jeu…</button>
             <button type="button" data-action="add-folder">Ajouter un dossier de jeux…</button>
             <button type="button" data-action="folders">Gérer les dossiers…</button>
+            <button type="button" data-action="tri">Ranger les jeux déposés…</button>
             <button type="button" data-action="install">Émulateurs…</button>
             <button type="button" data-action="external">Émulateurs externes…</button>
             <hr />
@@ -2325,10 +2401,9 @@
         <p class="hint-text" data-i18n-html>
           Quatre emplacements par jeu, gardés sur le disque. Chaque geste est
           écrit sous l'emplacement, et remplacer ou vider demande confirmation.
-          L'emplacement en gras est celui où vont <strong>F2</strong> et
-          <strong>F4</strong> — et <strong>Select + L1</strong> /
-          <strong>Select + R1</strong> à la manette — directement, sans rien
-          demander.
+          <strong>F2</strong> et <strong>F4</strong> — <strong>Select + L1</strong>
+          / <strong>Select + R1</strong> à la manette — vont droit à
+          l'emplacement en gras, sans rien demander.
         </p>
         <div class="emplacements" id="emplacements"></div>
       </div>
@@ -2365,12 +2440,9 @@
 
         <h3 class="section">Étirement</h3>
         <p class="hint-text">
-          Beaucoup de consoles n'ont pas les proportions d'un écran
-          d'aujourd'hui : une DS, une borne verticale ou une Game Boy laissent
-          de larges bandes noires sur les côtés. À zéro, l'image garde
-          exactement ses proportions d'origine ; à cent, elle occupe toute la
-          fenêtre, quitte à s'allonger. Entre les deux, chacun choisit ce qu'il
-          supporte.
+          Peu de consoles ont les proportions d'un écran d'aujourd'hui, d'où
+          les bandes noires sur les côtés. À zéro, l'image garde ses
+          proportions ; à cent, elle remplit la fenêtre, quitte à s'allonger.
         </p>
         <div class="crans" id="etirement-list"></div>
 
@@ -2393,9 +2465,10 @@
       <div class="dialog-body">
         <p class="field" id="pad-status">Aucune manette détectée.</p>
         <p class="hint-text">
-          Appuyez sur un bouton de la manette : la touche correspondante
-          s'allume. Pour en changer une, passez en réassignation, cliquez la
-          touche à modifier, puis pressez le bouton voulu.
+          Pressez un bouton de la manette : la commande correspondante
+          s'allume. Pour en changer une, cliquez la case du bas, puis pressez
+          le bouton voulu. Le bouton change alors de main : deux commandes sur
+          le même bouton passeraient pour une panne.
         </p>
         <p class="hint-text" data-i18n-html>
           <strong>Hors jeu, tout se fait à la manette :</strong> les directions
@@ -2409,7 +2482,6 @@
              changement de langue, ce qui recréerait ces deux boutons et
              perdrait les gestes qui leur sont attachés. -->
         <p class="hint-text">
-          <button type="button" id="controls-remap" class="lien">Réassigner…</button>
           <button type="button" id="controls-reset" class="lien">Liaisons d'origine</button>
         </p>
         <div class="pad" id="keypad"></div>
@@ -2641,23 +2713,42 @@
                aller chercher : personne ne devine seul ce que « Plus »
                compare à quoi. -->
           <p class="hint-text mod-mode-emploi">
-            Le jeu range ses comptes en mémoire, mais ne dit pas où. On le
-            trouve en éliminant : vous dites ce que le nombre affiché a fait,
-            et EvaChi écarte toutes les adresses qui ne l'ont pas fait aussi.
-            Deux ou trois passes suffisent.
+            Le jeu range ses comptes en mémoire sans dire où. On les trouve
+            en éliminant : vous dites ce que le nombre affiché a fait, et
+            EvaChi écarte les adresses qui ne l'ont pas fait aussi.
           </p>
           <p class="hint-text mod-mode-emploi">
-            Vous voyez 47 vies : tapez 47 dans « Valeur », puis « Chercher ».
-            Perdez-en une, tapez 46, puis « Vaut ». Si le chiffre n'est écrit
-            nulle part — une barre de vie, un chronomètre — laissez « Valeur »
-            vide et dites seulement « Plus », « Moins », « Différent » ou
-            « Identique » entre deux moments de jeu. Quand il n'en reste que
-            quelques-unes, « Figer » maintient la valeur. « Largeur » est la
-            taille du nombre : 1 jusqu'à 255, 2 jusqu'à 65 535, 4 au-delà.
+            Vous voyez 47 vies : tapez 47 dans « Valeur », puis
+            « Chercher ». Perdez-en une, tapez 46, puis « Vaut ». Si le chiffre
+            n'est écrit nulle part, laissez « Valeur » vide et dites seulement
+            « Plus », « Moins », « Différent » ou « Identique » entre deux
+            moments de jeu. « Figer » maintient ensuite la valeur trouvée.
+            « Largeur » est la taille du nombre : 1 jusqu'à 255, 2 au-delà, 4
+            pour les grands compteurs.
           </p>
         </div>
       </div>
       <div class="dialog-foot">
+        <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <!-- Le dépôt : on y jette, EvaChi range. Cette fenêtre montre où elle en
+         est, puis demande ce qu'elle n'a pas su trancher seule. -->
+    <dialog id="tri-dialog">
+      <h2>Rangement des jeux</h2>
+      <div class="dialog-body">
+        <p class="hint-text">
+          Ce qui a été déposé dans « drop u'r rom » part vers la console que
+          son extension désigne. Quand plusieurs consoles partagent la même —
+          les images disque — EvaChi demande plutôt que de parier.
+        </p>
+        <div class="jauge"><div class="part" id="tri-part"></div></div>
+        <p class="tri-etat" id="tri-etat"></p>
+        <div class="tri-questions" id="tri-questions"></div>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="tri-appliquer" hidden>Ranger</button>
         <button type="button" data-close>Fermer</button>
       </div>
     </dialog>

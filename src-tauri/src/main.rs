@@ -24,6 +24,7 @@ mod install;
 mod manual;
 mod pads;
 mod piles;
+mod tri;
 mod sentinel;
 mod shots;
 mod skeleton;
@@ -210,6 +211,10 @@ fn main() {
             commands::delete_state_slot,
             commands::list_saves,
             commands::clear_saves,
+            commands::list_drops,
+            commands::file_drop,
+            commands::sweep_drop,
+            commands::known_folders,
             commands::save_shot,
             commands::list_shots,
             commands::delete_shot,

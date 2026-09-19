@@ -40,6 +40,10 @@ import {
   deleteStateSlot,
   clearSaves,
   listSaves,
+  listDrops,
+  fileDrop,
+  sweepDrop,
+  knownFolders,
   directories,
   libraryFolders,
   listRoms,
@@ -112,6 +116,7 @@ import {
   vitesseAvance,
 } from './input.ts';
 import type { ButtonLayout } from './input.ts';
+import type { Depose } from '../libretro/client.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
 import { COMME_INTERFACE, PARLERS, langueDemandee, parlerParCode } from './parlers.ts';
 import { fichesPour, lireFiche } from './triches.ts';
@@ -255,6 +260,10 @@ const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
 const emplacementsBoite = $<HTMLDivElement>('emplacements');
+const triPart = $<HTMLDivElement>('tri-part');
+const triEtat = $<HTMLParagraphElement>('tri-etat');
+const triQuestions = $<HTMLDivElement>('tri-questions');
+const triAppliquer = $<HTMLButtonElement>('tri-appliquer');
 const surQuoi = $<HTMLParagraphElement>('sur-quoi');
 const surOui = $<HTMLButtonElement>('sur-oui');
 const surNon = $<HTMLButtonElement>('sur-non');
@@ -302,6 +311,7 @@ const dialogs = {
   triches: $<HTMLDialogElement>('triches-dialog'),
   mod: $<HTMLDialogElement>('mod-dialog'),
   sur: $<HTMLDialogElement>('sur-dialog'),
+  tri: $<HTMLDialogElement>('tri-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -2012,7 +2022,7 @@ const manches: number[] = [0, 0, 0, 0];
  * pas prudent doit pouvoir le recevoir.
  */
 const REPOS_MANCHE = 0.12;
-const buttonCells = new Map<number, HTMLButtonElement>();
+const buttonCells = new Map<number, HTMLElement>();
 
 /**
  * Les boutons de la manette, au format standard du W3C.
@@ -3138,6 +3148,11 @@ const boutons = {
  * un même appui ferait deux choses à la fois, et on ne saurait jamais laquelle.
  */
 function naviguerMenu(): void {
+  // Une case qui attend son bouton écoute la manette ; la laisser conduire en
+  // même temps ferait qu'un seul appui lie la commande *et* déplace le focus,
+  // ou pire, actionne ce qui se trouvait dessous.
+  if (enAttente !== null || raccourciEnAttente !== null) return;
+
   // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
   // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
   const pad = currentPad();
@@ -5749,6 +5764,209 @@ $('placeholder-add').addEventListener('click', () => void addFolder());
 installOffer.addEventListener('click', () => void openInstall());
 $('folders-add').addEventListener('click', () => void addFolder());
 
+// --- Le dépôt ---------------------------------------------------------------
+
+/**
+ * Range ce qui a été déposé, et demande ce qu'on ne peut pas deviner.
+ *
+ * Deux temps, et l'ordre compte. Ce qui est évident part d'abord, sans rien
+ * demander : c'est le gros du tas, et personne n'a envie de valider quarante
+ * fois « oui, un .nes va dans le dossier NES ». Ce qui reste — une image
+ * disque qui pourrait venir de huit consoles, un jeu déjà rangé ailleurs — se
+ * pose ensuite, d'un bloc, quand le travail est fait.
+ *
+ * @param silencieux vrai au démarrage : un dépôt vide ne doit alors rien
+ *   afficher du tout, pas même une fenêtre qui dit qu'il n'y a rien à faire.
+ */
+async function rangerDepot(silencieux: boolean): Promise<void> {
+  let attente: Depose[] = [];
+  try {
+    attente = await listDrops();
+  } catch (error) {
+    if (!silencieux) log(reason(error), 'err');
+    return;
+  }
+
+  if (attente.length === 0) {
+    if (!silencieux) {
+      triQuestions.replaceChildren();
+      triAppliquer.hidden = true;
+      avancementTri(0, 0, t('Le dépôt est vide.'));
+      openDialog(dialogs.tri);
+    }
+    return;
+  }
+
+  triQuestions.replaceChildren();
+  triAppliquer.hidden = true;
+  avancementTri(0, attente.length, '');
+  openDialog(dialogs.tri);
+
+  // La liste des consoles sert à ranger à la main ce qu'aucune extension ne
+  // désigne. Demandée une fois, et seulement quand le dépôt n'est pas vide.
+  if (dossiersConnus.length === 0) {
+    try {
+      dossiersConnus = await knownFolders();
+    } catch {
+      // Sans elle, on ne proposera que les consoles que l'extension désigne.
+    }
+  }
+
+  // Évident : une seule console possible, et rien de ce nom dans la
+  // bibliothèque. Tout le reste attendra la fin.
+  const evident = (depose: Depose): boolean => depose.dossiers.length === 1 && !depose.double;
+  const seuls = attente.filter(evident);
+  const adecider = attente.filter((depose) => !evident(depose));
+
+  let ranges = 0;
+  for (const [rang, depose] of seuls.entries()) {
+    avancementTri(rang, seuls.length, depose.nom);
+    try {
+      await fileDrop(depose.chemin, depose.dossiers[0], 'ranger');
+      ranges += 1;
+    } catch (error) {
+      log(reason(error), 'err');
+    }
+  }
+  avancementTri(seuls.length, seuls.length, '');
+
+  try {
+    await sweepDrop();
+  } catch {
+    // Un dossier vide qui reste ne gêne personne.
+  }
+
+  if (ranges > 0) {
+    log(dit('{0} rangés', plural(ranges, 'jeu', 'jeux')), 'ok');
+    await refreshLibrary();
+  }
+
+  renderQuestionsTri(adecider);
+}
+
+/** Avance la barre, et dit où l'on en est. */
+function avancementTri(faits: number, total: number, quoi: string): void {
+  const part = total > 0 ? Math.round((faits / total) * 100) : 100;
+  triPart.style.width = `${part}%`;
+  triEtat.textContent = total > 0 ? [dit('{0} sur {1}', faits, total), quoi].filter(Boolean).join(' · ') : quoi;
+}
+
+/**
+ * Dessine ce qui reste à décider.
+ *
+ * Une ligne par fichier, avec le choix de la console et, pour un jeu déjà
+ * rangé, ce qu'on fait du nouveau. Rien n'est coché d'avance : c'est
+ * précisément parce qu'EvaChi ne sait pas choisir qu'on en est là.
+ */
+function renderQuestionsTri(attente: readonly Depose[]): void {
+  triQuestions.replaceChildren();
+  triAppliquer.hidden = attente.length === 0;
+  if (attente.length === 0) return;
+
+  for (const depose of attente) {
+    const ligne = document.createElement('div');
+    ligne.className = 'tri-ligne';
+
+    const nom = document.createElement('span');
+    nom.className = 'nom';
+    nom.textContent = `${depose.nom} · ${humanSize(depose.taille)}`;
+    ligne.append(nom);
+
+    if (depose.double) {
+      const deja = document.createElement('span');
+      deja.className = 'deja';
+      deja.textContent = dit('Déjà dans la bibliothèque : {0}', depose.double);
+      ligne.append(deja);
+    }
+
+    const choix = document.createElement('div');
+    choix.className = 'choix';
+
+    // Les consoles que l'extension désigne ; toutes quand elle ne dit rien,
+    // parce qu'un fichier qu'on ne reconnaît pas doit quand même pouvoir être
+    // rangé à la main.
+    const ou = document.createElement('select');
+    const laisser = document.createElement('option');
+    laisser.value = '';
+    laisser.textContent = t('Laisser dans le dépôt');
+    ou.append(laisser);
+    for (const dossier of depose.dossiers.length > 0 ? depose.dossiers : dossiersConnus) {
+      const option = document.createElement('option');
+      option.value = dossier;
+      option.textContent = folderLabel(dossier);
+      ou.append(option);
+    }
+    choix.append(ou);
+
+    const quoi = document.createElement('select');
+    if (depose.double) {
+      for (const [valeur, texte] of [
+        ['ranger', aTraduire('Garder les deux')],
+        ['remplacer', aTraduire('Remplacer')],
+        ['jeter', aTraduire('Jeter')],
+      ] as const) {
+        const option = document.createElement('option');
+        option.value = valeur;
+        option.textContent = t(texte);
+        quoi.append(option);
+      }
+      choix.append(quoi);
+    }
+
+    ligne.append(choix);
+    ligne.dataset.chemin = depose.chemin;
+    triQuestions.append(ligne);
+
+    lignesTri.set(depose.chemin, { ou, quoi, double: Boolean(depose.double) });
+  }
+}
+
+/** Les dossiers de l'ossature, pour ce qu'aucune extension ne désigne. */
+let dossiersConnus: string[] = [];
+
+/** Les choix en cours, par fichier. */
+const lignesTri = new Map<
+  string,
+  { ou: HTMLSelectElement; quoi: HTMLSelectElement; double: boolean }
+>();
+
+triAppliquer.addEventListener('click', async () => {
+  const choisis = [...lignesTri].filter(([, ligne]) => ligne.ou.value !== '');
+  if (choisis.length === 0) {
+    dialogs.tri.close();
+    return;
+  }
+
+  triAppliquer.disabled = true;
+  let ranges = 0;
+  for (const [rang, [chemin, ligne]] of choisis.entries()) {
+    avancementTri(rang, choisis.length, '');
+    const geste = ligne.double
+      ? (ligne.quoi.value as 'ranger' | 'remplacer' | 'jeter')
+      : 'ranger';
+    try {
+      await fileDrop(chemin, ligne.ou.value, geste);
+      ranges += 1;
+    } catch (error) {
+      log(reason(error), 'err');
+    }
+  }
+  avancementTri(choisis.length, choisis.length, '');
+  triAppliquer.disabled = false;
+
+  try {
+    await sweepDrop();
+  } catch {
+    // Sans importance.
+  }
+
+  if (ranges > 0) {
+    log(dit('{0} rangés', plural(ranges, 'jeu', 'jeux')), 'ok');
+    await refreshLibrary();
+  }
+  await rangerDepot(false);
+});
+
 // --- Installation des cœurs -------------------------------------------------
 
 let offers: InstallableCore[] = [];
@@ -6338,6 +6556,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   open: openContent,
   'add-folder': addFolder,
   folders: () => openDialog(dialogs.folders),
+  tri: () => void rangerDepot(false),
   install: openInstall,
   external: () => openDialog(dialogs.external),
   themes: () => {
@@ -6699,9 +6918,6 @@ let liaisons: AllOverrides = parseOverrides(retenu(RETENU.liaisons));
 /** Le bouton du cœur qui attend qu'on lui désigne un bouton de manette. */
 let enAttente: number | null = null;
 
-/** Vrai quand la grille sert à réassigner plutôt qu'à jouer. */
-let remappage = false;
-
 /**
  * Les liaisons à appliquer maintenant : celles d'origine, corrigées.
  *
@@ -6779,16 +6995,7 @@ function capturerLiaison(): void {
   log(`${layout.labels[cible] ?? cible} ← ${padButtonShort(presse)}`, 'ok');
 }
 
-const remapButton = $<HTMLButtonElement>('controls-remap');
 const resetBindings = $<HTMLButtonElement>('controls-reset');
-
-remapButton.addEventListener('click', () => {
-  remappage = !remappage;
-  enAttente = null;
-  remapButton.textContent = remappage ? t('Terminer') : t('Réassigner…');
-  keypadBox.classList.toggle('remappage', remappage);
-  buildKeypad();
-});
 
 resetBindings.addEventListener('click', () => {
   if (!liaisons[layout.id]) return;
@@ -6797,9 +7004,96 @@ resetBindings.addEventListener('click', () => {
   log(t('liaisons de manette remises d’origine'));
 });
 
+/**
+ * Comment la manette se range, par zones.
+ *
+ * Seize cases en vrac ne ressemblent à rien qu'on tienne en main : on cherche
+ * « le bouton du bas » dans une grille où rien ne dit où est le bas. Rangées
+ * comme sur la manette — la croix, les quatre boutons, les gâchettes, les deux
+ * du milieu — les mêmes seize cases se lisent sans réfléchir.
+ *
+ * Le pavé hexadécimal du CHIP-8 n'y figure pas : c'est un objet réel, carré,
+ * et le dessiner tel quel vaut mieux que de le découper.
+ */
+const ZONES: Record<string, readonly (readonly [string, readonly number[]])[]> = {
+  joypad: [
+    [aTraduire('Croix directionnelle'), [4, 5, 6, 7]],
+    [aTraduire('Boutons'), [8, 0, 9, 1]],
+    [aTraduire('Gâchettes'), [10, 11, 12, 13, 14, 15]],
+    [aTraduire('Système'), [2, 3]],
+  ],
+};
+
 let keyLabels: Map<string, string> | null = null;
 
-/** Redessine la grille de commandes pour la disposition du cœur actif. */
+/**
+ * Dessine une commande : ce qu'elle fait, la touche qui la tient, le bouton
+ * qui la tient.
+ *
+ * Deux boutons dans la case, et non un seul. Le grand se presse pour jouer —
+ * c'est ainsi qu'on essaie un pavé au CHIP-8, et qu'on vérifie qu'une touche
+ * arrive. Le petit, en bas, porte le bouton de manette : on le clique, on
+ * presse le bouton voulu, et c'est fait. L'ancien panneau demandait de passer
+ * d'abord en « réassignation », un mode qu'il fallait connaître et penser à
+ * quitter.
+ */
+function caseDeCommande(index: number, physical: string): HTMLElement {
+  const cell = document.createElement('div');
+  cell.className = 'key';
+
+  const touche = document.createElement('button');
+  touche.type = 'button';
+  touche.className = 'touche';
+
+  const label = document.createElement('span');
+  label.className = 'label';
+  label.textContent = layout.labels[index] ?? String(index);
+
+  const key = document.createElement('span');
+  key.className = 'phys';
+  key.textContent = physical.toUpperCase();
+  touche.append(label, key);
+
+  const attribution = document.createElement('button');
+  attribution.type = 'button';
+  attribution.className = 'attribution';
+  const source = [...padBindings()].find(([, cible]) => cible === index)?.[0];
+  if (enAttente === index) {
+    attribution.textContent = '…';
+    attribution.title = t('pressez le bouton voulu sur la manette');
+    cell.classList.add('attente');
+  } else if (source !== undefined) {
+    attribution.textContent = padButtonShort(source);
+    attribution.title = dit('manette : {0}', padButtonShort(source));
+  } else {
+    // Un tiret plutôt que le vide : une case vide se lit comme un défaut
+    // d'affichage, un tiret dit « rien, et c'est voulu ».
+    attribution.textContent = '—';
+    attribution.classList.add('vide');
+    attribution.title = t('aucun');
+  }
+  attribution.addEventListener('click', () => {
+    enAttente = enAttente === index ? null : index;
+    buildKeypad();
+  });
+
+  touche.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    touche.setPointerCapture(event.pointerId);
+    setButton(index, true);
+    void audio.unlock();
+  });
+  const release = (): void => setButton(index, false);
+  touche.addEventListener('pointerup', release);
+  touche.addEventListener('pointercancel', release);
+  touche.addEventListener('lostpointercapture', release);
+
+  cell.append(touche, attribution);
+  buttonCells.set(index, cell);
+  return cell;
+}
+
+/** Redessine le panneau des commandes pour la disposition du cœur actif. */
 function buildKeypad(): void {
   keypadBox.replaceChildren();
   buttonCells.clear();
@@ -6808,60 +7102,37 @@ function buildKeypad(): void {
 
   const physicalFor = new Map<number, string>();
   for (const [code, index] of layout.bindings) physicalFor.set(index, code);
-
-  for (const index of layout.display) {
-    const cell = document.createElement('button');
-    cell.className = 'key';
-    cell.type = 'button';
-
+  const touchePhysique = (index: number): string => {
     const code = physicalFor.get(index);
-    const physical = code ? keyLabels?.get(code) ?? FALLBACK_KEY_LABELS[code] ?? '' : '';
+    return code ? keyLabels?.get(code) ?? FALLBACK_KEY_LABELS[code] ?? '' : '';
+  };
 
-    const label = document.createElement('span');
-    label.className = 'label';
-    label.textContent = layout.labels[index] ?? String(index);
+  const zones = ZONES[layout.id];
+  keypadBox.classList.toggle('zones', zones !== undefined);
+  keypadBox.classList.toggle('grille', zones === undefined);
 
-    const key = document.createElement('span');
-    key.className = 'phys';
-    key.textContent = physical.toUpperCase();
+  if (!zones) {
+    for (const index of layout.display) {
+      keypadBox.append(caseDeCommande(index, touchePhysique(index)));
+    }
+    return;
+  }
 
-    // Ce que la manette envoie sur cette touche, en toutes lettres : sans
-    // cela, réassigner revient à deviner ce qu'on est en train de changer.
-    const manette = document.createElement('span');
-    manette.className = 'pad';
-    const source = [...padBindings()].find(([, cible]) => cible === index)?.[0];
-    if (enAttente === index) {
-      manette.textContent = '…';
-      cell.title = t('pressez le bouton voulu sur la manette');
-    } else if (source !== undefined) {
-      manette.textContent = padButtonShort(source);
-      cell.title = dit('manette : {0}', padButtonShort(source));
-    } else {
-      manette.textContent = '';
+  for (const [titre, boutons] of zones) {
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+
+    const nom = document.createElement('h4');
+    nom.textContent = t(titre);
+
+    const rangee = document.createElement('div');
+    rangee.className = 'rangee';
+    for (const index of boutons) {
+      rangee.append(caseDeCommande(index, touchePhysique(index)));
     }
 
-    cell.append(label, key, manette);
-    if (enAttente === index) cell.classList.add('attente');
-
-    cell.addEventListener('pointerdown', (event) => {
-      event.preventDefault();
-      // En mode réassignation, la grille ne joue plus : elle désigne.
-      if (remappage) {
-        enAttente = enAttente === index ? null : index;
-        buildKeypad();
-        return;
-      }
-      cell.setPointerCapture(event.pointerId);
-      setButton(index, true);
-      void audio.unlock();
-    });
-    const release = () => setButton(index, false);
-    cell.addEventListener('pointerup', release);
-    cell.addEventListener('pointercancel', release);
-    cell.addEventListener('lostpointercapture', release);
-
-    buttonCells.set(index, cell);
-    keypadBox.append(cell);
+    zone.append(nom, rangee);
+    keypadBox.append(zone);
   }
 }
 
@@ -6981,6 +7252,11 @@ async function start(): Promise<void> {
 
   const first = catalog[0];
   if (first) await selectCore(first);
+
+  // Ce qui a été déposé depuis la dernière fois est rangé avant que la
+  // bibliothèque ne se dessine : autrement elle s'afficherait sans les jeux
+  // qu'on vient d'y mettre, et se redessinerait sous les yeux.
+  if (inShell) await rangerDepot(true);
 
   await refreshLibrary();
   showLibrary(true);

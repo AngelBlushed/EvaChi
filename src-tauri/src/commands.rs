@@ -885,6 +885,54 @@ pub async fn delete_state_slot(
         .map_err(|error| format!("effacement interrompu : {error}"))?
 }
 
+/// Ce qui attend dans le dépôt, et ce qu'on sait en faire.
+#[tauri::command]
+pub async fn list_drops(paths: State<'_, Paths>) -> Result<Vec<crate::tri::Depose>, String> {
+    let roms = paths.roms.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::tri::inventaire(&roms))
+        .await
+        .map_err(|error| format!("lecture du dépôt interrompue : {error}"))
+}
+
+/// Range un fichier déposé, ou le jette. Rend son nouveau chemin.
+///
+/// Un fichier à la fois, et non le dépôt entier : c'est ce qui permet à la
+/// fenêtre de montrer où elle en est, et de s'arrêter proprement au milieu.
+#[tauri::command]
+pub async fn file_drop(
+    file: String,
+    folder: String,
+    action: String,
+    paths: State<'_, Paths>,
+) -> Result<String, String> {
+    let roms = paths.roms.clone();
+    let geste = crate::tri::Geste::depuis(&action).ok_or_else(|| format!("{action} : inconnu"))?;
+    tauri::async_runtime::spawn_blocking(move || crate::tri::ranger(&roms, &file, &folder, geste))
+        .await
+        .map_err(|error| format!("rangement interrompu : {error}"))?
+}
+
+/// Les dossiers de consoles que l'ossature crée, dans l'ordre.
+///
+/// La fenêtre en a besoin pour proposer un rangement à la main quand aucune
+/// extension ne désigne de console — un `.rar`, un fichier renommé.
+#[tauri::command]
+pub fn known_folders() -> Vec<String> {
+    crate::skeleton::FOLDERS
+        .iter()
+        .map(|dossier| (*dossier).to_string())
+        .collect()
+}
+
+/// Retire du dépôt les dossiers restés vides.
+#[tauri::command]
+pub async fn sweep_drop(paths: State<'_, Paths>) -> Result<usize, String> {
+    let roms = paths.roms.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::tri::balayer(&roms))
+        .await
+        .map_err(|error| format!("balayage interrompu : {error}"))
+}
+
 /// Ce que le jeu a écrit de lui-même : sa pile, telle qu'elle est sur le disque.
 #[tauri::command]
 pub async fn list_saves(
@@ -2466,6 +2514,12 @@ fn scan_roms(directory: &Path, folder: &str, depth: usize, out: &mut Vec<RomEntr
         let path = entry.path();
 
         if path.is_dir() {
+            // Le dépôt n'est pas une console : ce qui y attend n'a pas encore
+            // de place, et l'afficher en ferait un volet de plus, qui
+            // disparaîtrait au rangement suivant.
+            if folder.is_empty() && path.file_name().is_some_and(|nom| nom == crate::tri::DEPOT) {
+                continue;
+            }
             // Seul le premier niveau nomme la console : au-delà, on garde ce
             // nom-là, un sous-dossier « Europe » ne désignant aucun système.
             let deeper = if folder.is_empty() {

@@ -229,6 +229,30 @@ const RENOMMEES = new Map([
     "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on le resserre. À la manette, les directions déplacent et les gâchettes resserrent ou élargissent.",
     "Glissez le cadre, ou tirez un coin. Aux flèches on le déplace, avec Maj on l'agrandit ou on le réduit. Débordé de l'image, il ajoute des bandes transparentes : c'est ainsi qu'on dézoome une jaquette trop serrée. À la manette, les directions déplacent et les gâchettes règlent la taille.",
   ],
+  // Les deux entrées du menu ouvrent désormais le panneau, où l'on désigne
+  // l'emplacement ; les points de suspension le disent.
+  ["Sauvegarder l'état", "Sauvegarder l'état…"],
+  ["Charger l'état", "Charger l'état…"],
+  // Le panneau des emplacements ne devine plus ce qu'un clic voulait dire, et
+  // demande avant de perdre quoi que ce soit.
+  [
+    "Quatre emplacements par jeu, gardés sur le disque. L'emplacement en gras est celui qu'utilisent <strong>F2</strong> et <strong>F4</strong> — et <strong>Select + L1</strong> / <strong>Select + R1</strong> à la manette. Clic droit sur un emplacement pour le vider.",
+    "Quatre emplacements par jeu, gardés sur le disque. Chaque geste est écrit sous l'emplacement, et remplacer ou vider demande confirmation. <strong>F2</strong> et <strong>F4</strong> — <strong>Select + L1</strong> / <strong>Select + R1</strong> à la manette — vont droit à l'emplacement en gras, sans rien demander.",
+  ],
+  // Le panneau des commandes n'a plus de mode « réassignation » : on clique la
+  // case du bouton, et on presse.
+  [
+    "Appuyez sur un bouton de la manette : la touche correspondante s'allume. Pour en changer une, passez en réassignation, cliquez la touche à modifier, puis pressez le bouton voulu.",
+    "Pressez un bouton de la manette : la commande correspondante s'allume. Pour en changer une, cliquez la case du bas, puis pressez le bouton voulu. Le bouton change alors de main : deux commandes sur le même bouton passeraient pour une panne.",
+  ],
+  // Les trois qui suivent ne sont pas des réécritures mais des reprises de
+  // rang : « Réassigner… », « Terminer » et l'ancien libellé d'un emplacement
+  // ont disparu de l'interface, et trois phrases neuves prennent leur place
+  // plutôt que de décaler les cinquante tables. Ces rangs-là sont retraduits
+  // d'un bout à l'autre, comme s'il s'agissait de clés neuves.
+  ['Réassigner…', 'Vider'],
+  ['Terminer', 'Jeter'],
+  ['Reprendre cette sauvegarde — clic droit pour la vider', 'Remplacer'],
   // Le cœur ne vit plus dans la fenêtre : la phrase qui l'affirmait est devenue
   // fausse du jour au lendemain.
   [
