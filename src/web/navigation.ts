@@ -275,6 +275,67 @@ export class Held {
 }
 
 /**
+ * Retient la manette tant qu'un appui n'a pas été relâché.
+ *
+ * Deux lecteurs se partagent la même manette dans la même trame : la case qui
+ * attend qu'on lui désigne un bouton, et la conduite des menus. La case prend
+ * le bouton et se referme ; la conduite qui suit, dans la même trame, voit
+ * l'appui encore tenu et l'exécute. On liait « B » à une commande et la fenêtre
+ * se refermait aussitôt — le bouton qu'on venait de choisir servait deux fois.
+ *
+ * Le verrou se ferme dès qu'une capture est en cours, et ne se rouvre qu'une
+ * fois tous les boutons lâchés. Le prix est d'une trame ; on ne le sent pas.
+ */
+export class Verrou {
+  #tenu = false;
+
+  /** Ferme le verrou : plus rien ne passera avant un relâchement. */
+  fermer(): void {
+    this.#tenu = true;
+  }
+
+  /**
+   * Vrai quand la conduite peut reprendre.
+   *
+   * @param presse vrai tant qu'un bouton quelconque est enfoncé.
+   */
+  ouvert(presse: boolean): boolean {
+    if (this.#tenu && !presse) this.#tenu = false;
+    return !this.#tenu;
+  }
+}
+
+/**
+ * Le pas d'une avancée douce vers une cible.
+ *
+ * Un lissage exponentiel, et non une transition : la cible change pendant que
+ * l'on avance — on pousse la direction trois fois de suite — et une transition
+ * repartirait de zéro à chaque fois, ce qui donne un mouvement qui hoquette.
+ *
+ * Le pas dépend du temps écoulé et non du nombre de trames : sur une machine
+ * qui en saute, il faut avancer autant, pas moins.
+ *
+ * @param ms temps écoulé depuis la trame précédente, en millisecondes.
+ * @param constante temps au bout duquel il reste un tiers du chemin.
+ * @param arret en deçà, on est arrivé — un dixième d'unité pour une position,
+ *   bien moins pour une échelle, qui se compte en fractions.
+ */
+export function avancer(
+  depuis: number,
+  vers: number,
+  ms: number,
+  constante = 110,
+  arret = 0.1,
+): number {
+  if (!Number.isFinite(ms) || ms <= 0) return depuis;
+  const part = 1 - Math.exp(-ms / Math.max(1, constante));
+  const suivant = depuis + (vers - depuis) * part;
+  // Sans cet arrêt net, on poursuit indéfiniment une cible qu'on n'atteint
+  // jamais, et le navigateur repeint la scène pour rien.
+  return Math.abs(vers - suivant) < arret ? vers : suivant;
+}
+
+/**
  * Le palier suivant d'une jauge, dans un sens donné.
  *
  * Une jauge se glisse finement à la souris, mais à la manette chaque appui doit

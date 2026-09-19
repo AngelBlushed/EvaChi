@@ -209,6 +209,18 @@ if (fs.existsSync(cheminCles)) {
  * alignés, et il n'y a qu'une ligne à retraduire au lieu de tout.
  */
 const RENOMMEES = new Map([
+  // L'étagère et l'archipel ont laissé la place au paquet et à la séance. Les
+  // quatre phrases gardent leur rang, et leurs traductions sont reprises.
+  ['Étagère', 'Paquet'],
+  ['Archipel', 'Séance'],
+  [
+    'Un mur de rayonnages : une planche par console, et des boîtiers dont l’épaisseur est celle du fichier.',
+    'Les jaquettes tenues en éventail, comme une main de cartes. Le poignet tourne, la carte lue se redresse.',
+  ],
+  [
+    'Une île par console, les jeux semés autour, et une caméra qui survole. La place d’un jeu ne change jamais.',
+    'Une salle obscure, un faisceau plein de poussière, et le jeu projeté en grand. Le reste attend dans le panier.',
+  ],
   // Le carrousel a rendu ces trois phrases fausses : la musique, le saut de
   // cinq jeux et les flèches valent pour les deux menus de salon, pas pour un
   // seul.

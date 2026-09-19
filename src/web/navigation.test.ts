@@ -11,6 +11,8 @@ import { describe, it } from 'node:test';
 
 import {
   Held,
+  Verrou,
+  avancer,
   columnsFor,
   cranSuivant,
   echelle,
@@ -193,6 +195,54 @@ describe('appui tenu', () => {
       { pressed: false, repeat: false },
       'un même instant a rendu deux fronts',
     );
+  });
+});
+
+describe('l’avancée vers une cible', () => {
+  it('avance vers sa cible et finit par y être', () => {
+    let ou = 0;
+    for (let trame = 0; trame < 240; trame += 1) ou = avancer(ou, 1000, 16.7);
+    assert.equal(ou, 1000, 'la cible n’est jamais atteinte');
+  });
+
+  it('avance autant quand une trame a été sautée', () => {
+    // Un pas par trame ferait ralentir le mouvement sur une machine chargée,
+    // c'est-à-dire exactement quand on le regarde.
+    const enUneFois = avancer(0, 100, 33.4);
+    let enDeux = avancer(0, 100, 16.7);
+    enDeux = avancer(enDeux, 100, 16.7);
+    assert.ok(Math.abs(enUneFois - enDeux) < 0.5, `${enUneFois} contre ${enDeux}`);
+  });
+
+  it('ne bouge pas quand le temps ne passe pas', () => {
+    assert.equal(avancer(4, 100, 0), 4);
+    assert.equal(avancer(4, 100, Number.NaN), 4);
+  });
+});
+
+describe('verrou de capture', () => {
+  it('laisse passer tant qu’aucune capture n’a eu lieu', () => {
+    const verrou = new Verrou();
+    assert.equal(verrou.ouvert(true), true);
+    assert.equal(verrou.ouvert(false), true);
+  });
+
+  it('retient l’appui qui vient d’être capturé', () => {
+    // Le bouton qu'on désigne pour une commande est encore enfoncé quand la
+    // conduite des menus lit la manette, une ligne plus bas : sans le verrou,
+    // le « B » qu'on vient de lier referme la fenêtre dans la même trame.
+    const verrou = new Verrou();
+    verrou.fermer();
+    assert.equal(verrou.ouvert(true), false, 'la conduite a repris trop tôt');
+    assert.equal(verrou.ouvert(true), false);
+  });
+
+  it('rouvre au relâchement, et pas avant', () => {
+    const verrou = new Verrou();
+    verrou.fermer();
+    verrou.ouvert(true);
+    assert.equal(verrou.ouvert(false), true);
+    assert.equal(verrou.ouvert(true), true, 'le verrou s’est refermé tout seul');
   });
 });
 

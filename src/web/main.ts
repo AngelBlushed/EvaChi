@@ -151,6 +151,8 @@ import { TOUT, change, deplacer, etirer, tirer, zoomer } from './recadre.ts';
 import type { Cadre, Coin } from './recadre.ts';
 import {
   Held,
+  Verrou,
+  avancer,
   cranSuivant,
   echelle,
   initiale,
@@ -164,19 +166,8 @@ import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 import { bandes, fenetre, place } from './carrousel.ts';
-import { decalage, epaisseur, murs, places } from './etagere.ts';
-import {
-  LOIN,
-  PRES,
-  VOYAGE,
-  autour,
-  avancer,
-  camera,
-  etendue,
-  graine,
-  ile,
-  place as placeJeu,
-} from './archipel.ts';
+import { fenetre as fenetrePaquet, main as mainDuPaquet } from './eventail.ts';
+import { dessinerFaisceau, panier as panierSeance } from './seance.ts';
 import { dessinerCourant } from './courant.ts';
 import { dessiner as dessinerPoussiere } from './poussiere.ts';
 import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
@@ -226,21 +217,25 @@ const carrHeure = $<HTMLElement>('carrousel-heure');
 const carrTitre = $<HTMLElement>('carrousel-titre');
 const carrDetail = $<HTMLElement>('carrousel-detail');
 const carrPied = $<HTMLElement>('carrousel-pied');
-const etagView = $<HTMLElement>('etagere');
-const etagMur = $<HTMLDivElement>('etagere-mur');
-const etagConsole = $<HTMLElement>('etagere-console');
-const etagHeure = $<HTMLElement>('etagere-heure');
-const etagTitre = $<HTMLElement>('etagere-titre');
-const etagDetail = $<HTMLElement>('etagere-detail');
-const etagPied = $<HTMLElement>('etagere-pied');
-const archView = $<HTMLElement>('archipel');
-const archMer = $<HTMLCanvasElement>('archipel-mer');
-const archMonde = $<HTMLDivElement>('archipel-monde');
-const archConsole = $<HTMLElement>('archipel-console');
-const archHeure = $<HTMLElement>('archipel-heure');
-const archTitre = $<HTMLElement>('archipel-titre');
-const archDetail = $<HTMLElement>('archipel-detail');
-const archPied = $<HTMLElement>('archipel-pied');
+const paqView = $<HTMLElement>('paquet');
+const paqMain = $<HTMLDivElement>('paquet-main');
+const paqConsole = $<HTMLElement>('paquet-console');
+const paqHeure = $<HTMLElement>('paquet-heure');
+const paqTitre = $<HTMLElement>('paquet-titre');
+const paqDetail = $<HTMLElement>('paquet-detail');
+const paqPied = $<HTMLElement>('paquet-pied');
+const seaView = $<HTMLElement>('seance');
+const seaFaisceau = $<HTMLCanvasElement>('seance-faisceau');
+const seaEcran = $<HTMLElement>('seance-ecran');
+const seaBoite = $<HTMLElement>('seance-boite');
+const seaImage = $<HTMLImageElement>('seance-image');
+const seaInitiale = $<HTMLElement>('seance-initiale');
+const seaPanier = $<HTMLDivElement>('seance-panier');
+const seaConsole = $<HTMLElement>('seance-console');
+const seaHeure = $<HTMLElement>('seance-heure');
+const seaTitre = $<HTMLElement>('seance-titre');
+const seaDetail = $<HTMLElement>('seance-detail');
+const seaPied = $<HTMLElement>('seance-pied');
 const carrLettre = $<HTMLDivElement>('carrousel-lettre');
 const trichesScan = $<HTMLButtonElement>('triches-scan');
 const trichesEtat = $<HTMLElement>('triches-etat');
@@ -723,17 +718,17 @@ const MENUS = [
     ),
   },
   {
-    id: 'etagere',
-    label: aTraduire('Étagère'),
+    id: 'paquet',
+    label: aTraduire('Paquet'),
     detail: aTraduire(
-      'Un mur de rayonnages : une planche par console, et des boîtiers dont l’épaisseur est celle du fichier.',
+      'Les jaquettes tenues en éventail, comme une main de cartes. Le poignet tourne, la carte lue se redresse.',
     ),
   },
   {
-    id: 'archipel',
-    label: aTraduire('Archipel'),
+    id: 'seance',
+    label: aTraduire('Séance'),
     detail: aTraduire(
-      'Une île par console, les jeux semés autour, et une caméra qui survole. La place d’un jeu ne change jamais.',
+      'Une salle obscure, un faisceau plein de poussière, et le jeu projeté en grand. Le reste attend dans le panier.',
     ),
   },
 ] as const;
@@ -2043,8 +2038,8 @@ function jeuVise(): Playable | undefined {
   if (enGrille()) return tuiles[choisie];
   if (enXmb()) return voletsXmb[colonneXmb]?.games[entreeXmb];
   if (enCarrousel()) return voletsCarr[etageCarr]?.games[carteCarr];
-  if (enEtagere()) return voletsEtag[plancheEtag]?.games[boitierEtag];
-  if (enArchipel()) return voletsArch[ileArch]?.games[jeuArch];
+  if (enPaquet()) return voletsPaq[consolePaq]?.games[cartePaq];
+  if (enSeance()) return voletsSea[consoleSea]?.games[lameSea];
   return undefined;
 }
 
@@ -3211,7 +3206,7 @@ const rails = { avant: new Held(320, 130), arriere: new Held(320, 130) };
 const valider = new Held(1000, 1000);
 
 /** Les présentations qui se parcourent à la manette. */
-type Vue = 'grille' | 'xmb' | 'carrousel' | 'etagere' | 'archipel';
+type Vue = 'grille' | 'xmb' | 'carrousel' | 'paquet' | 'seance';
 
 /** Vrai quand une vue manette est à l'écran et qu'elle a de quoi montrer. */
 function vueManette(): Vue | null {
@@ -3219,8 +3214,8 @@ function vueManette(): Vue | null {
   if (enGrille() && tuiles.length > 0) return 'grille';
   if (enXmb() && voletsXmb.length > 0) return 'xmb';
   if (enCarrousel() && voletsCarr.length > 0) return 'carrousel';
-  if (enEtagere() && voletsEtag.length > 0) return 'etagere';
-  if (enArchipel() && voletsArch.length > 0) return 'archipel';
+  if (enPaquet() && voletsPaq.length > 0) return 'paquet';
+  if (enSeance() && voletsSea.length > 0) return 'seance';
   return null;
 }
 
@@ -3228,8 +3223,8 @@ function vueManette(): Vue | null {
 function jouerVue(vue: Vue): Promise<void> {
   if (vue === 'grille') return jouerChoisie();
   if (vue === 'xmb') return jouerXmb();
-  if (vue === 'etagere') return jouerEtagere();
-  if (vue === 'archipel') return jouerArchipel();
+  if (vue === 'paquet') return jouerPaquet();
+  if (vue === 'seance') return jouerSeance();
   return jouerCarr();
 }
 
@@ -3262,7 +3257,10 @@ function naviguerMenu(): void {
   // Une case qui attend son bouton écoute la manette ; la laisser conduire en
   // même temps ferait qu'un seul appui lie la commande *et* déplace le focus,
   // ou pire, actionne ce qui se trouvait dessous.
-  if (enAttente !== null || raccourciEnAttente !== null) return;
+  if (enAttente !== null || raccourciEnAttente !== null) {
+    verrouPad.fermer();
+    return;
+  }
 
   // `currentPad` et non `padIndex` : sous Windows la manette ne s'annonce
   // qu'au premier bouton pressé, et ce bouton-là est souvent le nôtre.
@@ -3273,6 +3271,11 @@ function naviguerMenu(): void {
     avanceRapide = false;
     return;
   }
+
+  // La capture vient de prendre son bouton, et ce bouton est encore enfoncé :
+  // on ne conduit pas avec, sans quoi le « B » qu'on vient de lier refermerait
+  // la fenêtre dans la foulée.
+  if (!verrouPad.ouvert(pad.buttons.some((bouton) => bouton?.pressed))) return;
 
   const [x = 0, y = 0] = pad.axes;
   const maintenant = performance.now();
@@ -3322,18 +3325,15 @@ function naviguerMenu(): void {
   }
 
   if (enMenu) {
-    // Les deux menus de salon ont les mêmes commandes, sur des axes échangés :
-    // les jeux se parcourent en colonne dans l'un, en rangée dans l'autre, et
-    // les consoles l'inverse. Tout le reste est écrit une fois pour les deux.
     // Quatre menus de salon, les mêmes commandes, et l'axe des jeux qui
     // change d'un à l'autre : en colonne dans le menu animé, en rangée
     // ailleurs. Tout le reste est écrit une fois pour les quatre.
     const bouger = enCarrousel()
       ? deplacerCarr
-      : enEtagere()
-        ? deplacerEtag
-        : enArchipel()
-          ? deplacerArch
+      : enPaquet()
+        ? deplacerPaq
+        : enSeance()
+          ? deplacerSea
           : deplacerXmb;
     /** L'axe des jeux : c'est là que la croix enjambe cinq crans. */
     const enRangee = !enXmb();
@@ -3860,7 +3860,7 @@ xmbView.addEventListener(
 let lettreMinuterie = 0;
 
 function montrerLettre(texte: string): void {
-  // L'étagère et l'archipel n'ont pas de repère de lettre à eux : ils
+  // Le paquet et la séance n'ont pas de repère de lettre à eux : ils
   // empruntent celui du carrousel, qui est posé au même endroit de l'écran.
   const boite = enGrille() ? grilleLettre : enXmb() ? xmbLettre : carrLettre;
   clearTimeout(lettreMinuterie);
@@ -3883,10 +3883,10 @@ function initialesVue(vue: Vue): string[] {
       ? tuiles
       : vue === 'xmb'
         ? (voletsXmb[colonneXmb]?.games ?? [])
-        : vue === 'etagere'
-          ? (voletsEtag[plancheEtag]?.games ?? [])
-          : vue === 'archipel'
-            ? (voletsArch[ileArch]?.games ?? [])
+        : vue === 'paquet'
+          ? (voletsPaq[consolePaq]?.games ?? [])
+          : vue === 'seance'
+            ? (voletsSea[consoleSea]?.games ?? [])
             : (voletsCarr[etageCarr]?.games ?? []);
   return liste.map((item) => initiale(gameLabel(item.rom.name)));
 }
@@ -3907,18 +3907,18 @@ function sauterLettre(vue: Vue, sens: 1 | -1): void {
       ? choisie
       : vue === 'xmb'
         ? entreeXmb
-        : vue === 'etagere'
-          ? boitierEtag
-          : vue === 'archipel'
-            ? jeuArch
+        : vue === 'paquet'
+          ? cartePaq
+          : vue === 'seance'
+            ? lameSea
             : carteCarr;
   const vers = sautInitiale(depuis, initiales, sens);
   if (vers === depuis) return;
 
   if (vue === 'grille') choisir(vers);
   else if (vue === 'xmb') allerEntree(vers);
-  else if (vue === 'etagere') allerBoitier(vers);
-  else if (vue === 'archipel') allerJeuArch(vers);
+  else if (vue === 'paquet') allerCartePaq(vers);
+  else if (vue === 'seance') allerLame(vers);
   else allerCarte(vers);
   montrerLettre(initiales[vers]);
 }
@@ -3927,8 +3927,8 @@ function sauterLettre(vue: Vue, sens: 1 | -1): void {
 function pousser(vue: Vue, sens: Direction): void {
   if (vue === 'grille') choisir(voisin(choisie, boitesGrille, sens));
   else if (vue === 'xmb') deplacerXmb(sens);
-  else if (vue === 'etagere') deplacerEtag(sens);
-  else if (vue === 'archipel') deplacerArch(sens);
+  else if (vue === 'paquet') deplacerPaq(sens);
+  else if (vue === 'seance') deplacerSea(sens);
   else deplacerCarr(sens);
 }
 
@@ -4460,7 +4460,7 @@ function renderXmb(shelves: Shelf[]): void {
  * à la demi-minute, et seulement quand le menu est là.
  */
 function poserHeure(): void {
-  if (xmbView.hidden && carrView.hidden && etagView.hidden && archView.hidden) return;
+  if (xmbView.hidden && carrView.hidden && paqView.hidden && seaView.hidden) return;
   const maintenant = new Date();
   const heure = maintenant.toLocaleString(localeCourante(), {
     weekday: 'short',
@@ -4471,8 +4471,8 @@ function poserHeure(): void {
   });
   xmbHeure.textContent = heure;
   carrHeure.textContent = heure;
-  etagHeure.textContent = heure;
-  archHeure.textContent = heure;
+  paqHeure.textContent = heure;
+  seaHeure.textContent = heure;
 }
 setInterval(poserHeure, 30_000);
 
@@ -4504,14 +4504,10 @@ function replacerMenus(): void {
   poserEchelle();
   if (!xmbView.hidden) placerXmb();
   if (!carrView.hidden) placerCarr();
-  if (!etagView.hidden) {
-    etagView.style.setProperty('--ech', String(echelle(etagView.clientHeight)));
-    placerEtagere();
-  }
-  if (!archView.hidden) {
-    archView.style.setProperty('--ech', String(echelle(archView.clientHeight)));
-    placerArchipel();
-  }
+  // Le paquet et la séance replacent tout à chaque trame : l'échelle suffit,
+  // la boucle fera le reste au seizième de seconde près.
+  if (!paqView.hidden) paqView.style.setProperty('--ech', String(echelle(paqView.clientHeight)));
+  if (!seaView.hidden) seaView.style.setProperty('--ech', String(echelle(seaView.clientHeight)));
 }
 
 /** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
@@ -4646,7 +4642,7 @@ function enCarrousel(): boolean {
 
 /** Vrai quand l'une des présentations de salon est à l'écran. */
 function enMenuAnime(): boolean {
-  return enXmb() || enCarrousel() || enEtagere() || enArchipel();
+  return enXmb() || enCarrousel() || enPaquet() || enSeance();
 }
 
 /** Redessine la pile des consoles. */
@@ -5498,245 +5494,280 @@ modOnglets.addEventListener('click', (event) => {
 });
 
 
-// --- Étagère ----------------------------------------------------------------
+// --- Le paquet ----------------------------------------------------------------
 
-/** Vrai quand le mur de rayonnages est à l'écran. */
-function enEtagere(): boolean {
-  return menuActuel() === 'etagere';
+/** Vrai quand la main de cartes est à l'écran. */
+function enPaquet(): boolean {
+  return menuActuel() === 'paquet';
 }
 
-/** Les volets tels que l'étagère les montre. */
-let voletsEtag: Shelf[] = [];
-/** La planche en cours, et le boîtier en cours sur cette planche. */
-let plancheEtag = 0;
-let boitierEtag = 0;
+/** La hauteur d'une carte, avant mise à l'échelle. */
+const HAUTEUR_CARTE = 300;
+
+/** Les volets tels que le paquet les montre. */
+let voletsPaq: Shelf[] = [];
+/** La console en cours, et la carte visée dans cette console. */
+let consolePaq = 0;
+let cartePaq = 0;
 /** Le rang retenu pour chaque console : on y revient là où on l'avait laissée. */
-const rangsEtag = new Map<string, number>();
+const rangsPaq = new Map<string, number>();
+/**
+ * Où le poignet en est vraiment, pendant qu'il rejoint la carte visée.
+ *
+ * Le paquet ne saute pas d'une carte à l'autre : il tourne. La position est
+ * donc un réel, que la boucle rapproche du rang visé — et non une transition,
+ * qui repartirait de zéro à chaque appui et ferait hoqueter la main quand on
+ * pousse la direction trois fois de suite.
+ */
+let poignetPaq = 0;
+/** Les cartes construites, par rang : on ne rebâtit que ce qui entre et sort. */
+const cartesPaq = new Map<number, HTMLElement>();
 
-/** Range l'étagère : plus de planches, plus de sélection. */
-function viderEtagere(): void {
+/** Repose la main : plus de cartes, plus de sélection. */
+function viderPaquet(): void {
   arreterMusique();
-  etagView.hidden = true;
-  etagMur.replaceChildren();
-  voletsEtag = [];
+  paqView.hidden = true;
+  paqMain.replaceChildren();
+  cartesPaq.clear();
+  voletsPaq = [];
 }
 
-/** Dessine tout le mur à partir des volets déjà classés. */
-function renderEtagere(shelves: Shelf[]): void {
-  const avant = voletsEtag[plancheEtag]?.key;
+/** Dessine la main à partir des volets déjà classés. */
+function renderPaquet(shelves: Shelf[]): void {
+  const avant = voletsPaq[consolePaq]?.key;
 
-  voletsEtag = shelves;
+  voletsPaq = shelves;
   const retrouve = avant === undefined ? -1 : shelves.findIndex((shelf) => shelf.key === avant);
-  if (retrouve >= 0) plancheEtag = retrouve;
-  plancheEtag = step(plancheEtag, shelves.length, 0);
-  const shelf = shelves[plancheEtag];
-  boitierEtag = step(boitierEtag, shelf?.games.length ?? 0, 0);
+  if (retrouve >= 0) consolePaq = retrouve;
+  consolePaq = step(consolePaq, shelves.length, 0);
+  const shelf = shelves[consolePaq];
+  cartePaq = step(cartePaq, shelf?.games.length ?? 0, 0);
+  // La main est distribuée telle quelle : voir le poignet rejoindre sa place
+  // en arrivant sur la vue donnerait l'impression d'avoir raté quelque chose.
+  poignetPaq = cartePaq;
 
-  etagView.style.setProperty('--ech', String(echelle(etagView.clientHeight)));
+  paqView.style.setProperty('--ech', String(echelle(paqView.clientHeight)));
   if (musiqueVoulue()) demarrerMusique();
-  renderPlanches();
-  placerEtagere();
+  cartesPaq.clear();
+  paqMain.replaceChildren();
+  renderCartes();
+  ecrireLegendePaq();
   poserHeure();
+  animerPaquet();
 }
 
 /**
- * Construit les planches qu'on voit, et elles seules.
+ * Construit les cartes que la main montre, et elles seules.
  *
- * Quarante consoles et cinq cents jeux se construisent en une seconde entière ;
- * on n'en voit que sept, et le reste attend d'être approché.
+ * Cinq cents jaquettes demandées pour une main de quinze cartes rempliraient
+ * le réseau sans que personne ne les voie. Celles qui sortent de la main sont
+ * retirées, celles qui y entrent sont bâties, et les autres restent en place —
+ * une carte reconstruite perdrait son image le temps de la recharger.
  */
-function renderPlanches(): void {
-  etagMur.replaceChildren();
+function renderCartes(): void {
+  const shelf = voletsPaq[consolePaq];
+  const jeux = shelf?.games ?? [];
+  const montrees = fenetrePaquet(Math.round(poignetPaq), jeux.length);
+  const garder = new Set(montrees);
 
-  for (const rang of murs(plancheEtag, voletsEtag.length)) {
-    const shelf = voletsEtag[rang];
-    if (!shelf) continue;
+  for (const [rang, carte] of [...cartesPaq]) {
+    if (garder.has(rang)) continue;
+    carte.remove();
+    cartesPaq.delete(rang);
+  }
 
-    const planche = document.createElement('div');
-    planche.className = 'etag-planche';
-    planche.setAttribute('aria-current', String(rang === plancheEtag));
-
-    const bois = document.createElement('div');
-    bois.className = 'bois';
-
-    const etiquette = document.createElement('span');
-    etiquette.className = 'etiquette';
-    etiquette.textContent = `${t(shelf.label)} · ${plural(shelf.games.length, 'jeu', 'jeux')}`;
-
-    const rangee = document.createElement('div');
-    rangee.className = 'etag-rang';
-    rangee.dataset.rang = String(rang);
-
-    const choisi = rang === plancheEtag ? boitierEtag : -1;
-    const posees = places(
-      shelf.games.map((item) => epaisseur(item.rom.size)),
-      choisi,
-    );
-
-    for (const [place, item] of shelf.games.entries()) {
-      const pose = posees[place];
-      if (!pose) continue;
-
-      const boitier = document.createElement('button');
-      boitier.type = 'button';
-      boitier.className = 'etag-boitier';
-      boitier.title = item.rom.path;
-      boitier.style.setProperty('--x', String(pose.x));
-      boitier.style.setProperty('--w', String(pose.largeur));
-      boitier.setAttribute('aria-selected', String(pose.ouvert));
-
-      const tranche = document.createElement('span');
-      tranche.className = 'tranche';
-      tranche.textContent = gameLabel(item.rom.name);
-      boitier.append(tranche);
-
-      // La jaquette n'est construite que pour celui qui est ouvert : c'est le
-      // seul qui la montre, et cinq cents images demandées pour rien
-      // rempliraient le réseau sans que personne ne les voie.
-      if (pose.ouvert) {
-        const boite = document.createElement('span');
-        boite.className = 'boite';
-
-        const marque = document.createElement('span');
-        marque.className = 'initiale';
-        marque.textContent = item.rom.name.slice(0, 1).toUpperCase();
-        boite.append(marque);
-
-        if (jaquettesVoulues()) {
-          const jaquette = document.createElement('img');
-          jaquette.alt = '';
-          jaquette.dataset.console = item.rom.folder;
-          jaquette.dataset.jeu = item.rom.name;
-          jaquette.dataset.chemin = item.rom.path;
-          jaquette.addEventListener('load', () => {
-            marque.hidden = true;
-          });
-          boite.append(jaquette);
-          void habiller(jaquette);
-        }
-        boitier.append(boite);
-      }
-
-      boitier.addEventListener('click', () => {
-        if (rang === plancheEtag && place === boitierEtag) {
-          if (sonsVoulus()) ticValidation();
-          void jouerEtagere();
-          return;
-        }
-        allerPlanche(rang);
-        boitierEtag = place;
-        renderPlanches();
-        placerEtagere();
-      });
-
-      rangee.append(boitier);
+  const posees: HTMLElement[] = [];
+  for (const rang of montrees) {
+    const item = jeux[rang];
+    if (!shelf || !item) continue;
+    let carte = cartesPaq.get(rang);
+    if (!carte) {
+      carte = construireCarte(item, rang);
+      cartesPaq.set(rang, carte);
     }
+    posees.push(carte);
+  }
+  // Toujours dans l'ordre des rangs : l'ordre du document est celui que suit
+  // un lecteur d'écran, et l'empilement se règle ailleurs.
+  paqMain.replaceChildren(...posees);
+}
 
-    planche.append(bois, etiquette, rangee);
-    etagMur.append(planche);
+/** Une carte : la jaquette, son initiale en attendant, et l'étoile. */
+function construireCarte(item: Playable, rang: number): HTMLElement {
+  const carte = document.createElement('button');
+  carte.type = 'button';
+  carte.className = 'paq-carte';
+  carte.title = item.rom.path;
+
+  const boite = document.createElement('span');
+  boite.className = 'boite';
+
+  const marque = document.createElement('span');
+  marque.className = 'initiale';
+  marque.textContent = item.rom.name.slice(0, 1).toUpperCase();
+  boite.append(marque);
+
+  if (jaquettesVoulues()) {
+    const jaquette = document.createElement('img');
+    jaquette.alt = '';
+    jaquette.dataset.console = item.rom.folder;
+    jaquette.dataset.jeu = item.rom.name;
+    jaquette.dataset.chemin = item.rom.path;
+    jaquette.addEventListener('load', () => {
+      marque.hidden = true;
+    });
+    boite.append(jaquette);
+    void habiller(jaquette);
+  }
+  carte.append(boite);
+
+  if (estFavori(item.rom.path)) {
+    const etoile = document.createElement('span');
+    etoile.className = 'etoile';
+    etoile.textContent = '★';
+    carte.append(etoile);
+  }
+
+  carte.addEventListener('click', () => {
+    if (rang === cartePaq) {
+      if (sonsVoulus()) ticValidation();
+      void jouerPaquet();
+      return;
+    }
+    allerCartePaq(rang);
+  });
+
+  return carte;
+}
+
+/** Pose chaque carte à sa place, à cet instant de la respiration. */
+function placerPaquet(secondes: number): void {
+  const total = voletsPaq[consolePaq]?.games.length ?? 0;
+  if (total === 0) return;
+  const hauteur = HAUTEUR_CARTE * echelle(paqView.clientHeight);
+
+  for (const carte of mainDuPaquet(poignetPaq, total, secondes)) {
+    const element = cartesPaq.get(carte.rang);
+    if (!element) continue;
+    element.style.transform =
+      `translate(${(carte.x * hauteur).toFixed(1)}px, ${(carte.y * hauteur).toFixed(1)}px) ` +
+      `rotate(${carte.angle.toFixed(2)}deg) scale(${carte.echelle.toFixed(3)})`;
+    element.style.opacity = carte.opacite.toFixed(3);
+    // Le rang d'empilement se compte en centièmes : la proximité est un réel,
+    // et deux cartes arrondies au même entier se recouvriraient au hasard.
+    element.style.zIndex = String(Math.round(carte.z * 100));
+    element.setAttribute('aria-selected', String(carte.rang === cartePaq));
   }
 }
 
-/** Glisse le mur et la planche choisie pour amener la sélection au milieu. */
-function placerEtagere(): void {
-  const shelf = voletsEtag[plancheEtag];
-  const jeux = shelf?.games ?? [];
-  const item = jeux[boitierEtag];
-
-  // Le mur monte ou descend d'une planche entière : on connaît la hauteur par
-  // le style, et non en mesurant — mesurer pendant une transition rend la
-  // position d'avant.
-  const vues = murs(plancheEtag, voletsEtag.length);
-  const place = vues.indexOf(plancheEtag);
-  const milieu = (vues.length - 1) / 2;
-  const hauteur = etagMur.firstElementChild?.getBoundingClientRect().height ?? 0;
-  const gouttiere = 30 * echelle(etagView.clientHeight);
-  etagMur.style.transform = `translateY(${(milieu - place) * (hauteur + gouttiere)}px)`;
-
-  for (const rangee of etagMur.querySelectorAll<HTMLElement>('.etag-rang')) {
-    const rang = Number(rangee.dataset.rang);
-    const volet = voletsEtag[rang];
-    if (!volet) continue;
-    // La planche qu'on regarde se centre sur le boîtier ouvert ; les autres se
-    // centrent sur celui qu'on y avait laissé, sans l'ouvrir. Centrées sur
-    // rien, elles partaient du milieu vers la droite et la moitié gauche de
-    // l'étagère restait vide.
-    const ouvert = rang === plancheEtag ? boitierEtag : -1;
-    const vise =
-      rang === plancheEtag
-        ? boitierEtag
-        : Math.min(rangsEtag.get(volet.key) ?? 0, Math.max(0, volet.games.length - 1));
-    const posees = places(
-      volet.games.map((jeu) => epaisseur(jeu.rom.size)),
-      ouvert,
-    );
-    const unite = 9 * echelle(etagView.clientHeight);
-    rangee.style.transform = `translateX(${decalage(posees, vise) * unite}px)`;
-  }
-
-  etagConsole.textContent = shelf ? t(shelf.label) : '—';
-  etagTitre.textContent = item ? gameLabel(item.rom.name) : '';
-  etagDetail.textContent = shelf && item ? detailJeu(shelf, item, boitierEtag) : '';
-  etagPied.textContent = shelf
-    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${dit('{0} sur {1}', boitierEtag + 1, shelf.games.length)}`
+/** Écrit ce que la main tient, sous les cartes. */
+function ecrireLegendePaq(): void {
+  const shelf = voletsPaq[consolePaq];
+  const item = shelf?.games[cartePaq];
+  paqConsole.textContent = shelf ? t(shelf.label) : '—';
+  paqTitre.textContent = item ? gameLabel(item.rom.name) : '';
+  paqDetail.textContent = shelf && item ? detailJeu(shelf, item, cartePaq) : '';
+  paqPied.textContent = shelf
+    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${dit('{0} sur {1}', cartePaq + 1, shelf.games.length)}`
     : '';
 }
 
-/** Change de planche, en retrouvant le jeu où on l'avait laissé. */
-function allerPlanche(rang: number): void {
-  const precedente = voletsEtag[plancheEtag];
-  if (precedente) rangsEtag.set(precedente.key, boitierEtag);
+/**
+ * Fait respirer la main, et tourner le poignet.
+ *
+ * Une seule boucle pour les deux : la position des cartes dépend à la fois du
+ * rang visé et de l'instant, et les séparer demanderait de les accorder.
+ */
+let paquetEnCours = false;
 
-  plancheEtag = step(rang, voletsEtag.length, 0);
-  const suivante = voletsEtag[plancheEtag];
-  boitierEtag = suivante
-    ? Math.min(rangsEtag.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
+function animerPaquet(): void {
+  if (paquetEnCours) return;
+  paquetEnCours = true;
+  let derniere = 0;
+  let dernierDessin = 0;
+
+  const trame = (temps: number): void => {
+    if (paqView.hidden || libraryView.hidden) {
+      paquetEnCours = false;
+      return;
+    }
+    // Trente-cinq images par seconde suffisent à un souffle : au-delà, on
+    // repeint quinze cartes pour un dixième de degré.
+    if (temps - dernierDessin < 28) {
+      requestAnimationFrame(trame);
+      return;
+    }
+    const ms = derniere === 0 ? 16.7 : Math.min(96, temps - dernierDessin);
+    derniere = temps;
+    dernierDessin = temps;
+
+    // La fenêtre suit le poignet et non la carte visée : les cartes qui
+    // arrivent doivent être là avant d'entrer dans le champ.
+    const avant = Math.round(poignetPaq);
+    poignetPaq = avancer(poignetPaq, cartePaq, ms, 95, 0.002);
+    if (Math.round(poignetPaq) !== avant) renderCartes();
+
+    placerPaquet(temps / 1000);
+    requestAnimationFrame(trame);
+  };
+  requestAnimationFrame(trame);
+}
+
+/** Change de console, en retrouvant le jeu où on l'avait laissé. */
+function allerConsolePaq(rang: number): void {
+  const precedente = voletsPaq[consolePaq];
+  if (precedente) rangsPaq.set(precedente.key, cartePaq);
+
+  consolePaq = step(rang, voletsPaq.length, 0);
+  const suivante = voletsPaq[consolePaq];
+  cartePaq = suivante
+    ? Math.min(rangsPaq.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
     : 0;
 
-  renderPlanches();
-  placerEtagere();
+  // Une console entière change : la main est jetée et redistribuée, plutôt que
+  // de faire tourner le poignet sur cinq cents cartes qui ne sont plus là.
+  poignetPaq = cartePaq;
+  cartesPaq.clear();
+  paqMain.replaceChildren();
+  paqMain.classList.remove('distribue');
+  void paqMain.offsetWidth;
+  paqMain.classList.add('distribue');
+  renderCartes();
+  ecrireLegendePaq();
 }
 
-/** Va droit à un boîtier de la planche en cours. */
-function allerBoitier(rang: number): void {
-  const shelf = voletsEtag[plancheEtag];
-  boitierEtag = step(rang, shelf?.games.length ?? 0, 0);
-  renderPlanches();
-  placerEtagere();
+/** Va droit à une carte de la console en cours. */
+function allerCartePaq(rang: number): void {
+  const shelf = voletsPaq[consolePaq];
+  cartePaq = step(rang, shelf?.games.length ?? 0, 0);
+  renderCartes();
+  ecrireLegendePaq();
 }
 
-/** Un pas de manette sur l'étagère. */
-function deplacerEtag(sens: Direction, pas = 1): void {
-  const shelf = voletsEtag[plancheEtag];
+/** Un pas de manette sur le paquet. */
+function deplacerPaq(sens: Direction, pas = 1): void {
+  const shelf = voletsPaq[consolePaq];
   if (sens === 'haut' || sens === 'bas') {
-    allerPlanche(step(plancheEtag, voletsEtag.length, sens === 'bas' ? pas : -pas));
+    allerConsolePaq(step(consolePaq, voletsPaq.length, sens === 'bas' ? pas : -pas));
     return;
   }
-  boitierEtag = step(boitierEtag, shelf?.games.length ?? 0, sens === 'droite' ? pas : -pas);
-  renderPlanches();
-  placerEtagere();
+  allerCartePaq(step(cartePaq, shelf?.games.length ?? 0, sens === 'droite' ? pas : -pas));
 }
 
-/** Lance le jeu qui est sorti du rang. */
-async function jouerEtagere(): Promise<void> {
-  const shelf = voletsEtag[plancheEtag];
-  const item = shelf?.games[boitierEtag];
+/** Lance la carte qui est sortie du paquet. */
+async function jouerPaquet(): Promise<void> {
+  const shelf = voletsPaq[consolePaq];
+  const item = shelf?.games[cartePaq];
   if (!shelf || !item) return;
   const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
   if (cœur) await play(cœur, item.rom);
 }
 
-/**
- * La molette sur l'étagère.
- *
- * Le mur monte et descend, les boîtiers vont de côté : la molette suit ce que
- * l'œil voit bouger, verticalement les planches et horizontalement les jeux.
- * Une souris sans molette horizontale garde donc l'axe le plus utile.
- */
-etagView.addEventListener(
+/** La molette sur le paquet : de côté les cartes, de haut en bas les consoles. */
+paqView.addEventListener(
   'wheel',
   (event) => {
-    if (etagView.hidden || libraryView.hidden) return;
+    if (paqView.hidden || libraryView.hidden) return;
     if (document.querySelector('dialog[open]')) return;
     event.preventDefault();
 
@@ -5747,253 +5778,324 @@ etagView.addEventListener(
     const sens: Direction = cotes !== 0 ? (crans > 0 ? 'droite' : 'gauche') : crans > 0 ? 'bas' : 'haut';
     // Jamais plus de huit crans d'un coup : une roulette lancée traverserait
     // la console entière, et il faudrait revenir.
-    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerEtag(sens);
+    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerPaq(sens);
     bruit();
   },
   { passive: false },
 );
 
-// --- Archipel ----------------------------------------------------------------
+// --- La séance ------------------------------------------------------------------
 
-/** Vrai quand la carte des îles est à l'écran. */
-function enArchipel(): boolean {
-  return menuActuel() === 'archipel';
+/** Vrai quand la salle de projection est à l'écran. */
+function enSeance(): boolean {
+  return menuActuel() === 'seance';
 }
 
-let voletsArch: Shelf[] = [];
-let ileArch = 0;
-let jeuArch = 0;
-const rangsArch = new Map<string, number>();
-/** Où la caméra est vraiment, pendant qu'elle rejoint où elle devrait être. */
-let cameraArch = { x: 0, y: 0 };
-/**
- * L'altitude de la caméra, entre le survol et le nez sur la carte.
- *
- * Elle n'est pas commandée : elle suit la distance qu'il reste à parcourir.
- * Passer d'un jeu au suivant est un pas de côté et l'on reste bas ; passer
- * d'une île à l'autre est un vol, et l'on prend de la hauteur le temps de la
- * traversée. C'est ce mouvement-là qui distingue l'archipel du carrousel :
- * ici, c'est le spectateur qui se déplace.
- */
-let zoomArch: number = PRES;
+/** La largeur d'une lamelle du panier, avant mise à l'échelle. */
+const LARGEUR_LAMELLE = 46;
 
-function viderArchipel(): void {
+/** Le temps qu'une vue doit rester en place avant d'être projetée. */
+const AVANT_PROJECTION = 150;
+
+let voletsSea: Shelf[] = [];
+let consoleSea = 0;
+let lameSea = 0;
+const rangsSea = new Map<string, number>();
+/** Où le panier en est vraiment, pendant qu'il tourne vers la vue visée. */
+let plateauSea = 0;
+/** Les lamelles construites, par rang. */
+const lamellesSea = new Map<number, HTMLElement>();
+/** Ce qui est projeté en ce moment, et le compte à rebours de la prochaine. */
+let projetee = -1;
+let minuterieProjection = 0;
+
+function viderSeance(): void {
   arreterMusique();
-  archView.hidden = true;
-  archMonde.replaceChildren();
-  voletsArch = [];
+  seaView.hidden = true;
+  seaPanier.replaceChildren();
+  lamellesSea.clear();
+  clearTimeout(minuterieProjection);
+  projetee = -1;
+  voletsSea = [];
 }
 
-function renderArchipel(shelves: Shelf[]): void {
-  const avant = voletsArch[ileArch]?.key;
+function renderSeance(shelves: Shelf[]): void {
+  const avant = voletsSea[consoleSea]?.key;
 
-  voletsArch = shelves;
+  voletsSea = shelves;
   const retrouve = avant === undefined ? -1 : shelves.findIndex((shelf) => shelf.key === avant);
-  if (retrouve >= 0) ileArch = retrouve;
-  ileArch = step(ileArch, shelves.length, 0);
-  const shelf = shelves[ileArch];
-  jeuArch = step(jeuArch, shelf?.games.length ?? 0, 0);
+  if (retrouve >= 0) consoleSea = retrouve;
+  consoleSea = step(consoleSea, shelves.length, 0);
+  const shelf = shelves[consoleSea];
+  lameSea = step(lameSea, shelf?.games.length ?? 0, 0);
+  plateauSea = lameSea;
 
-  archView.style.setProperty('--ech', String(echelle(archView.clientHeight)));
+  seaView.style.setProperty('--ech', String(echelle(seaView.clientHeight)));
   if (musiqueVoulue()) demarrerMusique();
-  renderIles();
-  // La caméra se pose d'emblée sur la sélection la première fois : la voir
-  // traverser tout l'archipel à l'ouverture serait un long voyage pour rien.
-  const vise = placeJeu(ileArch, jeuArch);
-  cameraArch = camera(vise);
-  zoomArch = PRES;
-  placerArchipel();
+  lamellesSea.clear();
+  seaPanier.replaceChildren();
+  renderLamelles();
+  ecrireLegendeSea();
+  projeter();
   poserHeure();
-  animerMer();
+  animerSalle();
 }
 
-/** Construit les îles qu'on voit, et elles seules. */
-function renderIles(): void {
-  archMonde.replaceChildren();
+/** Construit les lamelles que le panier montre, et elles seules. */
+function renderLamelles(): void {
+  const shelf = voletsSea[consoleSea];
+  const jeux = shelf?.games ?? [];
+  const montrees = panierSeance(plateauSea, jeux.length);
+  const garder = new Set(montrees.map((vue) => vue.rang));
 
-  for (const rang of autour(ileArch, voletsArch.length)) {
-    const shelf = voletsArch[rang];
-    if (!shelf) continue;
+  for (const [rang, lamelle] of [...lamellesSea]) {
+    if (garder.has(rang)) continue;
+    lamelle.remove();
+    lamellesSea.delete(rang);
+  }
 
-    const centre = ile(rang);
-    const bloc = document.createElement('div');
-    bloc.className = 'arch-ile';
-    bloc.style.setProperty('--x', String(centre.x));
-    bloc.style.setProperty('--y', String(centre.y));
-    bloc.setAttribute('aria-current', String(rang === ileArch));
-
-    // Le rayon appartient à l'île et non au seul halo : le nom se pose en
-    // dessous, et il lui faut la même mesure.
-    bloc.style.setProperty('--r', String(etendue(shelf.games.length)));
-
-    const halo = document.createElement('div');
-    halo.className = 'halo';
-
-    const nom = document.createElement('span');
-    nom.className = 'nom';
-    nom.textContent = `${t(shelf.label)} · ${shelf.games.length}`;
-
-    bloc.append(halo, nom);
-
-    for (const [rangJeu, item] of shelf.games.entries()) {
-      const ou = graine(rangJeu);
-      const jeu = document.createElement('button');
-      jeu.type = 'button';
-      jeu.className = 'arch-jeu';
-      jeu.title = item.rom.path;
-      jeu.style.setProperty('--x', String(ou.x));
-      jeu.style.setProperty('--y', String(ou.y));
-      jeu.setAttribute('aria-selected', String(rang === ileArch && rangJeu === jeuArch));
-
-      const marque = document.createElement('span');
-      marque.className = 'initiale';
-      marque.textContent = item.rom.name.slice(0, 1).toUpperCase();
-      jeu.append(marque);
-
-      if (jaquettesVoulues()) {
-        const jaquette = document.createElement('img');
-        jaquette.alt = '';
-        jaquette.loading = 'lazy';
-        jaquette.dataset.console = item.rom.folder;
-        jaquette.dataset.jeu = item.rom.name;
-        jaquette.dataset.chemin = item.rom.path;
-        jaquette.addEventListener('load', () => {
-          marque.hidden = true;
-        });
-        jeu.append(jaquette);
-        regarderJaquette(jaquette);
-      }
-
-      if (estFavori(item.rom.path)) {
-        const etoile = document.createElement('span');
-        etoile.className = 'etoile';
-        etoile.textContent = '★';
-        jeu.append(etoile);
-      }
-
-      jeu.addEventListener('click', () => {
-        if (rang === ileArch && rangJeu === jeuArch) {
-          if (sonsVoulus()) ticValidation();
-          void jouerArchipel();
-          return;
-        }
-        allerIle(rang);
-        jeuArch = rangJeu;
-        renderIles();
-        placerArchipel();
-      });
-
-      bloc.append(jeu);
+  const posees: HTMLElement[] = [];
+  for (const { rang } of montrees) {
+    const item = jeux[rang];
+    if (!item) continue;
+    let lamelle = lamellesSea.get(rang);
+    if (!lamelle) {
+      lamelle = construireLamelle(item, rang);
+      lamellesSea.set(rang, lamelle);
     }
+    posees.push(lamelle);
+  }
+  seaPanier.replaceChildren(...posees);
+}
 
-    archMonde.append(bloc);
+/** Une lamelle du panier : une vignette, et rien d'autre. */
+function construireLamelle(item: Playable, rang: number): HTMLElement {
+  const lamelle = document.createElement('button');
+  lamelle.type = 'button';
+  lamelle.className = 'sea-lamelle';
+  lamelle.title = gameLabel(item.rom.name);
+
+  const marque = document.createElement('span');
+  marque.className = 'initiale';
+  marque.textContent = item.rom.name.slice(0, 1).toUpperCase();
+  lamelle.append(marque);
+
+  if (jaquettesVoulues()) {
+    const jaquette = document.createElement('img');
+    jaquette.alt = '';
+    jaquette.dataset.console = item.rom.folder;
+    jaquette.dataset.jeu = item.rom.name;
+    jaquette.dataset.chemin = item.rom.path;
+    jaquette.addEventListener('load', () => {
+      marque.hidden = true;
+    });
+    lamelle.append(jaquette);
+    void habiller(jaquette);
+  }
+
+  lamelle.addEventListener('click', () => {
+    if (rang === lameSea) {
+      if (sonsVoulus()) ticValidation();
+      void jouerSeance();
+      return;
+    }
+    allerLame(rang);
+  });
+
+  return lamelle;
+}
+
+/** Pose chaque lamelle là où le panier en est. */
+function placerPanier(): void {
+  const total = voletsSea[consoleSea]?.games.length ?? 0;
+  if (total === 0) return;
+  const largeur = LARGEUR_LAMELLE * echelle(seaView.clientHeight);
+
+  for (const vue of panierSeance(plateauSea, total)) {
+    const element = lamellesSea.get(vue.rang);
+    if (!element) continue;
+    element.style.transform =
+      `translate(${(vue.x * largeur).toFixed(1)}px, ${(vue.y * largeur).toFixed(1)}px) ` +
+      `scale(${vue.echelle.toFixed(3)})`;
+    element.style.opacity = vue.opacite.toFixed(3);
+    element.style.zIndex = String(Math.round(vue.z * 100));
+    element.setAttribute('aria-selected', String(vue.rang === lameSea));
   }
 }
 
-/** Pose la caméra où elle en est, et écrit la légende. */
-function placerArchipel(): void {
-  const shelf = voletsArch[ileArch];
-  const item = shelf?.games[jeuArch];
-  archMonde.style.transform = `scale(${zoomArch}) translate(${cameraArch.x}px, ${cameraArch.y}px)`;
+/**
+ * Met la vue choisie dans la fenêtre du projecteur.
+ *
+ * Avec un temps d'arrêt : traverser une console en tenant la direction
+ * demanderait sinon cinq cents images au serveur de vignettes, dont on ne
+ * verrait aucune. La lamelle tombe donc quand la main s'arrête, comme un
+ * chargeur qui attend que le panier ait fini de tourner.
+ */
+function projeter(): void {
+  const shelf = voletsSea[consoleSea];
+  const item = shelf?.games[lameSea];
+  clearTimeout(minuterieProjection);
+  if (!item || projetee === lameSea) return;
+  projetee = lameSea;
 
-  archConsole.textContent = shelf ? t(shelf.label) : '—';
-  archTitre.textContent = item ? gameLabel(item.rom.name) : '';
-  archDetail.textContent = shelf && item ? detailJeu(shelf, item, jeuArch) : '';
-  archPied.textContent = shelf
-    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${dit('{0} sur {1}', jeuArch + 1, shelf.games.length)}`
+  seaBoite.classList.remove('tombe');
+  void seaBoite.offsetWidth;
+  seaBoite.classList.add('tombe');
+  seaImage.classList.remove('vue');
+  seaImage.removeAttribute('src');
+  seaEcran.style.removeProperty('--rapport');
+  seaInitiale.hidden = false;
+  seaInitiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
+  if (!jaquettesVoulues()) return;
+
+  minuterieProjection = window.setTimeout(() => {
+    seaImage.dataset.console = item.rom.folder;
+    seaImage.dataset.jeu = item.rom.name;
+    seaImage.dataset.chemin = item.rom.path;
+    void habiller(seaImage);
+  }, AVANT_PROJECTION);
+}
+
+// L'écran prend la forme de la diapositive qu'il porte : une image plus large
+// que haute laissée dans un cadre de jaquette serait bordée de deux bandes
+// éclairées, et l'on verrait la lumière tomber à côté.
+seaImage.addEventListener('load', () => {
+  seaInitiale.hidden = true;
+  if (seaImage.naturalWidth > 0 && seaImage.naturalHeight > 0) {
+    seaEcran.style.setProperty(
+      '--rapport',
+      (seaImage.naturalWidth / seaImage.naturalHeight).toFixed(4),
+    );
+  }
+});
+
+/** Écrit sous l'écran ce qui y est projeté. */
+function ecrireLegendeSea(): void {
+  const shelf = voletsSea[consoleSea];
+  const item = shelf?.games[lameSea];
+  seaConsole.textContent = shelf ? t(shelf.label) : '—';
+  seaTitre.textContent = item ? gameLabel(item.rom.name) : '';
+  seaDetail.textContent = shelf && item ? detailJeu(shelf, item, lameSea) : '';
+  seaPied.textContent = shelf
+    ? `${plural(shelf.games.length, 'jeu', 'jeux')} · ${dit('{0} sur {1}', lameSea + 1, shelf.games.length)}`
     : '';
 }
 
 /**
- * Fait voler la caméra jusqu'à la sélection.
+ * Fait tourner le panier et vivre le faisceau.
  *
- * Par lissage exponentiel et non par transition : la cible change pendant qu'on
- * avance — on pousse la direction trois fois de suite — et une transition
- * repartirait de zéro à chaque fois, ce qui donne une caméra qui hoquette.
+ * Le faisceau est peint, et non posé en dégradé : c'est la poussière qui le
+ * rend visible, et une poussière qui ne bouge pas est une tache.
  */
-let volEnCours = false;
+let salleEnCours = false;
 
-function volerVers(): void {
-  if (volEnCours) return;
-  volEnCours = true;
-  let derniere = 0;
+function animerSalle(): void {
+  if (salleEnCours) return;
+  const contexte = seaFaisceau.getContext('2d');
+  if (!contexte) return;
+
+  salleEnCours = true;
+  let encre = encreDuFond();
+  // Très loin dans le passé, pour que la première trame mesure : à zéro, la
+  // mesure attend que l'horloge de la page ait dépassé deux secondes, et
+  // pendant ce temps le canevas garde sa taille d'origine, étirée sur tout
+  // l'écran.
+  let derniereMesure = Number.NEGATIVE_INFINITY;
+  let dernierDessin = 0;
+  let demi = 0.2;
 
   const trame = (temps: number): void => {
-    if (archView.hidden || libraryView.hidden) {
-      volEnCours = false;
+    if (seaView.hidden || libraryView.hidden) {
+      salleEnCours = false;
       return;
     }
-    const ms = derniere === 0 ? 16.7 : Math.min(64, temps - derniere);
-    derniere = temps;
-
-    const vise = camera(placeJeu(ileArch, jeuArch));
-    const suivante = { x: avancer(cameraArch.x, vise.x, ms), y: avancer(cameraArch.y, vise.y, ms) };
-
-    // On prend de la hauteur tant qu'il reste du chemin, et l'on se repose en
-    // arrivant. Le zoom suit la distance plutôt qu'une commande : c'est le
-    // voyage qui décide, et il n'y a rien de plus à apprendre.
-    const reste = Math.hypot(vise.x - suivante.x, vise.y - suivante.y);
-    zoomArch = avancer(zoomArch, reste > VOYAGE ? LOIN : PRES, ms, 190, 0.002);
-
-    const arrive = suivante.x === vise.x && suivante.y === vise.y && zoomArch === PRES;
-    cameraArch = suivante;
-    placerArchipel();
-
-    if (arrive) {
-      volEnCours = false;
+    if (temps - dernierDessin < 32) {
+      requestAnimationFrame(trame);
       return;
     }
+    const ms = dernierDessin === 0 ? 16.7 : Math.min(96, temps - dernierDessin);
+    dernierDessin = temps;
+
+    if (temps - derniereMesure > 2000) {
+      derniereMesure = temps;
+      encre = encreDuFond();
+      const largeur = seaView.clientWidth;
+      const hauteur = seaView.clientHeight;
+      if (seaFaisceau.width !== largeur || seaFaisceau.height !== hauteur) {
+        seaFaisceau.width = largeur;
+        seaFaisceau.height = hauteur;
+      }
+      // Le cône s'arrête aux bords de l'écran, qu'on mesure : le faisceau doit
+      // porter l'image, pas déborder autour.
+      if (largeur > 0) demi = seaEcran.getBoundingClientRect().width / 2 / largeur;
+    }
+
+    const avant = Math.round(plateauSea);
+    plateauSea = avancer(plateauSea, lameSea, ms, 105, 0.002);
+    if (Math.round(plateauSea) !== avant) renderLamelles();
+    placerPanier();
+
+    contexte.clearRect(0, 0, seaFaisceau.width, seaFaisceau.height);
+    dessinerFaisceau(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre, demi);
     requestAnimationFrame(trame);
   };
   requestAnimationFrame(trame);
 }
 
-function allerIle(rang: number): void {
-  const precedente = voletsArch[ileArch];
-  if (precedente) rangsArch.set(precedente.key, jeuArch);
+/** Change de console, en retrouvant le jeu où on l'avait laissé. */
+function allerConsoleSea(rang: number): void {
+  const precedente = voletsSea[consoleSea];
+  if (precedente) rangsSea.set(precedente.key, lameSea);
 
-  ileArch = step(rang, voletsArch.length, 0);
-  const suivante = voletsArch[ileArch];
-  jeuArch = suivante
-    ? Math.min(rangsArch.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
+  consoleSea = step(rang, voletsSea.length, 0);
+  const suivante = voletsSea[consoleSea];
+  lameSea = suivante
+    ? Math.min(rangsSea.get(suivante.key) ?? 0, Math.max(0, suivante.games.length - 1))
     : 0;
 
-  renderIles();
-  volerVers();
+  // Le panier entier est remplacé : le faire tourner jusqu'au rang du nouveau
+  // jeu ferait défiler des lamelles qui n'existent plus.
+  plateauSea = lameSea;
+  lamellesSea.clear();
+  seaPanier.replaceChildren();
+  renderLamelles();
+  ecrireLegendeSea();
+  projeter();
 }
 
-/** Va droit à un jeu de l'île en cours. */
-function allerJeuArch(rang: number): void {
-  const shelf = voletsArch[ileArch];
-  jeuArch = step(rang, shelf?.games.length ?? 0, 0);
-  renderIles();
-  volerVers();
+/** Va droit à une vue du panier. */
+function allerLame(rang: number): void {
+  const shelf = voletsSea[consoleSea];
+  lameSea = step(rang, shelf?.games.length ?? 0, 0);
+  renderLamelles();
+  ecrireLegendeSea();
+  projeter();
 }
 
-function deplacerArch(sens: Direction, pas = 1): void {
-  const shelf = voletsArch[ileArch];
+/** Un pas de manette dans la salle. */
+function deplacerSea(sens: Direction, pas = 1): void {
+  const shelf = voletsSea[consoleSea];
   if (sens === 'haut' || sens === 'bas') {
-    allerIle(step(ileArch, voletsArch.length, sens === 'bas' ? pas : -pas));
+    allerConsoleSea(step(consoleSea, voletsSea.length, sens === 'bas' ? pas : -pas));
     return;
   }
-  jeuArch = step(jeuArch, shelf?.games.length ?? 0, sens === 'droite' ? pas : -pas);
-  renderIles();
-  volerVers();
+  allerLame(step(lameSea, shelf?.games.length ?? 0, sens === 'droite' ? pas : -pas));
 }
 
-async function jouerArchipel(): Promise<void> {
-  const shelf = voletsArch[ileArch];
-  const item = shelf?.games[jeuArch];
+/** Lance ce qui est projeté. */
+async function jouerSeance(): Promise<void> {
+  const shelf = voletsSea[consoleSea];
+  const item = shelf?.games[lameSea];
   if (!shelf || !item) return;
   const cœur = effectiveCore(item.rom, item.cores, chosenCore, shelf.preferred);
   if (cœur) await play(cœur, item.rom);
 }
 
-/** La molette sur l'archipel : de côté on change de jeu, de haut en bas d'île. */
-archView.addEventListener(
+/** La molette dans la salle : de côté le panier, de haut en bas les consoles. */
+seaView.addEventListener(
   'wheel',
   (event) => {
-    if (archView.hidden || libraryView.hidden) return;
+    if (seaView.hidden || libraryView.hidden) return;
     if (document.querySelector('dialog[open]')) return;
     event.preventDefault();
 
@@ -6002,66 +6104,11 @@ archView.addEventListener(
     if (crans === 0) return;
 
     const sens: Direction = cotes !== 0 ? (crans > 0 ? 'droite' : 'gauche') : crans > 0 ? 'bas' : 'haut';
-    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerArch(sens);
+    for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerSea(sens);
     bruit();
   },
   { passive: false },
 );
-
-/**
- * La mer, sous les îles.
- *
- * Le même courant que le carrousel, à une autre échelle : c'est le même air, et
- * en inventer un second donnerait deux décors à comprendre au lieu d'un.
- */
-let merEnCours = false;
-
-function animerMer(): void {
-  if (merEnCours) return;
-  const contexte = archMer.getContext('2d');
-  if (!contexte) return;
-
-  merEnCours = true;
-  let encre = encreDuFond();
-  // Très loin dans le passé, pour que la première trame mesure : à zéro, la
-  // mesure attend que l'horloge de la page ait dépassé deux secondes, et
-  // pendant ce temps le canevas garde sa taille d'origine — trois cents pixels
-  // sur cent cinquante, étirés sur tout l'écran. Un trait d'un pixel y devient
-  // une plaque.
-  let derniereMesure = Number.NEGATIVE_INFINITY;
-  let dernierDessin = 0;
-
-  const trame = (temps: number): void => {
-    if (archView.hidden || libraryView.hidden) {
-      merEnCours = false;
-      return;
-    }
-    if (temps - dernierDessin < 32) {
-      requestAnimationFrame(trame);
-      return;
-    }
-    dernierDessin = temps;
-
-    if (temps - derniereMesure > 2000) {
-      derniereMesure = temps;
-      encre = encreDuFond();
-      const largeur = archView.clientWidth;
-      const hauteur = archView.clientHeight;
-      if (archMer.width !== largeur || archMer.height !== hauteur) {
-        archMer.width = largeur;
-        archMer.height = hauteur;
-      }
-    }
-
-    // Effacé avant de peindre : sans cela les trames s'empilent et la mer
-    // devient un hachis opaque en quelques secondes. Le carrousel efface dans
-    // `dessiner` ; ici on peint le courant seul, et l'effacement est à nous.
-    contexte.clearRect(0, 0, archMer.width, archMer.height);
-    dessinerCourant(contexte, archMer.width, archMer.height, temps / 1000, encre);
-    requestAnimationFrame(trame);
-  };
-  requestAnimationFrame(trame);
-}
 
 // --- Jaquettes --------------------------------------------------------------
 
@@ -6264,8 +6311,8 @@ function rangerLesVues(): void {
   viderGrille();
   viderXmb();
   viderCarrousel();
-  viderEtagere();
-  viderArchipel();
+  viderPaquet();
+  viderSeance();
 }
 
 function renderGames(): void {
@@ -6280,8 +6327,8 @@ function renderGames(): void {
   // Puis la galerie, puis les favoris, puis les consoles.
   const reprendre = needle ? null : voletReprendre(classes);
   // La galerie n'existe que là où son volet sait se dessiner : le menu animé
-  // et le carrousel la montrent, l'étagère et l'archipel n'auraient qu'un
-  // boîtier par capture, qui ne se lance pas.
+  // et le carrousel la montrent, le paquet et la séance n'auraient qu'une
+  // carte par capture, qui ne se lance pas.
   const galerie = (enXmb() || enCarrousel()) && !needle ? voletGalerie() : null;
   const shelves = [
     ...(reprendre ? [reprendre] : []),
@@ -6351,8 +6398,8 @@ function renderGames(): void {
     [enGrille, grilleView, renderGrille],
     [enXmb, xmbView, renderXmb],
     [enCarrousel, carrView, renderCarrousel],
-    [enEtagere, etagView, renderEtagere],
-    [enArchipel, archView, renderArchipel],
+    [enPaquet, paqView, renderPaquet],
+    [enSeance, seaView, renderSeance],
   ];
 
   for (const [regarde, vue, dessiner] of dessinees) {
@@ -7681,7 +7728,7 @@ function pollControls(): void {
   // La musique appartient aux menus de salon et à eux seuls. Surveillé ici
   // plutôt qu'au lancement d'un jeu : il y a plusieurs façons de quitter un
   // menu, et une seule oubliée laisserait la musique jouer sous la partie.
-  const salon = !xmbView.hidden || !carrView.hidden || !etagView.hidden || !archView.hidden;
+  const salon = !xmbView.hidden || !carrView.hidden || !paqView.hidden || !seaView.hidden;
   if (musiqueEnCours() && (libraryView.hidden || !salon)) {
     arreterMusique();
   }
@@ -7707,6 +7754,9 @@ let liaisons: AllOverrides = parseOverrides(retenu(RETENU.liaisons));
 
 /** Le bouton du cœur qui attend qu'on lui désigne un bouton de manette. */
 let enAttente: number | null = null;
+
+/** Tient la conduite des menus à l'écart le temps d'une capture. */
+const verrouPad = new Verrou();
 
 /**
  * Les liaisons à appliquer maintenant : celles d'origine, corrigées.
