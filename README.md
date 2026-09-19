@@ -44,6 +44,7 @@ Les quarante-huit dossiers sont déjà là, vides.
 | **Un dossier où jeter ses jeux** | `drop u'r rom` : on y dépose en vrac, EvaChi range au lancement suivant et demande ce qu'elle ne peut pas deviner |
 | **Les touches portées** | réassigner un bouton ici l'écrit aussi chez PCSX2, PPSSPP et Dolphin, chacun dans son dialecte |
 | **Pencher et secouer** | les jeux qui lisent un accéléromètre reçoivent le manche droit, et une secousse à la demande |
+| **Trois filtres d'image** | balayage, quadrillage et tube cathodique, calculés par la carte graphique à la taille affichée |
 | **Tout à la manette** | y compris le plein écran, les captures, les sauvegardes d'état et l'avance rapide |
 | **Des thèmes** | et un plein écran « console de salon » qui retire jusqu'aux barres |
 | **Un cœur écrit ici** | CHIP-8, complet, avec ses six écarts de comportement — le reste vient de libretro |
@@ -161,7 +162,7 @@ l'ABI [libretro](https://www.libretro.com).
 
 ```bash
 npm install
-npm run test:all          # 703 épreuves côté fenêtre, 286 côté Rust
+npm run test:all          # 722 épreuves côté fenêtre, 286 côté Rust
 npm run app:build         # l'exécutable, dans src-tauri/target/release/
 node outils/livraison.mjs <dossier>   # monte une livraison complète
 ```

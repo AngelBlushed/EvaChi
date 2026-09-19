@@ -25,7 +25,7 @@ export const CLES: readonly string[] = [
   "A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour",
   "À propos d'EvaChi",
   "À propos…",
-  "À venir : filtres de tube cathodique, quadrillage, balayage. La place est prête, les filtres arriveront ici.",
+  "Ce qu'un téléviseur cathodique faisait à l'image, et que les jeux d'alors tenaient pour acquis. Ne vaut que pour les cœurs joués ici : un émulateur autonome affiche son image lui-même.",
   "Actualiser la bibliothèque",
   "Affichage",
   "Afficher les jaquettes des jeux",
@@ -474,6 +474,14 @@ export const CLES: readonly string[] = [
   "Orage",
   "Perle",
   "Pistache",
+  "Aucun",
+  "Balayage",
+  "Chaque pixel rendu en trois fentes, rouge, verte et bleue",
+  "L’image du cœur, pixel pour pixel",
+  "Le verre bombé, les lignes, les fentes et les bords éteints",
+  "Quadrillage",
+  "Tube cathodique",
+  "Une ligne sur deux assombrie, comme sur un téléviseur",
 ];
 
 /**

@@ -167,6 +167,8 @@ import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
 import { bandes, fenetre, place } from './carrousel.ts';
 import { fenetre as fenetrePaquet, main as mainDuPaquet } from './eventail.ts';
+import { dessinerMoire } from './moire.ts';
+import { NUANCES, Peintre, nuanceParId } from './nuances.ts';
 import { dessinerFaisceau, panier as panierSeance } from './seance.ts';
 import { dessinerCourant } from './courant.ts';
 import { dessiner as dessinerPoussiere } from './poussiere.ts';
@@ -182,6 +184,7 @@ const $ = <T extends HTMLElement>(id: string): T => {
 
 const canvas = $<HTMLCanvasElement>('screen');
 const context = canvas.getContext('2d');
+const nuanceCanvas = $<HTMLCanvasElement>('nuance');
 if (!context) throw new Error('Contexte 2D indisponible');
 context.imageSmoothingEnabled = false;
 
@@ -218,6 +221,7 @@ const carrTitre = $<HTMLElement>('carrousel-titre');
 const carrDetail = $<HTMLElement>('carrousel-detail');
 const carrPied = $<HTMLElement>('carrousel-pied');
 const paqView = $<HTMLElement>('paquet');
+const paqFond = $<HTMLCanvasElement>('paquet-fond');
 const paqMain = $<HTMLDivElement>('paquet-main');
 const paqConsole = $<HTMLElement>('paquet-console');
 const paqHeure = $<HTMLElement>('paquet-heure');
@@ -281,6 +285,7 @@ const langueList = $<HTMLDivElement>('langue-list');
 const langueMenu = $<HTMLDivElement>('menu-langue');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
+const nuanceList = $<HTMLDivElement>('nuance-list');
 const etirementList = $<HTMLDivElement>('etirement-list');
 const croquisManette = $<HTMLTemplateElement>('croquis-manette');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
@@ -358,6 +363,7 @@ const RETENU = {
   theme: 'evachi.theme',
   liaisons: 'evachi.liaisons',
   menu: 'evachi.menu',
+  nuance: 'evachi.nuance',
   jaquettes: 'evachi.jaquettes',
   disques: 'evachi.disques',
   musique: 'evachi.musique',
@@ -1206,7 +1212,7 @@ window.addEventListener('resize', () => {
 async function prendreCapture(): Promise<void> {
   if (!core || libraryView.hidden === false) return;
   try {
-    const adresse = canvas.toDataURL('image/png');
+    const adresse = ecranVisible().toDataURL('image/png');
     const fichier = await saveShot(contentName || 'capture', adresse);
     if (sonsVoulus()) ticValidation();
     log(`capture — ${fichier}`, 'ok');
@@ -1586,7 +1592,8 @@ async function sauverEmplacement(slot: number): Promise<void> {
   if (!core || !cheminEnCours) return;
   try {
     const etat = await core.saveState();
-    const vignette = canvas.width > 0 ? canvas.toDataURL('image/png') : '';
+    const ecran = ecranVisible();
+    const vignette = ecran.width > 0 ? ecran.toDataURL('image/png') : '';
     await saveStateSlot(cheminEnCours, slot, encodeBase64(etat), vignette);
     savedState = etat;
     refreshMenus();
@@ -1969,6 +1976,50 @@ function lissageImage(): string {
   return retenu(RETENU.lissage) === 'doux' ? 'doux' : 'net';
 }
 
+/** Le filtre retenu, ou aucun. */
+function nuanceImage(): string {
+  return nuanceParId(retenu(RETENU.nuance)).id;
+}
+
+/**
+ * Le peintre des filtres, ouvert à la première demande.
+ *
+ * Pas au démarrage : ouvrir un contexte graphique réserve de la mémoire sur la
+ * carte, et la plupart des parties se jouent sans filtre. `false` dit qu'on a
+ * essayé et que la machine n'a pas suivi — on ne réessaie pas à chaque trame.
+ */
+let peintre: Peintre | null | false = null;
+
+/** Vrai quand la trame doit passer par un filtre, et qu'elle le peut. */
+function filtreActif(): boolean {
+  const nuance = nuanceParId(retenu(RETENU.nuance));
+  if (!nuance.source) return false;
+  if (peintre === null) peintre = Peintre.ouvrir(nuanceCanvas) ?? false;
+  if (peintre === false) return false;
+  if (!peintre.poser(nuance)) return false;
+  peintre.lissage(lissageImage() === 'doux');
+  return true;
+}
+
+/**
+ * Montre l'écran qui convient, et cache l'autre.
+ *
+ * Deux canevas parce qu'un canevas ne change pas d'avis : on lui demande une
+ * fois pour toutes s'il se peint pixel par pixel ou par la carte graphique, et
+ * la réponse vaut pour sa vie entière.
+ */
+function poserEcran(): void {
+  const filtre = filtreActif();
+  canvas.hidden = filtre;
+  nuanceCanvas.hidden = !filtre;
+  fitScreen();
+}
+
+/** Celui des deux écrans qu'on voit : c'est de lui qu'on tire une capture. */
+function ecranVisible(): HTMLCanvasElement {
+  return nuanceCanvas.hidden ? canvas : nuanceCanvas;
+}
+
 /** Dessine un choix de réglage graphique, à la façon des présentations. */
 function renderChoix(
   boite: HTMLElement,
@@ -2018,6 +2069,20 @@ function renderGraphisme(): void {
     renderGraphisme();
     appliquerLissage();
   });
+
+  renderChoix(
+    nuanceList,
+    NUANCES.map((nuance) => [nuance.id, nuance.label, nuance.detail] as const),
+    nuanceImage(),
+    (id) => {
+      retenir(RETENU.nuance, id);
+      renderGraphisme();
+      poserEcran();
+      // La trame en cours est déjà passée : sans cela, le filtre n'apparaît
+      // qu'au mouvement suivant, et sur un jeu en pause il n'apparaît jamais.
+      repeindre();
+    },
+  );
 }
 
 /** Pose le lissage sur le canvas et sur le contexte de dessin. */
@@ -2025,6 +2090,10 @@ function appliquerLissage(): void {
   const doux = lissageImage() === 'doux';
   canvas.style.imageRendering = doux ? 'auto' : 'pixelated';
   if (context) context.imageSmoothingEnabled = doux;
+  if (peintre) {
+    peintre.lissage(doux);
+    repeindre();
+  }
 }
 
 /** Lance un jeu donné, avec le cœur retenu pour son volet. */
@@ -2337,7 +2406,10 @@ function showLibrary(show: boolean): void {
   libraryView.hidden = !show;
   toolbar.hidden = !show;
   playerView.hidden = show;
-  if (!show) fitScreen();
+  // `poserEcran` choisit lequel des deux canevas se montre, et appelle
+  // `fitScreen` : le filtre doit être en place avant la première trame, sinon
+  // le jeu démarre sans lui.
+  if (!show) poserEcran();
 }
 
 // --- Affichage --------------------------------------------------------------
@@ -2393,6 +2465,23 @@ function fitScreen(available?: { width: number; height: number }): void {
 
   canvas.style.width = `${Math.floor(width)}px`;
   canvas.style.height = `${Math.floor(height)}px`;
+
+  // Le canevas des filtres est réglé à la taille affichée, et non à celle de la
+  // trame : c'est ce qui permet une ligne de balayage fine sur un grand écran.
+  // Peindre à la taille de la console ne donnerait qu'un pixel sur deux à
+  // noircir, et l'agrandissement en ferait des barres.
+  nuanceCanvas.style.width = `${Math.floor(width)}px`;
+  nuanceCanvas.style.height = `${Math.floor(height)}px`;
+  if (!nuanceCanvas.hidden) {
+    const points = Math.max(1, Math.min(window.devicePixelRatio || 1, 2));
+    const large = Math.max(1, Math.floor(width * points));
+    const haut = Math.max(1, Math.floor(height * points));
+    if (nuanceCanvas.width !== large || nuanceCanvas.height !== haut) {
+      nuanceCanvas.width = large;
+      nuanceCanvas.height = haut;
+      repeindre();
+    }
+  }
 }
 
 /**
@@ -2420,7 +2509,27 @@ function present(frame: Frame): void {
   }
 
   frameImage.data.set(frame.video);
+  if (peintre && !nuanceCanvas.hidden) {
+    peintre.peindre(frame.width, frame.height, frameImage.data);
+    return;
+  }
   context!.putImageData(frameImage, 0, 0);
+}
+
+/**
+ * Repeint la dernière trame connue.
+ *
+ * Changer de filtre pendant une pause, ou depuis le panneau alors que le jeu
+ * attend, ne produit aucune trame neuve : sans cela le réglage semblerait sans
+ * effet jusqu'au prochain mouvement.
+ */
+function repeindre(): void {
+  if (frameImage.width <= 1) return;
+  if (peintre && !nuanceCanvas.hidden) {
+    peintre.peindre(frameImage.width, frameImage.height, frameImage.data);
+    return;
+  }
+  context?.putImageData(frameImage, 0, 0);
 }
 
 // La fenêtre change de taille, le plein écran va et vient : dans les deux cas
@@ -4506,8 +4615,8 @@ function replacerMenus(): void {
   if (!carrView.hidden) placerCarr();
   // Le paquet et la séance replacent tout à chaque trame : l'échelle suffit,
   // la boucle fera le reste au seizième de seconde près.
-  if (!paqView.hidden) paqView.style.setProperty('--ech', String(echelle(paqView.clientHeight)));
-  if (!seaView.hidden) seaView.style.setProperty('--ech', String(echelle(seaView.clientHeight)));
+  if (!paqView.hidden) poserEchellePaq();
+  if (!seaView.hidden) poserEchelleSea();
 }
 
 /** Range le menu animé : plus d'entrées, plus de sélection, plus de fond qui tourne. */
@@ -5494,11 +5603,49 @@ modOnglets.addEventListener('click', (event) => {
 });
 
 
+/** Vrai quand la molette est passée sur l'un de ces éléments. */
+function survole(event: WheelEvent, selecteur: string): boolean {
+  return event.target instanceof Element && event.target.closest(selecteur) !== null;
+}
+
+/** Le sens d'un cran de molette, selon qu'il vise les jeux ou les consoles. */
+function sensDeMolette(crans: number, jeux: boolean): Direction {
+  if (jeux) return crans > 0 ? 'droite' : 'gauche';
+  return crans > 0 ? 'bas' : 'haut';
+}
+
 // --- Le paquet ----------------------------------------------------------------
 
 /** Vrai quand la main de cartes est à l'écran. */
 function enPaquet(): boolean {
   return menuActuel() === 'paquet';
+}
+
+/**
+ * Le temps d'arrêt avant qu'une jaquette soit demandée.
+ *
+ * Traverser une console en tenant la direction faisait demander une image par
+ * jeu traversé : cinq cents requêtes dont on ne voyait aucune, et le décodage
+ * de chacune volait une trame au mouvement — c'est ce qui donnait l'impression
+ * que la main avançait par à-coups. Les initiales tiennent donc la place tant
+ * que ça bouge, et l'on habille ce qui reste une fois posé.
+ */
+const ATTENTE_JAQUETTE = 170;
+
+/** Les jaquettes qui attendent, et le compte à rebours commun. */
+const jaquettesEnAttente = new Set<HTMLImageElement>();
+let minuterieJaquettes = 0;
+
+function habillerPlusTard(image: HTMLImageElement): void {
+  jaquettesEnAttente.add(image);
+  clearTimeout(minuterieJaquettes);
+  minuterieJaquettes = window.setTimeout(() => {
+    for (const attendue of [...jaquettesEnAttente]) {
+      jaquettesEnAttente.delete(attendue);
+      // Une carte partie entre-temps n'a plus besoin de sa jaquette.
+      if (attendue.isConnected) void habiller(attendue);
+    }
+  }, ATTENTE_JAQUETTE);
 }
 
 /** La hauteur d'une carte, avant mise à l'échelle. */
@@ -5522,6 +5669,22 @@ const rangsPaq = new Map<string, number>();
 let poignetPaq = 0;
 /** Les cartes construites, par rang : on ne rebâtit que ce qui entre et sort. */
 const cartesPaq = new Map<number, HTMLElement>();
+/**
+ * L'échelle de la vue, relevée à l'affichage et au redimensionnement.
+ *
+ * Retenue, et non relue à chaque trame : lire `clientHeight` force le
+ * navigateur à recalculer la mise en page, et le faire juste après avoir posé
+ * quinze transformations lui fait tout refaire soixante fois par seconde. La
+ * main tournait alors par saccades, d'autant plus visibles qu'on va vite.
+ */
+let echellePaq = 1;
+/** Les rangs posés en ce moment, pour ne pas refaire la liste pour rien. */
+let montreesPaq = '';
+
+function poserEchellePaq(): void {
+  echellePaq = echelle(paqView.clientHeight);
+  paqView.style.setProperty('--ech', String(echellePaq));
+}
 
 /** Repose la main : plus de cartes, plus de sélection. */
 function viderPaquet(): void {
@@ -5546,9 +5709,10 @@ function renderPaquet(shelves: Shelf[]): void {
   // en arrivant sur la vue donnerait l'impression d'avoir raté quelque chose.
   poignetPaq = cartePaq;
 
-  paqView.style.setProperty('--ech', String(echelle(paqView.clientHeight)));
+  poserEchellePaq();
   if (musiqueVoulue()) demarrerMusique();
   cartesPaq.clear();
+  montreesPaq = '';
   paqMain.replaceChildren();
   renderCartes();
   ecrireLegendePaq();
@@ -5568,6 +5732,13 @@ function renderCartes(): void {
   const shelf = voletsPaq[consolePaq];
   const jeux = shelf?.games ?? [];
   const montrees = fenetrePaquet(Math.round(poignetPaq), jeux.length);
+
+  // La main ne change que lorsqu'on franchit une carte : entre deux, rebâtir
+  // la liste reviendrait à remplacer quinze nœuds pour les remettre au même
+  // endroit, à chaque appui.
+  const signature = `${consolePaq}:${montrees[0] ?? -1}:${montrees.length}`;
+  if (signature === montreesPaq && cartesPaq.size === montrees.length) return;
+  montreesPaq = signature;
   const garder = new Set(montrees);
 
   for (const [rang, carte] of [...cartesPaq]) {
@@ -5617,7 +5788,7 @@ function construireCarte(item: Playable, rang: number): HTMLElement {
       marque.hidden = true;
     });
     boite.append(jaquette);
-    void habiller(jaquette);
+    habillerPlusTard(jaquette);
   }
   carte.append(boite);
 
@@ -5644,7 +5815,7 @@ function construireCarte(item: Playable, rang: number): HTMLElement {
 function placerPaquet(secondes: number): void {
   const total = voletsPaq[consolePaq]?.games.length ?? 0;
   if (total === 0) return;
-  const hauteur = HAUTEUR_CARTE * echelle(paqView.clientHeight);
+  const hauteur = HAUTEUR_CARTE * echellePaq;
 
   for (const carte of mainDuPaquet(poignetPaq, total, secondes)) {
     const element = cartesPaq.get(carte.rang);
@@ -5683,31 +5854,51 @@ let paquetEnCours = false;
 function animerPaquet(): void {
   if (paquetEnCours) return;
   paquetEnCours = true;
+  const contexte = paqFond.getContext('2d');
   let derniere = 0;
-  let dernierDessin = 0;
+  let encre = encreDuFond();
+  // Très loin dans le passé, pour que la première trame mesure : à zéro, la
+  // mesure attend que l'horloge de la page ait dépassé deux secondes, et
+  // pendant ce temps le canevas garde sa taille d'origine, étirée sur tout
+  // l'écran.
+  let derniereMesure = Number.NEGATIVE_INFINITY;
+  let dernierFond = 0;
 
   const trame = (temps: number): void => {
     if (paqView.hidden || libraryView.hidden) {
       paquetEnCours = false;
       return;
     }
-    // Trente-cinq images par seconde suffisent à un souffle : au-delà, on
-    // repeint quinze cartes pour un dixième de degré.
-    if (temps - dernierDessin < 28) {
-      requestAnimationFrame(trame);
-      return;
-    }
-    const ms = derniere === 0 ? 16.7 : Math.min(96, temps - dernierDessin);
+    const ms = derniere === 0 ? 16.7 : Math.min(96, temps - derniere);
     derniere = temps;
-    dernierDessin = temps;
 
-    // La fenêtre suit le poignet et non la carte visée : les cartes qui
-    // arrivent doivent être là avant d'entrer dans le champ.
+    // Les cartes, à chaque trame : c'est le mouvement qu'on suit des yeux, et
+    // un souffle rendu une fois sur deux se voit tout de suite.
     const avant = Math.round(poignetPaq);
     poignetPaq = avancer(poignetPaq, cartePaq, ms, 95, 0.002);
+    // La fenêtre suit le poignet et non la carte visée : les cartes qui
+    // arrivent doivent être là avant d'entrer dans le champ.
     if (Math.round(poignetPaq) !== avant) renderCartes();
-
     placerPaquet(temps / 1000);
+
+    // Le fond, deux fois moins souvent : des anneaux qui dérivent d'un
+    // millième de hauteur par seconde n'ont que faire de soixante images.
+    if (contexte && temps - dernierFond > 33) {
+      dernierFond = temps;
+      if (temps - derniereMesure > 2000) {
+        derniereMesure = temps;
+        encre = encreDuFond();
+        const largeur = paqView.clientWidth;
+        const hauteur = paqView.clientHeight;
+        if (paqFond.width !== largeur || paqFond.height !== hauteur) {
+          paqFond.width = largeur;
+          paqFond.height = hauteur;
+        }
+      }
+      contexte.clearRect(0, 0, paqFond.width, paqFond.height);
+      dessinerMoire(contexte, paqFond.width, paqFond.height, temps / 1000, encre);
+    }
+
     requestAnimationFrame(trame);
   };
   requestAnimationFrame(trame);
@@ -5763,7 +5954,14 @@ async function jouerPaquet(): Promise<void> {
   if (cœur) await play(cœur, item.rom);
 }
 
-/** La molette sur le paquet : de côté les cartes, de haut en bas les consoles. */
+/**
+ * La molette sur le paquet.
+ *
+ * Ce qu'elle fait dépend de ce qu'elle survole : sur les cartes elle les fait
+ * défiler, ailleurs elle change de console. Une molette qui change toujours de
+ * console oblige à trouver la molette horizontale — que la plupart des souris
+ * n'ont pas — pour faire la seule chose qu'on vienne y faire.
+ */
 paqView.addEventListener(
   'wheel',
   (event) => {
@@ -5775,7 +5973,7 @@ paqView.addEventListener(
     const crans = cotes !== 0 ? cotes : cransDeMolette(event.deltaY);
     if (crans === 0) return;
 
-    const sens: Direction = cotes !== 0 ? (crans > 0 ? 'droite' : 'gauche') : crans > 0 ? 'bas' : 'haut';
+    const sens = sensDeMolette(crans, cotes !== 0 || survole(event, '.paq-carte'));
     // Jamais plus de huit crans d'un coup : une roulette lancée traverserait
     // la console entière, et il faudrait revenir.
     for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerPaq(sens);
@@ -5805,8 +6003,17 @@ const rangsSea = new Map<string, number>();
 let plateauSea = 0;
 /** Les lamelles construites, par rang. */
 const lamellesSea = new Map<number, HTMLElement>();
+/** L'échelle de la salle, relevée à l'affichage et au redimensionnement. */
+let echelleSea = 1;
+/** Les rangs posés en ce moment, pour ne pas refaire le panier pour rien. */
+let montreesSea = '';
+
+function poserEchelleSea(): void {
+  echelleSea = echelle(seaView.clientHeight);
+  seaView.style.setProperty('--ech', String(echelleSea));
+}
 /** Ce qui est projeté en ce moment, et le compte à rebours de la prochaine. */
-let projetee = -1;
+let projetee = '';
 let minuterieProjection = 0;
 
 function viderSeance(): void {
@@ -5815,7 +6022,7 @@ function viderSeance(): void {
   seaPanier.replaceChildren();
   lamellesSea.clear();
   clearTimeout(minuterieProjection);
-  projetee = -1;
+  projetee = '';
   voletsSea = [];
 }
 
@@ -5830,9 +6037,10 @@ function renderSeance(shelves: Shelf[]): void {
   lameSea = step(lameSea, shelf?.games.length ?? 0, 0);
   plateauSea = lameSea;
 
-  seaView.style.setProperty('--ech', String(echelle(seaView.clientHeight)));
+  poserEchelleSea();
   if (musiqueVoulue()) demarrerMusique();
   lamellesSea.clear();
+  montreesSea = '';
   seaPanier.replaceChildren();
   renderLamelles();
   ecrireLegendeSea();
@@ -5846,6 +6054,12 @@ function renderLamelles(): void {
   const shelf = voletsSea[consoleSea];
   const jeux = shelf?.games ?? [];
   const montrees = panierSeance(plateauSea, jeux.length);
+
+  // Le panier ne change qu'au franchissement d'une lamelle ; entre deux, la
+  // liste est la même et la refaire remplacerait dix-neuf nœuds pour rien.
+  const signature = `${consoleSea}:${montrees[0]?.rang ?? -1}:${montrees.length}`;
+  if (signature === montreesSea && lamellesSea.size === montrees.length) return;
+  montreesSea = signature;
   const garder = new Set(montrees.map((vue) => vue.rang));
 
   for (const [rang, lamelle] of [...lamellesSea]) {
@@ -5890,7 +6104,7 @@ function construireLamelle(item: Playable, rang: number): HTMLElement {
       marque.hidden = true;
     });
     lamelle.append(jaquette);
-    void habiller(jaquette);
+    habillerPlusTard(jaquette);
   }
 
   lamelle.addEventListener('click', () => {
@@ -5909,7 +6123,7 @@ function construireLamelle(item: Playable, rang: number): HTMLElement {
 function placerPanier(): void {
   const total = voletsSea[consoleSea]?.games.length ?? 0;
   if (total === 0) return;
-  const largeur = LARGEUR_LAMELLE * echelle(seaView.clientHeight);
+  const largeur = LARGEUR_LAMELLE * echelleSea;
 
   for (const vue of panierSeance(plateauSea, total)) {
     const element = lamellesSea.get(vue.rang);
@@ -5926,48 +6140,94 @@ function placerPanier(): void {
 /**
  * Met la vue choisie dans la fenêtre du projecteur.
  *
- * Avec un temps d'arrêt : traverser une console en tenant la direction
+ * La diapositive suivante est chargée en coulisses, et ne prend la place de la
+ * précédente qu'une fois prête. Vider l'écran d'abord laissait une grande
+ * lettre pâle sur fond sombre le temps du chargement — un éclair blanc à
+ * chaque pas — et cette lettre restait par-dessus la jaquette quand elle
+ * arrivait. Un projecteur ne montre jamais sa fenêtre vide : la diapositive
+ * en place y reste jusqu'à ce que la suivante tombe.
+ *
+ * Avec un temps d'arrêt, aussi : traverser une console en tenant la direction
  * demanderait sinon cinq cents images au serveur de vignettes, dont on ne
- * verrait aucune. La lamelle tombe donc quand la main s'arrête, comme un
- * chargeur qui attend que le panier ait fini de tourner.
+ * verrait aucune.
  */
 function projeter(): void {
   const shelf = voletsSea[consoleSea];
   const item = shelf?.games[lameSea];
   clearTimeout(minuterieProjection);
-  if (!item || projetee === lameSea) return;
-  projetee = lameSea;
+  if (!shelf || !item) return;
+
+  // La console fait partie de la clé : deux consoles ont toutes deux un jeu
+  // de rang zéro, et changer de console sans changer de rang laissait l'écran
+  // sur la jaquette d'avant.
+  const clef = `${shelf.key}#${lameSea}`;
+  if (clef === projetee) return;
+  projetee = clef;
+
+  if (!jaquettesVoulues()) {
+    montrerDiapo(null, item);
+    return;
+  }
+
+  minuterieProjection = window.setTimeout(() => {
+    const coulisse = new Image();
+    coulisse.alt = '';
+    coulisse.dataset.console = item.rom.folder;
+    coulisse.dataset.jeu = item.rom.name;
+    coulisse.dataset.chemin = item.rom.path;
+    void habiller(coulisse).then(async () => {
+      // La sélection a pu repartir pendant le chargement : une diapositive en
+      // retard ne doit pas chasser celle qu'on regarde.
+      if (clef !== projetee) return;
+      const adresse = coulisse.getAttribute('src');
+      if (!adresse) {
+        montrerDiapo(null, item);
+        return;
+      }
+      // Décodée avant d'être posée : une image posée puis décodée apparaît une
+      // trame plus tard, et c'est cette trame-là qui se voit.
+      try {
+        await coulisse.decode();
+      } catch {
+        // Une jaquette qui n'arrive pas laisse simplement l'initiale.
+      }
+      if (clef !== projetee) return;
+      montrerDiapo(coulisse, item);
+    });
+  }, AVANT_PROJECTION);
+}
+
+/**
+ * Pose une diapositive dans la fenêtre, et la fait tomber.
+ *
+ * L'écran prend la forme de ce qu'il porte : une image plus large que haute
+ * laissée dans un cadre de jaquette serait bordée de deux bandes éclairées, et
+ * l'on verrait la lumière tomber à côté.
+ */
+function montrerDiapo(image: HTMLImageElement | null, item: Playable): void {
+  const adresse = image?.getAttribute('src') ?? '';
+  seaInitiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
+  seaInitiale.hidden = adresse !== '';
+
+  if (adresse && image) {
+    seaImage.src = adresse;
+    seaImage.classList.add('vue');
+    if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+      seaEcran.style.setProperty(
+        '--rapport',
+        (image.naturalWidth / image.naturalHeight).toFixed(4),
+      );
+    }
+  } else {
+    seaImage.classList.remove('vue');
+    seaImage.removeAttribute('src');
+    seaEcran.style.removeProperty('--rapport');
+  }
 
   seaBoite.classList.remove('tombe');
   void seaBoite.offsetWidth;
   seaBoite.classList.add('tombe');
-  seaImage.classList.remove('vue');
-  seaImage.removeAttribute('src');
-  seaEcran.style.removeProperty('--rapport');
-  seaInitiale.hidden = false;
-  seaInitiale.textContent = item.rom.name.slice(0, 1).toUpperCase();
-  if (!jaquettesVoulues()) return;
-
-  minuterieProjection = window.setTimeout(() => {
-    seaImage.dataset.console = item.rom.folder;
-    seaImage.dataset.jeu = item.rom.name;
-    seaImage.dataset.chemin = item.rom.path;
-    void habiller(seaImage);
-  }, AVANT_PROJECTION);
 }
-
-// L'écran prend la forme de la diapositive qu'il porte : une image plus large
-// que haute laissée dans un cadre de jaquette serait bordée de deux bandes
-// éclairées, et l'on verrait la lumière tomber à côté.
-seaImage.addEventListener('load', () => {
-  seaInitiale.hidden = true;
-  if (seaImage.naturalWidth > 0 && seaImage.naturalHeight > 0) {
-    seaEcran.style.setProperty(
-      '--rapport',
-      (seaImage.naturalWidth / seaImage.naturalHeight).toFixed(4),
-    );
-  }
-});
 
 /** Écrit sous l'écran ce qui y est projeté. */
 function ecrireLegendeSea(): void {
@@ -6036,6 +6296,8 @@ function animerSalle(): void {
     placerPanier();
 
     contexte.clearRect(0, 0, seaFaisceau.width, seaFaisceau.height);
+    // Le moiré d'abord : c'est le mur du fond, et la lumière passe devant.
+    dessinerMoire(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre);
     dessinerFaisceau(contexte, seaFaisceau.width, seaFaisceau.height, temps / 1000, encre, demi);
     requestAnimationFrame(trame);
   };
@@ -6091,7 +6353,12 @@ async function jouerSeance(): Promise<void> {
   if (cœur) await play(cœur, item.rom);
 }
 
-/** La molette dans la salle : de côté le panier, de haut en bas les consoles. */
+/**
+ * La molette dans la salle.
+ *
+ * Sur l'écran ou sur le panier, elle fait tourner le panier ; sur le reste de
+ * la salle, elle change de console.
+ */
 seaView.addEventListener(
   'wheel',
   (event) => {
@@ -6103,7 +6370,8 @@ seaView.addEventListener(
     const crans = cotes !== 0 ? cotes : cransDeMolette(event.deltaY);
     if (crans === 0) return;
 
-    const sens: Direction = cotes !== 0 ? (crans > 0 ? 'droite' : 'gauche') : crans > 0 ? 'bas' : 'haut';
+    const surJeu = survole(event, '.sea-lamelle, .sea-ecran');
+    const sens = sensDeMolette(crans, cotes !== 0 || surJeu);
     for (let reste = Math.min(Math.abs(crans), 8); reste > 0; reste -= 1) deplacerSea(sens);
     bruit();
   },

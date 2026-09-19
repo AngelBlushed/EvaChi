@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { THEMES, contrastRatio, themeById, variables, DEFAULT_THEME } from './themes.ts';
+import { DEFAULT_THEME, THEMES, contrastRatio, themeById, variables } from './themes.ts';
 
 /** Seuil du W3C pour du texte courant. */
 const LISIBLE = 4.5;
@@ -35,9 +35,27 @@ describe('habillages', () => {
     assert.ok(THEMES.some((theme) => theme.id === DEFAULT_THEME));
   });
 
-  it('rend le premier thème pour un identifiant inconnu', () => {
-    assert.equal(themeById('n’existe pas').id, THEMES[0].id);
-    assert.equal(themeById(null).id, THEMES[0].id);
+  it('rend le thème par défaut pour un identifiant inconnu', () => {
+    // Nommé, et non « le premier » : les palettes sont rangées par teinte, et
+    // ce rangement ne doit pas décider de ce qu'on voit au premier lancement.
+    assert.equal(themeById('n’existe pas').id, DEFAULT_THEME);
+    assert.equal(themeById(null).id, DEFAULT_THEME);
+  });
+
+  it('range les palettes par famille, sombres puis claires', () => {
+    // Trente-six vignettes en vrac ne se parcourent pas : on cherche « le vert »
+    // dans une grille où les verts sont à quatre endroits.
+    const rangs = THEMES.map((theme) => theme.scheme);
+    const apart = ['contraste', 'game-boy', 'virtual-boy', 'famicom'];
+    const goûts = THEMES.filter((theme) => !apart.includes(theme.id));
+    const premierClair = goûts.findIndex((theme) => theme.scheme === 'light');
+    assert.ok(premierClair > 0, 'aucune palette sombre en tête');
+    for (const theme of goûts.slice(premierClair)) {
+      assert.equal(theme.scheme, 'light', `${theme.label} rompt le bloc des claires`);
+    }
+    assert.equal(rangs.length, THEMES.length);
+    // Les quatre palettes qui ne sont pas un goût ferment la marche.
+    assert.deepEqual(THEMES.slice(-apart.length).map((theme) => theme.id), apart);
   });
 
   it('renseigne les dix variables, en couleurs valides', () => {

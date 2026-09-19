@@ -88,7 +88,7 @@ for (const trouve of reste.matchAll(/(?:title|placeholder|aria-label)="([^"]+)"/
  * littéralement l'argument écrit dans le source, et les deux ne peuvent donc
  * pas diverger.
  */
-const SOURCES = ['main.ts', 'recents.ts', 'themes.ts', 'library.ts', 'catalog.ts'];
+const SOURCES = ['main.ts', 'recents.ts', 'themes.ts', 'library.ts', 'catalog.ts', 'nuances.ts'];
 const code = new Set();
 const appels =
   /\b(?:t|dit|aTraduire)\(\s*(?:'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)")\s*[,)]/g;
@@ -209,6 +209,12 @@ if (fs.existsSync(cheminCles)) {
  * alignés, et il n'y a qu'une ligne à retraduire au lieu de tout.
  */
 const RENOMMEES = new Map([
+  // Les filtres ne sont plus à venir : la phrase qui promettait leur place
+  // explique maintenant ce qu'ils font, et garde son rang.
+  [
+    'À venir : filtres de tube cathodique, quadrillage, balayage. La place est prête, les filtres arriveront ici.',
+    "Ce qu'un téléviseur cathodique faisait à l'image, et que les jeux d'alors tenaient pour acquis. Ne vaut que pour les cœurs joués ici : un émulateur autonome affiche son image lui-même.",
+  ],
   // L'étagère et l'archipel ont laissé la place au paquet et à la séance. Les
   // quatre phrases gardent leur rang, et leurs traductions sont reprises.
   ['Étagère', 'Paquet'],

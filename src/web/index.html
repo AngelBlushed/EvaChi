@@ -505,6 +505,7 @@
         --ch: calc(300px * var(--ech));
       }
       .paq[hidden] { display: none; }
+      .paq-fond { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
 
       .paq-tete,
       .paq-pied { position: absolute; left: 0; right: 0; z-index: 4; }
@@ -1738,10 +1739,13 @@
        * limiter, il n'agrandit pas, et une Game Boy s'afficherait donc en
        * 160 pixels de large au milieu d'un écran vide.
        */
-      #screen {
+      #screen,
+      #nuance {
         display: block;
         image-rendering: pixelated;
       }
+      #screen[hidden],
+      #nuance[hidden] { display: none; }
 
       /* --- Barre d'état --- */
 
@@ -2469,6 +2473,7 @@
           <!-- Le paquet : les jaquettes tenues en éventail. Le poignet tourne,
                la carte lue se redresse et sort du lot. -->
           <div class="paq" id="paquet" hidden>
+            <canvas class="paq-fond" id="paquet-fond"></canvas>
             <div class="paq-tete">
               <strong id="paquet-console">—</strong>
               <span id="paquet-heure"></span>
@@ -2546,6 +2551,10 @@
 
         <div class="player" id="player" hidden>
           <canvas id="screen" width="64" height="32"></canvas>
+          <!-- Le second écran ne sert qu'aux filtres : un canevas ne peut pas
+               changer d'avis sur la façon dont on peint dessus, et l'un des
+               deux est donc toujours caché. -->
+          <canvas id="nuance" width="64" height="32" hidden></canvas>
         </div>
       </main>
 
@@ -2827,9 +2836,11 @@
 
         <h3 class="section">Shaders</h3>
         <p class="hint-text">
-          À venir : filtres de tube cathodique, quadrillage, balayage. La place
-          est prête, les filtres arriveront ici.
+          Ce qu'un téléviseur cathodique faisait à l'image, et que les jeux
+          d'alors tenaient pour acquis. Ne vaut que pour les cœurs joués ici :
+          un émulateur autonome affiche son image lui-même.
         </p>
+        <div class="menus" id="nuance-list"></div>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>
