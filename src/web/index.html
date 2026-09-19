@@ -384,11 +384,10 @@
         background: var(--raised);
         font: inherit;
         color: var(--muted);
-        cursor: pointer;
         text-align: left;
       }
       .emplacement[aria-current="true"] { border-color: var(--accent); }
-      .emplacement:focus, .emplacement:hover { outline: none; border-color: var(--accent); }
+      .emplacement:focus-within, .emplacement:hover { border-color: var(--accent); }
       .emplacement .apercu {
         width: 100%;
         aspect-ratio: 4 / 3;
@@ -402,6 +401,42 @@
       .emplacement .titre { padding: 0 9px; font-weight: 600; color: var(--ink); }
       .emplacement[aria-current="true"] .titre { color: var(--accent); }
       .emplacement .quand { padding: 0 9px; font-size: 11px; }
+      /* Chaque geste est écrit. La carte entière était cliquable, et ce qu'un
+         clic déclenchait dépendait de ce qu'il y avait dedans : reprendre une
+         partie ou en sauver une, selon. Une seconde d'inattention suffisait
+         alors à perdre la partie en cours. */
+      .emplacement .gestes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 10px;
+        padding: 2px 9px 0;
+      }
+      .emplacement .gestes button { font-size: 11px; }
+
+      /* Une rangée de crans : onze petits boutons, rien à lire, on vise le
+         cran voulu. Une liste de onze lignes décrites aurait fait trois écrans
+         pour un réglage qu'on pousse au jugé. */
+      .crans {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .crans button {
+        min-width: 52px;
+        padding: 6px 8px;
+        font: inherit;
+        color: var(--muted);
+        background: var(--raised);
+        border: 1px solid var(--edge);
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      .crans button:hover { border-color: var(--accent); }
+      .crans button[aria-pressed='true'] {
+        color: var(--ink);
+        background: var(--accent-soft);
+        border-color: var(--accent);
+      }
 
       /* La galerie : des vignettes que l'on parcourt, pas une liste. */
       dialog.large { width: min(92vw, 1000px); max-width: none; }
@@ -919,6 +954,20 @@
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+      }
+
+      /* Le mode d'emploi ferme le panneau : détaché du reste par un trait, et
+         seulement sous les boutons — au-dessus, il repousserait ce dont on se
+         sert à chaque passe. */
+      dialog.mod .mod-mode-emploi {
+        margin: 16px 0 0;
+        padding-top: 12px;
+        border-top: 1px solid var(--edge);
+      }
+      dialog.mod .mod-mode-emploi + .mod-mode-emploi {
+        margin-top: 8px;
+        padding-top: 0;
+        border-top: 0;
       }
 
       /* Le chercheur : une ligne de réglages, une rangée de questions, une
@@ -1891,13 +1940,17 @@
             <button type="button" data-action="toggle" disabled>Pause</button>
             <button type="button" data-action="reset" disabled>Réinitialiser</button>
             <hr />
+            <!-- Les trois ouvrent le même panneau, où l'on désigne
+                 l'emplacement. Les raccourcis restent écrits : eux vont droit
+                 à celui qui est visé, et c'est là toute leur utilité. -->
             <button type="button" data-action="save" disabled>
-              Sauvegarder l'état<span class="shortcut">F2</span>
+              Sauvegarder l'état…<span class="shortcut">F2</span>
             </button>
             <button type="button" data-action="restore" disabled>
-              Charger l'état<span class="shortcut">F4</span>
+              Charger l'état…<span class="shortcut">F4</span>
             </button>
             <button type="button" data-action="states" disabled>Emplacements…</button>
+            <button type="button" data-action="wipe" disabled>Effacer la sauvegarde…</button>
             <hr />
             <button type="button" data-action="triches">Triches…</button>
             <button type="button" data-action="mod" disabled>Panneau de triches</button>
@@ -2270,10 +2323,12 @@
       <h2>Emplacements de sauvegarde</h2>
       <div class="dialog-body">
         <p class="hint-text" data-i18n-html>
-          Quatre emplacements par jeu, gardés sur le disque. L'emplacement en
-          gras est celui qu'utilisent <strong>F2</strong> et <strong>F4</strong>
-          — et <strong>Select + L1</strong> / <strong>Select + R1</strong> à la
-          manette. Clic droit sur un emplacement pour le vider.
+          Quatre emplacements par jeu, gardés sur le disque. Chaque geste est
+          écrit sous l'emplacement, et remplacer ou vider demande confirmation.
+          L'emplacement en gras est celui où vont <strong>F2</strong> et
+          <strong>F4</strong> — et <strong>Select + L1</strong> /
+          <strong>Select + R1</strong> à la manette — directement, sans rien
+          demander.
         </p>
         <div class="emplacements" id="emplacements"></div>
       </div>
@@ -2307,6 +2362,17 @@
 
         <h3 class="section">Taille de l'image</h3>
         <div class="menus" id="echelle-list"></div>
+
+        <h3 class="section">Étirement</h3>
+        <p class="hint-text">
+          Beaucoup de consoles n'ont pas les proportions d'un écran
+          d'aujourd'hui : une DS, une borne verticale ou une Game Boy laissent
+          de larges bandes noires sur les côtés. À zéro, l'image garde
+          exactement ses proportions d'origine ; à cent, elle occupe toute la
+          fenêtre, quitte à s'allonger. Entre les deux, chacun choisit ce qu'il
+          supporte.
+        </p>
+        <div class="crans" id="etirement-list"></div>
 
         <h3 class="section">Lissage</h3>
         <div class="menus" id="lissage-list"></div>
@@ -2570,10 +2636,42 @@
           </div>
           <p class="mod-restantes" id="mod-restantes"></p>
           <div class="mod-adresses" id="mod-adresses"></div>
+
+          <!-- Écrit sous les boutons, et non dans une aide qu'il faudrait
+               aller chercher : personne ne devine seul ce que « Plus »
+               compare à quoi. -->
+          <p class="hint-text mod-mode-emploi">
+            Le jeu range ses comptes en mémoire, mais ne dit pas où. On le
+            trouve en éliminant : vous dites ce que le nombre affiché a fait,
+            et EvaChi écarte toutes les adresses qui ne l'ont pas fait aussi.
+            Deux ou trois passes suffisent.
+          </p>
+          <p class="hint-text mod-mode-emploi">
+            Vous voyez 47 vies : tapez 47 dans « Valeur », puis « Chercher ».
+            Perdez-en une, tapez 46, puis « Vaut ». Si le chiffre n'est écrit
+            nulle part — une barre de vie, un chronomètre — laissez « Valeur »
+            vide et dites seulement « Plus », « Moins », « Différent » ou
+            « Identique » entre deux moments de jeu. Quand il n'en reste que
+            quelques-unes, « Figer » maintient la valeur. « Largeur » est la
+            taille du nombre : 1 jusqu'à 255, 2 jusqu'à 65 535, 4 au-delà.
+          </p>
         </div>
       </div>
       <div class="dialog-foot">
         <button type="button" data-close>Fermer</button>
+      </div>
+    </dialog>
+
+    <!-- Ce qu'on ne peut pas défaire se demande d'abord. La question est
+         écrite par le code : c'est la même fenêtre pour tout. -->
+    <dialog id="sur-dialog">
+      <h2>Confirmation</h2>
+      <div class="dialog-body">
+        <p class="hint-text" id="sur-quoi"></p>
+      </div>
+      <div class="dialog-foot">
+        <button type="button" id="sur-oui" class="lien">Oui</button>
+        <button type="button" id="sur-non" data-close>Annuler</button>
       </div>
     </dialog>
 

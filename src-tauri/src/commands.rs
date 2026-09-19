@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
 use tauri::{Manager, State};
 
-use evachi::libretro::{AvInfo, CoreInfo, Session, VideoFrame, JOYPAD_BUTTONS};
+use evachi::libretro::{AvInfo, CoreInfo, Entrees, Session, VideoFrame};
 
 /// Au-delà, un état de jeu n'en est plus un.
 ///
@@ -881,6 +881,31 @@ pub async fn delete_state_slot(
 ) -> Result<(), String> {
     let base = racine(&paths);
     tauri::async_runtime::spawn_blocking(move || crate::states::effacer(&base, &rom_path, slot))
+        .await
+        .map_err(|error| format!("effacement interrompu : {error}"))?
+}
+
+/// Ce que le jeu a écrit de lui-même : sa pile, telle qu'elle est sur le disque.
+#[tauri::command]
+pub async fn list_saves(
+    rom_path: String,
+    paths: State<'_, Paths>,
+) -> Result<Vec<crate::piles::Pile>, String> {
+    let saves = paths.saves.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::piles::listees(&saves, &rom_path))
+        .await
+        .map_err(|error| format!("lecture interrompue : {error}"))
+}
+
+/// Efface la pile d'un jeu, pour le reprendre depuis le début.
+///
+/// Les emplacements de sauvegarde ne sont pas touchés : ils vivent ailleurs, et
+/// ce sont deux choses différentes — l'une appartient au jeu, l'autre à qui y
+/// joue.
+#[tauri::command]
+pub async fn clear_saves(rom_path: String, paths: State<'_, Paths>) -> Result<usize, String> {
+    let saves = paths.saves.clone();
+    tauri::async_runtime::spawn_blocking(move || crate::piles::effacer(&saves, &rom_path))
         .await
         .map_err(|error| format!("effacement interrompu : {error}"))?
 }
@@ -2725,12 +2750,19 @@ fn pack_frame(video: Option<&VideoFrame>, audio: &[i16], shutdown: bool) -> Vec<
 #[tauri::command]
 pub async fn run_frame(
     input: Vec<i16>,
+    axes: Option<Vec<i16>>,
     frames: Option<u32>,
     video: Option<bool>,
     session: State<'_, Arc<Session>>,
 ) -> Result<Response, String> {
-    let mut buttons = [0i16; JOYPAD_BUTTONS];
-    for (slot, value) in buttons.iter_mut().zip(input) {
+    // Les deux tableaux sont recopiés dans des tableaux de taille fixe plutôt
+    // que crus sur parole : ce qui vient de la fenêtre peut être plus court, ou
+    // plus long, et un cœur lit toujours les seize et les quatre.
+    let mut entrees = Entrees::default();
+    for (slot, value) in entrees.boutons.iter_mut().zip(input) {
+        *slot = value;
+    }
+    for (slot, value) in entrees.manches.iter_mut().zip(axes.unwrap_or_default()) {
         *slot = value;
     }
 
@@ -2739,7 +2771,7 @@ pub async fn run_frame(
 
     let session = Arc::clone(&session);
     let bloc = au_travail(move || {
-        let frame = session.run_frames(buttons, combien, image)?;
+        let frame = session.run_frames(entrees, combien, image)?;
         Ok(pack_frame(
             frame.video.as_ref(),
             &frame.audio,

@@ -12,14 +12,17 @@
 
 use std::path::PathBuf;
 
-use evachi::libretro::{Consignes, Poke, Session, JOYPAD_BUTTONS};
+use evachi::libretro::{Consignes, Entrees, Poke, Session};
 
 /// Dimensions annoncées par le cœur d'essai.
 const WIDTH: u32 = 32;
 const HEIGHT: u32 = 16;
 const AUDIO_FRAMES: usize = 735;
 
-const NO_BUTTONS: [i16; JOYPAD_BUTTONS] = [0; JOYPAD_BUTTONS];
+const NO_BUTTONS: Entrees = Entrees {
+    boutons: [0; 16],
+    manches: [0; 4],
+};
 
 /// Les quatre boutons qui demandent au cœur d'essai de mal tourner : L2, R2,
 /// L3 et R3 dans la numérotation de libretro. Voir `test-core/src/lib.rs`.
@@ -29,15 +32,15 @@ const FIGE: usize = 8;
 /// Avec X (bouton 9) en plus, il abandonne de lui-même.
 const ABANDON: usize = 9;
 
-fn boutons(tenus: &[usize]) -> [i16; JOYPAD_BUTTONS] {
+fn boutons(tenus: &[usize]) -> Entrees {
     let mut etat = NO_BUTTONS;
     for index in tenus {
-        etat[*index] = 1;
+        etat.boutons[*index] = 1;
     }
     etat
 }
 
-fn saboter(avec: Option<usize>) -> [i16; JOYPAD_BUTTONS] {
+fn saboter(avec: Option<usize>) -> Entrees {
     let mut tenus = SABOTAGE.to_vec();
     if let Some(bouton) = avec {
         tenus.push(bouton);

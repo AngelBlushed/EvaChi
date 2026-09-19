@@ -11,7 +11,7 @@
 
 use std::path::{Path, PathBuf};
 
-use evachi::libretro::{Session, JOYPAD_BUTTONS};
+use evachi::libretro::{Entrees, Session};
 
 fn main() {
     let mut args = std::env::args().skip(1);
@@ -95,7 +95,7 @@ fn main() {
     println!("cadence     {:.3} images/s", av.fps);
     println!("audio       {:.0} Hz", av.sample_rate);
 
-    let no_buttons = [0i16; JOYPAD_BUTTONS];
+    let no_buttons = Entrees::default();
     let mut fresh = 0usize;
     let mut samples = 0usize;
 

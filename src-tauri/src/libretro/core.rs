@@ -404,7 +404,7 @@ impl Core {
     }
 
     /// Émule une trame et récupère ce que les rappels ont déposé.
-    pub fn run_frame(&mut self, input: [i16; JOYPAD_BUTTONS]) -> Result<Frame, CoreError> {
+    pub fn run_frame(&mut self, input: Entrees) -> Result<Frame, CoreError> {
         if !self.content_loaded {
             return Err(CoreError::NoContent);
         }

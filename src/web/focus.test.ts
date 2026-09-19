@@ -28,6 +28,12 @@ describe('geste attendu selon l’élément', () => {
     assert.equal(gestePour('INPUT', 'range'), 'glisser');
   });
 
+  it('compte un champ de nombre plutôt que de le cliquer', () => {
+    // Une manette n'a pas de pavé numérique : la valeur cherchée se donne en
+    // poussant à gauche et à droite, ou elle ne se donne pas du tout.
+    assert.equal(gestePour('INPUT', 'number'), 'compter');
+  });
+
   it('déroule une liste plutôt que de la cliquer', () => {
     assert.equal(gestePour('SELECT', ''), 'derouler');
   });

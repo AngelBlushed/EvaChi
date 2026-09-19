@@ -227,7 +227,7 @@ fn tourner(
 
     for _ in 0..requete.trames {
         let trame = coeur
-            .run_frame(requete.boutons)
+            .run_frame(requete.entrees)
             .map_err(|erreur| erreur.to_string())?;
 
         // La dernière image *produite* du lot, et non celle de la dernière

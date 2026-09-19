@@ -21,7 +21,7 @@ export const SELECTEUR_ACTIF = [
 ].join(', ');
 
 /** Ce qu'on peut faire d'un élément une fois dessus. */
-export type Geste = 'cliquer' | 'cocher' | 'glisser' | 'derouler';
+export type Geste = 'cliquer' | 'cocher' | 'glisser' | 'derouler' | 'compter';
 
 /**
  * Ce qu'un appui doit faire sur cet élément.
@@ -37,6 +37,10 @@ export function gestePour(balise: string, type: string): Geste {
   if (nom === 'input') {
     if (type === 'range') return 'glisser';
     if (type === 'checkbox' || type === 'radio') return 'cocher';
+    // Un champ de nombre se remplit au clavier, et une manette n'en a pas :
+    // sans quoi la valeur cherchée reste la seule chose du panneau de triches
+    // qu'on ne puisse pas donner sans lâcher la manette.
+    if (type === 'number') return 'compter';
     return 'cliquer';
   }
   return 'cliquer';

@@ -38,6 +38,8 @@ import {
   dismissCrash,
   deleteShot,
   deleteStateSlot,
+  clearSaves,
+  listSaves,
   directories,
   libraryFolders,
   listRoms,
@@ -247,11 +249,15 @@ const langueList = $<HTMLDivElement>('langue-list');
 const langueMenu = $<HTMLDivElement>('menu-langue');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
+const etirementList = $<HTMLDivElement>('etirement-list');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
 const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
 const emplacementsBoite = $<HTMLDivElement>('emplacements');
+const surQuoi = $<HTMLParagraphElement>('sur-quoi');
+const surOui = $<HTMLButtonElement>('sur-oui');
+const surNon = $<HTMLButtonElement>('sur-non');
 const crashTitre = $<HTMLElement>('crash-titre');
 const crashQuoi = $<HTMLElement>('crash-quoi');
 const crashEcarter = $<HTMLButtonElement>('crash-ecarter');
@@ -295,6 +301,7 @@ const dialogs = {
   crop: $<HTMLDialogElement>('crop-dialog'),
   triches: $<HTMLDialogElement>('triches-dialog'),
   mod: $<HTMLDialogElement>('mod-dialog'),
+  sur: $<HTMLDialogElement>('sur-dialog'),
 };
 
 // --- Habillage --------------------------------------------------------------
@@ -317,6 +324,7 @@ const RETENU = {
   favoris: 'evachi.favoris',
   echelle: 'evachi.echelle',
   lissage: 'evachi.lissage',
+  etirement: 'evachi.etirement',
   etats: 'evachi.etats',
   emplacement: 'evachi.emplacement',
   recents: 'evachi.recents',
@@ -1558,13 +1566,9 @@ async function renderEmplacements(): Promise<void> {
   }
 
   for (const place of liste) {
-    const carte = document.createElement('button');
-    carte.type = 'button';
+    const carte = document.createElement('div');
     carte.className = 'emplacement';
     carte.setAttribute('aria-current', String(place.slot === emplacementVise));
-    carte.title = place.filled
-      ? t('Reprendre cette sauvegarde — clic droit pour la vider')
-      : t('Sauvegarder ici');
 
     const apercu = document.createElement('span');
     apercu.className = 'apercu';
@@ -1595,24 +1599,112 @@ async function renderEmplacements(): Promise<void> {
         })} · ${humanSize(place.size)}`
       : '—';
 
-    carte.append(apercu, titre, quand);
-    // Un emplacement occupé se reprend, un emplacement vide se remplit : c'est
-    // ce qu'on veut faire neuf fois sur dix, et l'autre geste reste à portée.
-    carte.addEventListener('click', async () => {
-      emplacementVise = place.slot;
-      retenir(RETENU.emplacement, String(place.slot));
-      if (place.filled) await chargerEmplacement(place.slot);
-      else await sauverEmplacement(place.slot);
-      await renderEmplacements();
-    });
-    carte.addEventListener('contextmenu', async (event) => {
-      event.preventDefault();
-      if (!place.filled) return;
-      await deleteStateSlot(cheminEnCours, place.slot);
-      await renderEmplacements();
-    });
+    const gestes = document.createElement('div');
+    gestes.className = 'gestes';
+
+    /** Un geste écrit sous la carte. Le faire vise aussi cet emplacement. */
+    const geste = (texte: string, faire: () => Promise<void>): void => {
+      const bouton = document.createElement('button');
+      bouton.type = 'button';
+      bouton.className = 'lien';
+      bouton.textContent = texte;
+      bouton.addEventListener('click', async () => {
+        emplacementVise = place.slot;
+        retenir(RETENU.emplacement, String(place.slot));
+        await faire();
+        await renderEmplacements();
+      });
+      gestes.append(bouton);
+    };
+
+    if (place.filled) {
+      geste(t('Reprendre'), () => chargerEmplacement(place.slot));
+      geste(t('Remplacer'), async () => {
+        const sur = await demanderSur(
+          dit('Remplacer l’emplacement {0} ? Ce qui y est rangé sera perdu.', place.slot + 1),
+        );
+        if (sur) await sauverEmplacement(place.slot);
+      });
+      geste(t('Vider'), async () => {
+        const sur = await demanderSur(
+          dit('Vider l’emplacement {0} ? Ce qui y est rangé sera perdu.', place.slot + 1),
+        );
+        if (sur) await deleteStateSlot(cheminEnCours, place.slot);
+      });
+    } else {
+      geste(t('Sauvegarder ici'), () => sauverEmplacement(place.slot));
+    }
+
+    carte.append(apercu, titre, quand, gestes);
     emplacementsBoite.append(carte);
   }
+}
+
+/** Montre les emplacements du jeu en cours, à jour. */
+async function ouvrirEmplacements(): Promise<void> {
+  await renderEmplacements();
+  openDialog(dialogs.states);
+}
+
+/**
+ * Efface ce que le jeu a écrit de lui-même, et le relance neuf.
+ *
+ * Trois temps, et l'ordre compte. Le cœur tient la pile en mémoire et ne
+ * l'écrit sur le disque qu'en se déchargeant : effacer d'abord ne ferait que
+ * la voir réapparaître une seconde plus tard. On arrête donc la partie, on
+ * efface ensuite, et on relance le jeu — qui ne trouve plus rien, et
+ * recommence.
+ *
+ * Les emplacements de sauvegarde ne sont pas touchés : ce sont les vôtres, et
+ * ils restent là si l'on veut revenir en arrière.
+ */
+async function repartirDeZero(): Promise<void> {
+  const chemin = cheminEnCours;
+  const coeur = entry;
+  const jeu = contentName;
+  if (!chemin || !coeur) return;
+  const rom = games.find((candidat) => candidat.path === chemin);
+
+  try {
+    const piles = await listSaves(chemin);
+    for (const pile of piles) log(`${pile.nom} — ${humanSize(pile.taille)}`);
+  } catch (error) {
+    log(reason(error), 'err');
+  }
+
+  const sur = await demanderSur(
+    dit(
+      'Effacer la sauvegarde de {0} et reprendre depuis le début ? La partie en cours sera arrêtée, et ce que le jeu avait noté sera perdu.',
+      jeu,
+    ),
+  );
+  if (!sur) return;
+
+  await stopPlaying();
+  try {
+    const retires = await clearSaves(chemin);
+    log(
+      retires > 0
+        ? dit('sauvegarde effacée — {0}', plural(retires, 'fichier'))
+        : t('aucune sauvegarde à effacer'),
+      'ok',
+    );
+  } catch (error) {
+    log(reason(error), 'err');
+  }
+
+  if (rom) await play(coeur, rom);
+}
+
+/**
+ * Ce que font les raccourcis : droit à l'emplacement visé, sans rien demander.
+ *
+ * C'est leur seule raison d'être. Par le menu, on choisit ; par la touche, on
+ * va vite — et le panneau dit lequel des quatre est visé.
+ */
+function raccourciEtat(quoi: 'sauver' | 'charger'): void {
+  if (quoi === 'sauver') void sauverEmplacement(emplacementVise);
+  else void chargerEmplacement(emplacementVise);
 }
 
 // --- Sauvegarde rapide ------------------------------------------------------
@@ -1723,7 +1815,7 @@ function surveillerEtats(pad: Gamepad, maintenant: number): void {
     const tenu = raccourciTenu(pad, raccourcisEtat[quoi].pad);
     if (etats[quoi].update(tenu, maintenant).pressed) {
       if (sonsVoulus()) ticValidation();
-      void actions[quoi === 'sauver' ? 'save' : 'restore']?.();
+      raccourciEtat(quoi);
     }
   }
 }
@@ -1755,6 +1847,21 @@ const LISSAGES = [
     aTraduire('Les contours sont fondus — plus proche d’un vieux téléviseur'),
   ],
 ] as const;
+
+/**
+ * Les crans d'étirement, de zéro à cent pour cent.
+ *
+ * Onze plutôt qu'une jauge continue : on ne règle pas cela finement, on
+ * l'essaie. Et un cran retrouvé à l'identique d'un lancement à l'autre vaut
+ * mieux qu'un curseur qu'on ne remet jamais exactement où il était.
+ */
+const ETIREMENTS = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100] as const;
+
+/** De combien l'image déborde de ses proportions, en centièmes. */
+function etirementImage(): number {
+  const garde = Number(retenu(RETENU.etirement));
+  return ETIREMENTS.includes(garde as (typeof ETIREMENTS)[number]) ? garde : 0;
+}
 
 function echelleImage(): string {
   const garde = retenu(RETENU.echelle);
@@ -1794,6 +1901,21 @@ function renderGraphisme(): void {
     renderGraphisme();
     fitScreen();
   });
+  etirementList.replaceChildren();
+  for (const cran of ETIREMENTS) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    // Un pourcentage se lit dans toutes les langues : rien à traduire ici.
+    choix.textContent = `${cran} %`;
+    choix.setAttribute('aria-pressed', String(cran === etirementImage()));
+    choix.addEventListener('click', () => {
+      retenir(RETENU.etirement, String(cran));
+      renderGraphisme();
+      fitScreen();
+    });
+    etirementList.append(choix);
+  }
+
   renderChoix(lissageList, LISSAGES, lissageImage(), (id) => {
     retenir(RETENU.lissage, id);
     renderGraphisme();
@@ -1878,6 +2000,18 @@ const audio = new AudioSink();
  */
 const buttons: boolean[] = new Array(BUTTON_COUNT).fill(false);
 const keyboard: boolean[] = new Array(BUTTON_COUNT).fill(false);
+
+/** Les deux manches, de -1 à 1 : X et Y du gauche, puis X et Y du droit. */
+const manches: number[] = [0, 0, 0, 0];
+
+/**
+ * En deçà, un manche est tenu pour centré.
+ *
+ * Bien plus fin que le seuil des directions : celui-ci décide d'un oui ou d'un
+ * non, alors qu'ici on transmet la position elle-même, et un jeu qui attend un
+ * pas prudent doit pouvoir le recevoir.
+ */
+const REPOS_MANCHE = 0.12;
 const buttonCells = new Map<number, HTMLButtonElement>();
 
 /**
@@ -1979,6 +2113,7 @@ function refreshMenus(): void {
     save: playing,
     restore: playing,
     states: playing,
+    wipe: playing,
     shot: playing,
     stop: playing,
     mod: playing,
@@ -2017,10 +2152,64 @@ for (const menu of menubar.querySelectorAll<HTMLElement>('[data-menu]')) {
 
 document.addEventListener('click', closeMenus);
 
+/**
+ * Les fenêtres ouvertes, la dernière par-dessus.
+ *
+ * Une question posée par-dessus un panneau en laisse deux ouvertes à la fois.
+ * Chercher « la fenêtre ouverte » dans la page rendrait alors la première
+ * écrite dans le document, pas celle qu'on a sous les yeux : la manette
+ * conduirait le panneau du dessous pendant qu'on lit la question.
+ */
+const fenetresOuvertes: HTMLDialogElement[] = [];
+
+/** Celle qui est par-dessus, et qui a donc la main. */
+function fenetreDessus(): HTMLDialogElement | null {
+  return fenetresOuvertes.at(-1) ?? null;
+}
+
 /** Ouvre une boîte de dialogue, en fermant les menus au passage. */
 function openDialog(dialog: HTMLDialogElement): void {
   closeMenus();
+  fenetresOuvertes.push(dialog);
   dialog.showModal();
+}
+
+for (const dialog of Object.values(dialogs)) {
+  // Une fenêtre se referme de bien des façons — un bouton, la touche d'échappement,
+  // le code. Une seule les voit toutes.
+  dialog.addEventListener('close', () => {
+    const rang = fenetresOuvertes.lastIndexOf(dialog);
+    if (rang >= 0) fenetresOuvertes.splice(rang, 1);
+  });
+}
+
+/**
+ * Pose une question dont la réponse engage, et attend.
+ *
+ * Rien de ce qui se perd ne doit partir d'un seul clic. « Annuler » a le focus
+ * à l'ouverture : la manette et la touche d'entrée retombent donc sur le geste
+ * qui ne coûte rien.
+ */
+function demanderSur(question: string): Promise<boolean> {
+  surQuoi.textContent = question;
+  return new Promise((repondre) => {
+    let accepte = false;
+    const oui = (): void => {
+      accepte = true;
+      dialogs.sur.close();
+    };
+    surOui.addEventListener('click', oui);
+    dialogs.sur.addEventListener(
+      'close',
+      () => {
+        surOui.removeEventListener('click', oui);
+        repondre(accepte);
+      },
+      { once: true },
+    );
+    openDialog(dialogs.sur);
+    surNon.focus();
+  });
 }
 
 for (const dialog of Object.values(dialogs)) {
@@ -2079,6 +2268,15 @@ function fitScreen(available?: { width: number; height: number }): void {
       width = entier;
       height = canvas.height * facteur;
     }
+  }
+
+  // Et pour finir, l'étirement. Il s'applique à ce qui précède plutôt qu'à
+  // la place de tout : demandé sur un multiple entier, il en garde le point de
+  // départ, et l'utilisateur voit exactement ce qu'il a réglé.
+  const tirage = etirementImage() / 100;
+  if (tirage > 0) {
+    width += (box.width - width) * tirage;
+    height += (box.height - height) * tirage;
   }
 
   canvas.style.width = `${Math.floor(width)}px`;
@@ -2248,7 +2446,7 @@ async function runLoop(): Promise<void> {
 
     let frame: Frame;
     try {
-      frame = await core.runFrame(buttons, lot, peindra);
+      frame = await core.runFrame(buttons, lot, peindra, manches);
     } catch (error) {
       if (token === loopToken) {
         setRunning(false);
@@ -3045,13 +3243,13 @@ function naviguerMenu(): void {
     // Une fenêtre ouverte pendant une partie prend la manette, comme dans la
     // bibliothèque : sans cela le panneau de triches s'ouvrirait sans qu'on
     // puisse le parcourir, et les directions partiraient au jeu derrière.
-    const ouverte = document.querySelector<HTMLDialogElement>('dialog[open]');
+    const ouverte = fenetreDessus();
     if (ouverte) {
-      const pas: Direction[] = [];
-      for (const sens of ['gauche', 'droite', 'haut', 'bas'] as Direction[]) {
-        const etat = directions[sens].update(pousse[sens], maintenant);
-        if (etat.pressed || etat.repeat) pas.push(sens);
-      }
+      // Les directions déjà relevées plus haut, et surtout pas relues ici :
+      // un filtre d'appui ne rend son front qu'une fois. Le second appel
+      // rendait donc toujours « rien », et le panneau ouvert en pleine partie
+      // ne se parcourait pas — il s'ouvrait, se refermait, et n'obéissait à
+      // rien entre les deux.
       // B referme, sauf quand Select est tenu : c'est alors le raccourci
       // d'ouverture qu'on relâche.
       conduireFenetre(ouverte, { pas, a, b: b && !select0 }, tic);
@@ -3083,7 +3281,7 @@ function naviguerMenu(): void {
     return;
   }
 
-  const fenetre = document.querySelector<HTMLDialogElement>('dialog[open]');
+  const fenetre = fenetreDessus();
   if (fenetre === dialogs.crop) {
     // Le recadrage ne se parcourt pas comme une fenêtre de réglages : les
     // directions n'y changent pas de champ, elles déplacent le cadre.
@@ -3388,6 +3586,19 @@ function conduireFenetre(
       continue;
     }
 
+    if ((sens === 'gauche' || sens === 'droite') && geste === 'compter') {
+      const champ = vise as HTMLInputElement;
+      const enjambee = Number(champ.step) || 1;
+      const suivant = (Number(champ.value) || 0) + (sens === 'droite' ? enjambee : -enjambee);
+      const bas = champ.min === '' ? -Infinity : Number(champ.min);
+      const haut = champ.max === '' ? Infinity : Number(champ.max);
+      champ.value = String(Math.min(haut, Math.max(bas, suivant)));
+      champ.dispatchEvent(new Event('input', { bubbles: true }));
+      champ.dispatchEvent(new Event('change', { bubbles: true }));
+      tic();
+      continue;
+    }
+
     if ((sens === 'gauche' || sens === 'droite') && geste === 'derouler') {
       const liste = vise as HTMLSelectElement;
       liste.selectedIndex = tourne(
@@ -3605,7 +3816,7 @@ document.addEventListener(
     for (const quoi of ['sauver', 'charger'] as const) {
       if (raccourcisEtat[quoi].clavier && raccourcisEtat[quoi].clavier === event.key) {
         event.preventDefault();
-        void actions[quoi === 'sauver' ? 'save' : 'restore']?.();
+        raccourciEtat(quoi);
       }
     }
   },
@@ -6156,12 +6367,12 @@ const actions: Record<string, () => void | Promise<void>> = {
       log(dit('réinitialisation impossible — {0}', reason(error)), 'err');
     }
   },
-  save: () => sauverEmplacement(emplacementVise),
-  restore: () => chargerEmplacement(emplacementVise),
-  states: async () => {
-    await renderEmplacements();
-    openDialog(dialogs.states);
-  },
+  // Les trois ouvrent le panneau : par le menu, on désigne l'emplacement
+  // plutôt que d'en deviner un. Les raccourcis, eux, vont droit au but.
+  save: ouvrirEmplacements,
+  restore: ouvrirEmplacements,
+  states: ouvrirEmplacements,
+  wipe: repartirDeZero,
   stop: stopPlaying,
 
   fullscreen: toggleFullscreen,
@@ -6407,6 +6618,34 @@ function sampleInput(): void {
       const target = padBindings().get(source);
       if (active && target !== undefined) buttons[target] = true;
     }
+  }
+
+  // Et le manche tel quel, en plus de la croix qu'il imite. Les deux, parce
+  // que ce sont deux commandes différentes sur la machine émulée : la
+  // Nintendo 64 a une croix *et* un manche, et ses jeux lisent le second.
+  manches.fill(0);
+  if (pad) {
+    for (let axe = 0; axe < manches.length; axe += 1) {
+      const pousse = pad.axes[axe] ?? 0;
+      // Un manche au repos ne rend jamais exactement zéro : sans ce seuil, le
+      // personnage dérive tout seul, manette posée sur la table.
+      manches[axe] = Math.abs(pousse) < REPOS_MANCHE ? 0 : pousse;
+    }
+  }
+
+  // Un clavier n'a pas de manche. Ses flèches en tiennent lieu, à fond, tant
+  // que le vrai manche est au repos — sinon la Nintendo 64 serait injouable
+  // sans manette. La croix de la manette, elle, reste la croix : elle existe
+  // sur la machine, et certains jeux s'en servent pour autre chose.
+  if (manches[0] === 0 && manches[1] === 0) {
+    const tenue = (direction: number): boolean => {
+      const cible = padBindings().get(direction);
+      return cible !== undefined && keyboard[cible];
+    };
+    if (tenue(PAD_LEFT)) manches[0] = -1;
+    if (tenue(PAD_RIGHT)) manches[0] = 1;
+    if (tenue(PAD_UP)) manches[1] = -1;
+    if (tenue(PAD_DOWN)) manches[1] = 1;
   }
 
   if (dialogs.controls.open) {

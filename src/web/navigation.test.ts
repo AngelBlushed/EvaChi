@@ -179,6 +179,21 @@ describe('appui tenu', () => {
     bouton.update(false, 50);
     assert.deepEqual(bouton.update(true, 60), { pressed: true, repeat: false });
   });
+
+  it('ne rend son appui qu’une fois, même relu dans la même trame', () => {
+    // C'est le piège qui a rendu le panneau de triches inutilisable à la
+    // manette : les directions étaient relevées une fois pour toute
+    // l'application, puis une seconde fois par la branche de la fenêtre
+    // ouverte en pleine partie. Le second appel rendait « rien », et plus
+    // aucune direction n'arrivait au panneau.
+    const bouton = new Held(400, 100);
+    assert.equal(bouton.update(true, 1000).pressed, true);
+    assert.deepEqual(
+      bouton.update(true, 1000),
+      { pressed: false, repeat: false },
+      'un même instant a rendu deux fronts',
+    );
+  });
 });
 
 describe('voisin d’après la disposition réelle', () => {

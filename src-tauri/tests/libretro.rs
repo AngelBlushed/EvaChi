@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-use evachi::libretro::{Session, JOYPAD_BUTTONS};
+use evachi::libretro::{Entrees, Session};
 
 /// Un cœur libretro range son état en global : chargé deux fois dans le même
 /// processus, il n'existe toujours qu'en un exemplaire. Les tests s'exécutant
@@ -27,7 +27,10 @@ const WIDTH: u32 = 32;
 const HEIGHT: u32 = 16;
 const AUDIO_FRAMES: usize = 735;
 
-const NO_BUTTONS: [i16; JOYPAD_BUTTONS] = [0; JOYPAD_BUTTONS];
+const NO_BUTTONS: Entrees = Entrees {
+    boutons: [0; 16],
+    manches: [0; 4],
+};
 
 /// Localise la bibliothèque du cœur d'essai à côté du binaire de test.
 fn test_core_path() -> PathBuf {
@@ -191,9 +194,9 @@ fn les_boutons_traversent_jusqu_au_coeur() {
     let (_guard, session, _scratch) = session_with_content();
 
     let mut buttons = NO_BUTTONS;
-    buttons[0] = 1;
-    buttons[5] = 1;
-    buttons[15] = 1;
+    buttons.boutons[0] = 1;
+    buttons.boutons[5] = 1;
+    buttons.boutons[15] = 1;
 
     let frame = session.run_frame(buttons).expect("trame");
     let video = frame.video.expect("image");

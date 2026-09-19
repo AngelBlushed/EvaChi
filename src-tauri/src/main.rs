@@ -23,6 +23,7 @@ mod emulators;
 mod install;
 mod manual;
 mod pads;
+mod piles;
 mod sentinel;
 mod shots;
 mod skeleton;
@@ -207,6 +208,8 @@ fn main() {
             commands::load_state_slot,
             commands::list_states,
             commands::delete_state_slot,
+            commands::list_saves,
+            commands::clear_saves,
             commands::save_shot,
             commands::list_shots,
             commands::delete_shot,

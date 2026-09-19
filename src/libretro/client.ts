@@ -1,6 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
 
-import type { AsyncEmulatorCore, Frame, Framebuffer, InputState, SystemInfo } from '../core/types.ts';
+import type {
+  AsyncEmulatorCore,
+  Frame,
+  Framebuffer,
+  InputState,
+  StickState,
+  SystemInfo,
+} from '../core/types.ts';
 
 /**
  * Un cœur installé, tel que la coque native l'a interrogé.
@@ -424,6 +431,27 @@ export async function deleteStateSlot(romPath: string, slot: number): Promise<vo
   return invoke<void>('delete_state_slot', { romPath, slot });
 }
 
+/**
+ * Un fichier de sauvegarde écrit par le jeu lui-même.
+ *
+ * C'est la pile de la cartouche, pas un emplacement : le jeu y note ses
+ * parties, et la relit au démarrage suivant.
+ */
+export interface Pile {
+  readonly nom: string;
+  readonly taille: number;
+}
+
+/** Ce que ce jeu a écrit de lui-même, sur le disque. */
+export async function listSaves(romPath: string): Promise<Pile[]> {
+  return invoke<Pile[]>('list_saves', { romPath });
+}
+
+/** Efface la pile d'un jeu, et rend le nombre de fichiers retirés. */
+export async function clearSaves(romPath: string): Promise<number> {
+  return invoke<number>('clear_saves', { romPath });
+}
+
 /** Une capture d'écran conservée. */
 export interface Shot {
   readonly file: string;
@@ -811,13 +839,27 @@ export class LibretroCore implements AsyncEmulatorCore {
     await invoke('reset');
   }
 
-  async runFrame(input: InputState, trames = 1, image = true): Promise<Frame> {
+  async runFrame(
+    input: InputState,
+    trames = 1,
+    image = true,
+    manches: StickState = [],
+  ): Promise<Frame> {
     // La manette libretro compte seize boutons ; l'interface envoie un tableau
     // plat de booléens, converti ici en pressions 0 ou 1.
     const buttons = Array.from({ length: 16 }, (_, index) => (input[index] ? 1 : 0));
 
+    // Les manches arrivent de -1 à 1 ; libretro les veut en entiers de seize
+    // bits. Bornés avant conversion : une manette mal calibrée rend parfois
+    // 1,02, et le tour du compteur enverrait « à fond à gauche » là où le
+    // joueur poussait à fond à droite.
+    const axes = Array.from({ length: 4 }, (_, index) =>
+      Math.round(Math.max(-1, Math.min(1, manches[index] ?? 0)) * 32_767),
+    );
+
     const raw = await invoke<ArrayBuffer>('run_frame', {
       input: buttons,
+      axes,
       frames: trames,
       video: image,
     });

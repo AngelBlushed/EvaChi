@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 
-use super::super::abi::JOYPAD_BUTTONS;
+use super::super::abi::{Entrees, JOYPAD_BUTTONS, MANCHES};
 
 /// Taille de l'en-tête de cadrage, en octets.
 pub const ENTETE: usize = 12;
@@ -141,7 +141,7 @@ impl Tranche {
 /// qui parte soixante fois par seconde, et parfois cinq cents.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Requete {
-    pub boutons: [i16; JOYPAD_BUTTONS],
+    pub entrees: Entrees,
     /// Combien de trames faire tourner d'affilée. En avance rapide, demander
     /// les trames une par une paie l'aller-retour autant de fois ; on ne
     /// regarde de toute façon que la dernière image.
@@ -153,12 +153,19 @@ pub struct Requete {
 
 impl Requete {
     /// Taille de la requête une fois écrite.
-    pub const TAILLE: usize = JOYPAD_BUTTONS * 2 + 8;
+    ///
+    /// Les manches sont écrits à la suite des boutons : c'est la seule requête
+    /// qui part soixante fois par seconde, et quatre mots de plus se lisent
+    /// sans rien coûter là où un objet sérialisé aurait coûté cher.
+    pub const TAILLE: usize = (JOYPAD_BUTTONS + MANCHES) * 2 + 8;
 
     pub fn ecrire(&self) -> Vec<u8> {
         let mut octets = Vec::with_capacity(Self::TAILLE);
-        for bouton in self.boutons {
+        for bouton in self.entrees.boutons {
             octets.extend_from_slice(&bouton.to_le_bytes());
+        }
+        for axe in self.entrees.manches {
+            octets.extend_from_slice(&axe.to_le_bytes());
         }
         octets.extend_from_slice(&self.trames.to_le_bytes());
         octets.extend_from_slice(&u32::from(self.image).to_le_bytes());
@@ -173,11 +180,15 @@ impl Requete {
                 Self::TAILLE
             ));
         }
-        let mut boutons = [0i16; JOYPAD_BUTTONS];
-        for (rang, place) in boutons.iter_mut().enumerate() {
-            *place = i16::from_le_bytes([octets[rang * 2], octets[rang * 2 + 1]]);
+        let mot = |rang: usize| i16::from_le_bytes([octets[rang * 2], octets[rang * 2 + 1]]);
+        let mut entrees = Entrees::default();
+        for (rang, place) in entrees.boutons.iter_mut().enumerate() {
+            *place = mot(rang);
         }
-        let base = JOYPAD_BUTTONS * 2;
+        for (rang, place) in entrees.manches.iter_mut().enumerate() {
+            *place = mot(JOYPAD_BUTTONS + rang);
+        }
+        let base = (JOYPAD_BUTTONS + MANCHES) * 2;
         let nombre = |debut: usize| {
             u32::from_le_bytes([
                 octets[debut],
@@ -187,7 +198,7 @@ impl Requete {
             ])
         };
         Ok(Self {
-            boutons,
+            entrees,
             trames: nombre(base).clamp(1, 64),
             image: nombre(base + 4) != 0,
         })
@@ -451,11 +462,14 @@ mod tests {
 
     #[test]
     fn une_requete_de_trame_fait_l_aller_retour() {
-        let mut boutons = [0i16; JOYPAD_BUTTONS];
-        boutons[0] = 1;
-        boutons[JOYPAD_BUTTONS - 1] = 1;
+        let mut entrees = Entrees::default();
+        entrees.boutons[0] = 1;
+        entrees.boutons[JOYPAD_BUTTONS - 1] = 1;
+        // Un manche poussé à fond, un autre à moitié en arrière : sans eux,
+        // l'aller-retour ne dirait rien des quatre mots ajoutés.
+        entrees.manches = [i16::MAX, -16_384, 0, 1];
         let requete = Requete {
-            boutons,
+            entrees,
             trames: 9,
             image: false,
         };
@@ -469,14 +483,14 @@ mod tests {
         // Zéro trame ferait une réponse vide que la fenêtre attendrait pour
         // rien ; un million bloquerait le processus voisin pour de bon.
         let mut brut = Requete {
-            boutons: [0; JOYPAD_BUTTONS],
+            entrees: Entrees::default(),
             trames: 0,
             image: true,
         }
         .ecrire();
         assert_eq!(Requete::lire(&brut).expect("zéro").trames, 1);
 
-        let base = JOYPAD_BUTTONS * 2;
+        let base = (JOYPAD_BUTTONS + MANCHES) * 2;
         brut[base..base + 4].copy_from_slice(&1_000_000u32.to_le_bytes());
         assert_eq!(Requete::lire(&brut).expect("trop").trames, 64);
     }

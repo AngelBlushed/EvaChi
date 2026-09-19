@@ -26,7 +26,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 use std::thread;
 
-use super::abi::JOYPAD_BUTTONS;
+use super::abi::Entrees;
 use super::core::{AvInfo, Core, CoreInfo};
 use super::host::VideoFrame;
 
@@ -78,7 +78,7 @@ enum Request {
         reply: Reply<AvInfo>,
     },
     RunFrame {
-        input: [i16; JOYPAD_BUTTONS],
+        input: Entrees,
         trames: u32,
         reply: Reply<FramePayload>,
     },
@@ -272,11 +272,7 @@ impl Locale {
 /// Partagé par les deux façons de tenir un cœur : la fenêtre doit obtenir la
 /// même chose de l'une et de l'autre, sans quoi l'un des deux chemins finirait
 /// par diverger sans que rien ne le dise.
-fn tourner(
-    core: &mut Core,
-    input: [i16; JOYPAD_BUTTONS],
-    trames: u32,
-) -> Result<FramePayload, String> {
+fn tourner(core: &mut Core, input: Entrees, trames: u32) -> Result<FramePayload, String> {
     let mut audio: Vec<i16> = Vec::new();
     let mut messages: Vec<String> = Vec::new();
     let mut video = None;
@@ -551,7 +547,7 @@ impl Session {
     }
 
     /// Fait tourner une trame.
-    pub fn run_frame(&self, input: [i16; JOYPAD_BUTTONS]) -> Result<FramePayload, String> {
+    pub fn run_frame(&self, input: Entrees) -> Result<FramePayload, String> {
         self.run_frames(input, 1, true)
     }
 
@@ -563,7 +559,7 @@ impl Session {
     /// par une paierait l'aller-retour neuf fois.
     pub fn run_frames(
         &self,
-        input: [i16; JOYPAD_BUTTONS],
+        input: Entrees,
         trames: u32,
         image: bool,
     ) -> Result<FramePayload, String> {
@@ -578,7 +574,7 @@ impl Session {
             Tenant::Distant(_) => {
                 use super::distant::protocole::Requete;
                 let requete = Requete {
-                    boutons: input,
+                    entrees: input,
                     trames,
                     image,
                 };
@@ -767,7 +763,7 @@ mod tests {
     fn une_session_sans_coeur_refuse_poliment() {
         let session = Session::locale();
         let erreur = session
-            .run_frame([0; JOYPAD_BUTTONS])
+            .run_frame(Entrees::default())
             .expect_err("refus attendu");
         assert!(erreur.contains("aucun cœur"), "{erreur}");
     }
@@ -801,7 +797,7 @@ mod tests {
         let session = Session::isolee(PathBuf::from("evachi-qui-n-existe-pas.exe"));
         assert!(session.isolee_en_cours());
         let erreur = session
-            .run_frame([0; JOYPAD_BUTTONS])
+            .run_frame(Entrees::default())
             .expect_err("refus attendu");
         assert!(erreur.contains("aucun cœur"), "{erreur}");
     }

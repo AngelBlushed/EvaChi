@@ -21,7 +21,7 @@ pub mod langues;
 pub mod session;
 pub mod triches;
 
-pub use abi::JOYPAD_BUTTONS;
+pub use abi::{Entrees, JOYPAD_BUTTONS, MANCHES};
 pub use core::{AvInfo, Core, CoreInfo};
 pub use host::VideoFrame;
 pub use triches::{Consignes, Poke};

@@ -58,6 +58,16 @@ export type AudioBuffer = Float32Array;
  */
 export type InputState = readonly boolean[];
 
+/**
+ * Position des manches analogiques : X puis Y du gauche, X puis Y du droit.
+ *
+ * De -1 à 1, zéro au repos, comme le rend le navigateur. Les machines qui n'ont
+ * pas de manche l'ignorent ; celles qui en ont un ne savent pas s'en passer —
+ * une Nintendo 64 à qui l'on n'envoie que la croix donne un personnage qui ne
+ * bouge pas, sans qu'aucun message ne le dise.
+ */
+export type StickState = readonly number[];
+
 /** Résultat d'une trame émulée. */
 export interface Frame {
   readonly video: Framebuffer;
@@ -118,7 +128,12 @@ export interface AsyncEmulatorCore {
    * `image` dit si l'appelant compte peindre celle-ci. Quand il ne le compte
    * pas, un cœur distant s'épargne de la faire traverser.
    */
-  runFrame(input: InputState, trames?: number, image?: boolean): Promise<Frame>;
+  runFrame(
+    input: InputState,
+    trames?: number,
+    image?: boolean,
+    manches?: StickState,
+  ): Promise<Frame>;
   saveState(): Promise<Uint8Array>;
   loadState(state: Uint8Array): Promise<void>;
   /**

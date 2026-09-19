@@ -156,9 +156,62 @@ impl Default for PixelFormat {
 
 pub const RETRO_DEVICE_JOYPAD: c_uint = 1;
 
+/// Les manches analogiques, que le cœur interroge séparément des boutons.
+///
+/// C'est ce qui manquait à la Nintendo 64. Ses jeux ne lisent pas la croix
+/// directionnelle pour se déplacer — ils lisent le manche, et un manche qu'on
+/// ne leur donne pas vaut un personnage qui ne bouge pas. Le cœur demande
+/// alors l'axe par son numéro de manche et son numéro d'axe, et non par un
+/// identifiant de bouton.
+pub const RETRO_DEVICE_ANALOG: c_uint = 5;
+
+/// Les deux manches, dans l'ordre où libretro les numérote.
+pub const ANALOG_GAUCHE: c_uint = 0;
+pub const ANALOG_DROIT: c_uint = 1;
+
 /// Boutons de la manette libretro standard, dans l'ordre de leurs identifiants.
 /// C'est une disposition abstraite : chaque cœur y projette la sienne.
 pub const JOYPAD_BUTTONS: usize = 16;
+
+/// Les quatre axes : X et Y du manche gauche, puis X et Y du droit.
+pub const MANCHES: usize = 4;
+
+/// Ce que la manette envoie pour une trame.
+///
+/// Les deux choses voyagent ensemble parce qu'elles décrivent le même instant :
+/// séparées, un manche en retard d'une trame sur les boutons donnerait un saut
+/// qui part dans la mauvaise direction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Entrees {
+    /// Pression de chaque bouton, dans l'ordre de l'ABI.
+    pub boutons: [i16; JOYPAD_BUTTONS],
+    /// Position des axes, de -32768 à 32767, zéro au repos.
+    pub manches: [i16; MANCHES],
+}
+
+impl Entrees {
+    /// Les boutons seuls, manches au repos.
+    ///
+    /// La plupart des machines n'ont pas de manche, et toutes les épreuves qui
+    /// ne s'intéressent qu'aux boutons passent par là.
+    pub fn boutons(boutons: [i16; JOYPAD_BUTTONS]) -> Self {
+        Self {
+            boutons,
+            manches: [0; MANCHES],
+        }
+    }
+
+    /// L'axe demandé, ou zéro quand le cœur en invente un.
+    ///
+    /// Un cœur peut interroger un troisième manche ou un axe Z : la réponse est
+    /// « au repos », jamais un octet pris ailleurs dans le tableau.
+    pub fn axe(&self, manche: c_uint, axe: c_uint) -> i16 {
+        if manche > ANALOG_DROIT || axe > 1 {
+            return 0;
+        }
+        self.manches[(manche * 2 + axe) as usize]
+    }
+}
 
 // --- Structures échangées ---------------------------------------------------
 
@@ -237,4 +290,32 @@ pub type LogPrintfFn = unsafe extern "C" fn(level: c_uint, fmt: *const c_char, .
 #[repr(C)]
 pub struct LogCallback {
     pub log: LogPrintfFn,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rend_chaque_axe_a_sa_place() {
+        let entrees = Entrees {
+            boutons: [0; JOYPAD_BUTTONS],
+            manches: [1, 2, 3, 4],
+        };
+        assert_eq!(entrees.axe(ANALOG_GAUCHE, 0), 1);
+        assert_eq!(entrees.axe(ANALOG_GAUCHE, 1), 2);
+        assert_eq!(entrees.axe(ANALOG_DROIT, 0), 3);
+        assert_eq!(entrees.axe(ANALOG_DROIT, 1), 4);
+    }
+
+    #[test]
+    fn rend_le_repos_pour_un_axe_qui_n_existe_pas() {
+        let entrees = Entrees {
+            boutons: [0; JOYPAD_BUTTONS],
+            manches: [1, 2, 3, 4],
+        };
+        assert_eq!(entrees.axe(2, 0), 0, "un troisieme manche");
+        assert_eq!(entrees.axe(ANALOG_GAUCHE, 2), 0, "un axe Z");
+        assert_eq!(entrees.axe(99, 99), 0);
+    }
 }
