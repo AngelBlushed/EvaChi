@@ -550,14 +550,24 @@
         height: var(--ch);
         padding: 0;
         border: none;
-        border-radius: calc(9px * var(--ech));
-        background: var(--raised);
-        box-shadow: 0 calc(8px * var(--ech)) calc(22px * var(--ech)) rgba(0, 0, 0, 0.55);
-        overflow: hidden;
+        background: transparent;
         cursor: pointer;
         will-change: transform;
       }
-      .paq-carte .boite { position: absolute; inset: 0; display: grid; }
+      /* Le corps de la carte est porté par la boîte, et non par le bouton :
+         une jaquette recadrée est montrée entière, et sa boîte s'efface pour
+         qu'on ne voie que l'image. Sur le bouton, le fond et l'ombre auraient
+         continué de dessiner la carte pleine autour d'elle. */
+      .paq-carte .boite {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        border-radius: calc(9px * var(--ech));
+        overflow: hidden;
+        background: var(--raised);
+        box-shadow: 0 calc(8px * var(--ech)) calc(22px * var(--ech)) rgba(0, 0, 0, 0.55);
+      }
+      .paq-carte .boite.recadree { background: transparent; box-shadow: none; }
       .paq-carte .boite > * { grid-area: 1 / 1; }
       /* Le liseré de la sélection, posé sur l'image et non sur la carte.
          Une jaquette recadrée est montrée entière : si sa forme ne suit pas
@@ -590,9 +600,12 @@
         color: var(--muted);
         opacity: 0.4;
       }
-      .paq-carte[aria-selected="true"] {
+      .paq-carte[aria-selected="true"] .boite {
         box-shadow: 0 calc(18px * var(--ech)) calc(38px * var(--ech)) rgba(0, 0, 0, 0.65);
       }
+      /* Une jaquette recadrée n'a pas de fond : une ombre portée dessinerait
+         le contour de la carte au lieu de celui de l'image. */
+      .paq-carte[aria-selected="true"] .boite.recadree { box-shadow: none; }
       .paq-carte .etoile {
         position: absolute;
         top: calc(6px * var(--ech));

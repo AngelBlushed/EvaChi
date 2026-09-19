@@ -5830,6 +5830,13 @@ function construireCarte(item: Playable, rang: number): HTMLElement {
     allerCartePaq(rang);
   });
 
+  // Le menu contextuel amène d'abord la carte sous la main : agir sur un jeu
+  // qu'on n'a pas choisi, c'est recadrer la jaquette du voisin.
+  carte.addEventListener('contextmenu', (event) => {
+    allerCartePaq(rang);
+    ouvrirContextuel(event, item);
+  });
+
   return carte;
 }
 
@@ -6140,8 +6147,26 @@ function construireLamelle(item: Playable, rang: number): HTMLElement {
     allerLame(rang);
   });
 
+  lamelle.addEventListener('contextmenu', (event) => {
+    allerLame(rang);
+    ouvrirContextuel(event, item);
+  });
+
   return lamelle;
 }
+
+/**
+ * Le clic droit sur l'écran vise ce qui y est projeté.
+ *
+ * L'écran est le seul endroit de la salle où l'on voit vraiment une jaquette :
+ * c'est là qu'on a envie de la changer, et non sur une lamelle de deux
+ * centimètres. Posé une fois pour toutes, l'écran ne changeant jamais.
+ */
+seaEcran.addEventListener('contextmenu', (event) => {
+  if (seaView.hidden || libraryView.hidden) return;
+  const item = voletsSea[consoleSea]?.games[lameSea];
+  if (item) ouvrirContextuel(event, item);
+});
 
 /** Pose chaque lamelle là où le panier en est. */
 function placerPanier(): void {
