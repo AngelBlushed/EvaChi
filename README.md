@@ -35,12 +35,15 @@ Les quarante-huit dossiers sont déjà là, vides.
 
 |   |   |
 |---|---|
-| **Quatre présentations** | un menu animé, un carrousel de jaquettes, une grille, une liste dense |
+| **Six présentations** | un menu animé, un carrousel de jaquettes, une étagère où l'épaisseur d'un boîtier est celle du fichier, un archipel que l'on survole, une grille, une liste dense |
 | **Les jaquettes toutes seules** | trouvées sur le serveur du projet libretro, recadrables à la main si elles tombent mal |
 | **Cinquante langues** | chacune dans son alphabet, avec ses pluriels, ses dates et ses unités |
+| **Vingt-cinq palettes** | aucune choisie à l'œil : chacune est vérifiée au rapport de contraste du W3C |
 | **La langue des jeux** | réglée à part de celle de l'interface : une cartouche européenne démarre enfin dans la sienne |
 | **Un panneau de triches** | les fiches publiées par libretro, et un chercheur de valeurs en mémoire pour les jeux qui n'en ont pas |
 | **Un dossier où jeter ses jeux** | `drop u'r rom` : on y dépose en vrac, EvaChi range au lancement suivant et demande ce qu'elle ne peut pas deviner |
+| **Les touches portées** | réassigner un bouton ici l'écrit aussi chez PCSX2, PPSSPP et Dolphin, chacun dans son dialecte |
+| **Pencher et secouer** | les jeux qui lisent un accéléromètre reçoivent le manche droit, et une secousse à la demande |
 | **Tout à la manette** | y compris le plein écran, les captures, les sauvegardes d'état et l'avance rapide |
 | **Des thèmes** | et un plein écran « console de salon » qui retire jusqu'aux barres |
 | **Un cœur écrit ici** | CHIP-8, complet, avec ses six écarts de comportement — le reste vient de libretro |
@@ -158,7 +161,7 @@ l'ABI [libretro](https://www.libretro.com).
 
 ```bash
 npm install
-npm run test:all          # 640 épreuves côté fenêtre, 274 côté Rust
+npm run test:all          # 698 épreuves côté fenêtre, 286 côté Rust
 npm run app:build         # l'exécutable, dans src-tauri/target/release/
 node outils/livraison.mjs <dossier>   # monte une livraison complète
 ```

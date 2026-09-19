@@ -86,8 +86,14 @@ export interface Marque {
   readonly plan: number;
 }
 
-/** Les trois pâleurs, du plan le plus lointain au plus proche. */
-export const PALEURS: readonly number[] = [0.035, 0.055, 0.08];
+/**
+ * Les trois pâleurs, du plan le plus lointain au plus proche.
+ *
+ * Assez pour qu'on sente une direction, pas assez pour qu'on la regarde : au
+ * repos, les traits couvrent un pour cent de l'écran. La brume qu'ils
+ * remplacent en couvrait le quart.
+ */
+export const PALEURS: readonly number[] = [0.05, 0.085, 0.13];
 
 /** Combien de touches, et le réseau sur lequel on les sème. */
 const COLONNES = 18;

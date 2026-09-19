@@ -170,6 +170,21 @@ pub const CIBLES: &[Cible] = &[
             ("R", 11),
         ],
     },
+    // Le port 1 de Dolphin est débranché par défaut : `SIDevice0 = 0` veut
+    // dire « aucune manette », et tant qu'il vaut cela, les touches qu'on écrit
+    // dans GCPadNew.ini sont lues et ignorées. Six est la manette GameCube.
+    // C'est la première chose à réparer, avant même les boutons — sans elle,
+    // on croit avoir mal réglé alors qu'il n'y avait rien à régler.
+    Cible {
+        systeme: "GameCube · Wii",
+        label: "Dolphin",
+        fichier: "Config/Dolphin.ini",
+        chez_soi: "Dolphin Emulator",
+        section: "Core",
+        dialecte: Dialecte::XInput,
+        fixes: &[("SIDevice0", "6")],
+        liaisons: &[],
+    },
     // La manette GameCube n'a pas de second bouton d'épaule : Z prend celui de
     // droite, et les deux gâchettes analogiques prennent les vraies gâchettes.
     Cible {
@@ -583,7 +598,11 @@ mod tests {
     fn chaque_cible_couvre_les_boutons_de_sa_console() {
         let liaisons = ordinaires();
         for cible in CIBLES {
-            assert!(!cible.liaisons.is_empty(), "{} : aucune liaison", cible.label);
+            assert!(
+                !cible.liaisons.is_empty() || !cible.fixes.is_empty(),
+                "{} : ni liaison ni ligne fixe, ce fichier n'a rien à recevoir",
+                cible.label
+            );
             for (cle, bouton) in cible.liaisons {
                 assert!(*bouton < JOYPAD_BUTTONS, "{} {cle} : bouton {bouton}", cible.label);
                 assert!(

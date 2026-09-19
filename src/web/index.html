@@ -485,6 +485,320 @@
       .tri-ligne .choix { display: flex; flex-wrap: wrap; gap: 6px; }
       .tri-ligne select { max-width: 100%; }
 
+
+      /* ---------------------------------------------------------------------
+         L'étagère : un mur de rayonnages, une planche par console, les jeux
+         debout et serrés comme de vrais boîtiers. L'épaisseur de chacun est
+         celle de son fichier — c'est la seule présentation où l'on voit la
+         forme de la bibliothèque, et non son contenu. */
+      .etag {
+        position: relative;
+        /* Comme le carrousel : la hauteur vient du parent, qui n'est pas une
+           boîte flexible — `flex: 1` n'y donnerait rien, et la vue se
+           replierait sur zéro pixel sans que rien ne le dise. */
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        --ech: 1;
+        /* L'unité de tranche. Toute la géométrie s'y rapporte : une planche
+           n'a pas de mise en page, seulement des largeurs calculées. */
+        --unite: calc(9px * var(--ech));
+        --haut: calc(132px * var(--ech));
+      }
+      .etag[hidden] { display: none; }
+
+      .etag-tete,
+      .etag-pied { position: absolute; left: 0; right: 0; z-index: 3; }
+      .etag-tete {
+        top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: calc(16px * var(--ech)) calc(26px * var(--ech));
+        font-size: calc(12px * var(--ech));
+        color: var(--muted);
+        background: linear-gradient(var(--bg) 40%, transparent);
+      }
+      .etag-tete strong {
+        font-size: calc(17px * var(--ech));
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      /* Le mur glisse pour amener la planche choisie au milieu. Rien d'autre
+         ne bouge : un rayonnage qui dérive n'est plus un rayonnage. */
+      .etag-mur {
+        position: absolute;
+        /* Le mur laisse la place à l'en-tête et à la légende : une planche qui
+           passerait dessous se lirait à travers le titre du jeu. */
+        inset: calc(50px * var(--ech)) 0 calc(124px * var(--ech));
+        display: grid;
+        align-content: center;
+        gap: calc(30px * var(--ech));
+        transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+        will-change: transform;
+      }
+      .etag-planche { position: relative; height: calc(var(--haut) + 26px * var(--ech)); }
+      .etag-planche .etiquette {
+        position: absolute;
+        left: calc(26px * var(--ech));
+        bottom: calc(2px * var(--ech));
+        font-size: calc(11px * var(--ech));
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+        opacity: 0.55;
+      }
+      .etag-planche[aria-current="true"] .etiquette { color: var(--accent); opacity: 1; }
+      /* La planche elle-même : un trait épais sous les boîtiers. */
+      .etag-planche .bois {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(18px * var(--ech));
+        height: calc(3px * var(--ech));
+        background: var(--edge);
+      }
+      .etag-planche[aria-current="true"] .bois { background: var(--accent); }
+
+      .etag-rang {
+        position: absolute;
+        left: 50%;
+        bottom: calc(21px * var(--ech));
+        height: var(--haut);
+        transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+        will-change: transform;
+      }
+      .etag-boitier {
+        position: absolute;
+        bottom: 0;
+        left: calc(var(--x) * var(--unite));
+        width: calc(var(--w) * var(--unite));
+        height: 100%;
+        padding: 0;
+        border: 0;
+        border-radius: calc(2px * var(--ech));
+        background: var(--raised);
+        box-shadow: inset calc(-1px * var(--ech)) 0 0 rgba(0, 0, 0, 0.45);
+        font: inherit;
+        color: var(--muted);
+        cursor: pointer;
+        overflow: hidden;
+        transition:
+          width 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
+          left 240ms cubic-bezier(0.22, 0.61, 0.36, 1),
+          height 240ms ease,
+          background-color 140ms ease;
+      }
+      /* Le titre sur la tranche, couché comme sur un vrai dos de boîtier. */
+      .etag-boitier .tranche {
+        display: block;
+        width: 100%;
+        height: 100%;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        padding: calc(8px * var(--ech)) 0;
+        font-size: calc(10px * var(--ech));
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .etag-boitier .boite { display: none; }
+      .etag-boitier[aria-selected="true"] {
+        height: calc(100% + 16px * var(--ech));
+        background: var(--accent-soft);
+        box-shadow:
+          0 0 0 calc(2px * var(--ech)) var(--accent),
+          0 calc(14px * var(--ech)) calc(30px * var(--ech)) rgba(0, 0, 0, 0.55);
+        z-index: 2;
+      }
+      .etag-boitier[aria-selected="true"] .tranche { display: none; }
+      .etag-boitier[aria-selected="true"] .boite {
+        display: grid;
+        place-items: center;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+      .etag-boitier .boite > * { grid-area: 1 / 1; }
+      .etag-boitier .boite img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms ease; }
+      .etag-boitier .boite img.vue { opacity: 1; }
+      .etag-boitier .boite img.recadree { object-fit: contain; }
+      .etag-boitier .boite .initiale {
+        font-size: calc(30px * var(--ech));
+        font-weight: 600;
+        color: var(--muted);
+        opacity: 0.45;
+      }
+
+      .etag-legende,
+      .arch-legende {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(46px * var(--ech));
+        display: grid;
+        justify-items: center;
+        gap: calc(3px * var(--ech));
+        padding: 0 calc(24px * var(--ech));
+        z-index: 3;
+        pointer-events: none;
+        text-align: center;
+      }
+      .etag-legende strong,
+      .arch-legende strong {
+        max-width: 100%;
+        font-size: calc(19px * var(--ech));
+        font-weight: 600;
+        color: var(--ink);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        text-shadow: 0 1px 6px var(--bg);
+      }
+      .etag-legende span,
+      .arch-legende span {
+        font-size: calc(12px * var(--ech));
+        color: var(--muted);
+        text-shadow: 0 1px 6px var(--bg);
+      }
+      .etag-pied,
+      .arch-pied {
+        bottom: 0;
+        display: flex;
+        justify-content: space-between;
+        gap: calc(16px * var(--ech));
+        padding: calc(14px * var(--ech)) calc(26px * var(--ech));
+        font-size: calc(11px * var(--ech));
+        color: var(--muted);
+        background: linear-gradient(transparent, var(--bg) 60%);
+      }
+      .etag-touches,
+      .arch-touches { opacity: 0.7; white-space: nowrap; }
+
+      /* ---------------------------------------------------------------------
+         L'archipel : une mer, une île par console, les jeux semés en fleur de
+         tournesol. Le décor ne bouge jamais ; c'est la caméra qui se déplace,
+         et la place d'un jeu est donc absolue — on finit par savoir où il est. */
+      .arch {
+        position: relative;
+        height: 100%;
+        overflow: hidden;
+        background: var(--bg);
+        --ech: 1;
+      }
+      .arch[hidden] { display: none; }
+      .arch-mer { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+      .arch-tete,
+      .arch-pied { position: absolute; left: 0; right: 0; z-index: 3; }
+      .arch-tete {
+        top: 0;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding: calc(16px * var(--ech)) calc(26px * var(--ech));
+        font-size: calc(12px * var(--ech));
+        color: var(--muted);
+      }
+      .arch-tete strong {
+        font-size: calc(17px * var(--ech));
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      /* Un seul élément porte la caméra : tout le reste est posé à sa place
+         absolue et ne bouge plus jamais. */
+      .arch-monde {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0;
+        height: 0;
+        z-index: 1;
+        will-change: transform;
+      }
+      .arch-ile {
+        position: absolute;
+        left: calc(var(--x) * 1px);
+        top: calc(var(--y) * 1px);
+        width: 0;
+        height: 0;
+      }
+      .arch-ile .halo {
+        position: absolute;
+        left: calc(var(--r) * -1px);
+        top: calc(var(--r) * -1px);
+        width: calc(var(--r) * 2px);
+        height: calc(var(--r) * 2px);
+        border-radius: 50%;
+        border: 1px solid var(--edge);
+        background: var(--panel);
+        opacity: 0.55;
+      }
+      .arch-ile[aria-current="true"] .halo { border-color: var(--accent); opacity: 0.8; }
+      .arch-ile .nom {
+        position: absolute;
+        left: 0;
+        top: calc(var(--r) * 1px + 10px);
+        transform: translateX(-50%);
+        font-size: 15px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        color: var(--muted);
+      }
+      .arch-ile[aria-current="true"] .nom { color: var(--accent); }
+
+      .arch-jeu {
+        position: absolute;
+        left: calc(var(--x) * 1px - 17px);
+        top: calc(var(--y) * 1px - 23px);
+        width: 34px;
+        height: 46px;
+        padding: 0;
+        border: 0;
+        border-radius: 3px;
+        background: var(--raised);
+        overflow: hidden;
+        cursor: pointer;
+        transition: transform 160ms ease, box-shadow 160ms ease;
+      }
+      .arch-jeu > * { position: absolute; inset: 0; }
+      .arch-jeu img { width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 240ms ease; }
+      .arch-jeu img.vue { opacity: 1; }
+      .arch-jeu img.recadree { object-fit: contain; }
+      .arch-jeu .initiale {
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--muted);
+        opacity: 0.5;
+      }
+      .arch-jeu[aria-selected="true"] {
+        transform: scale(1.7);
+        box-shadow:
+          0 0 0 2px var(--accent),
+          0 10px 26px rgba(0, 0, 0, 0.6);
+        z-index: 2;
+      }
+      .arch-jeu .etoile {
+        inset: auto 2px 2px auto;
+        width: auto;
+        height: auto;
+        font-size: 10px;
+        color: var(--accent);
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .etag-mur,
+        .etag-rang,
+        .etag-boitier,
+        .arch-jeu { transition: none; }
+      }
+
       /* La galerie : des vignettes que l'on parcourt, pas une liste. */
       dialog.large { width: min(92vw, 1000px); max-width: none; }
       .galerie {
@@ -1700,7 +2014,9 @@
          `plaintext` le décide d'après la première lettre, ce qui range bien un
          titre arabe à côté d'un nom de jeu japonais. */
       #xmb,
-      #carrousel { direction: ltr; }
+      #carrousel,
+      #etagere,
+      #archipel { direction: ltr; }
       #xmb-console,
       #xmb-pied,
       #xmb-colonnes,
@@ -1711,6 +2027,12 @@
       #carrousel-titre,
       #carrousel-detail,
       #carrousel-consoles,
+      #etagere-pied,
+      #etagere-detail,
+      #archipel-pied,
+      #archipel-detail,
+      .etag-touches,
+      .arch-touches,
       .carr-touches { unicode-bidi: plaintext; }
 
       /* --- Recadrage d'une jaquette --- */
@@ -1864,7 +2186,9 @@
       }
       .pad.zones {
         display: grid;
-        grid-template-columns: auto minmax(0, 1fr) auto;
+        /* Le portrait garde sa colonne : sans ce minimum, les zones des côtés
+           la réduisent à un timbre-poste, et le dessin ne se lit plus. */
+        grid-template-columns: auto minmax(230px, 1fr) auto;
         align-items: start;
         justify-content: center;
         gap: 14px 18px;
@@ -1879,10 +2203,13 @@
       }
       .pad.zones .zone-croix { grid-row: 1; grid-column: 1; }
       .pad.zones .zone-boutons { grid-row: 1; grid-column: 3; }
-      .pad.zones .zone-gachettes { grid-row: 2; grid-column: 1 / 3; }
+      /* Les six gâchettes sous la croix, dans leur seule colonne : à cheval
+         sur deux, elles écrasaient le portrait. Elles se replient en deux
+         rangées, ce qu'une manette fait aussi. */
+      .pad.zones .zone-gachettes { grid-row: 2; grid-column: 1; }
       .pad.zones .zone-systeme { grid-row: 2; grid-column: 3; }
 
-      .croquis { display: block; width: 100%; max-width: 320px; margin: 0 auto; }
+      .croquis { display: block; width: 100%; min-width: 210px; max-width: 320px; margin: 0 auto; }
       .croquis .corps { fill: var(--raised); stroke: var(--edge); stroke-width: 1.4; }
       .croquis .creux { fill: var(--edge); opacity: 0.45; }
       .croquis .piece,
@@ -2178,6 +2505,44 @@
             <div class="xmb-pied">
               <span id="xmb-pied"></span>
               <span class="xmb-touches">A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour</span>
+            </div>
+          </div>
+
+
+          <!-- L'étagère : un mur de rayonnages. L'épaisseur d'un boîtier est
+               celle de son fichier, et quatre consoles se voient à la fois. -->
+          <div class="etag" id="etagere" hidden>
+            <div class="etag-tete">
+              <strong id="etagere-console">—</strong>
+              <span id="etagere-heure"></span>
+            </div>
+            <div class="etag-mur" id="etagere-mur"></div>
+            <div class="etag-legende">
+              <strong id="etagere-titre"></strong>
+              <span id="etagere-detail"></span>
+            </div>
+            <div class="etag-pied">
+              <span id="etagere-pied"></span>
+              <span class="etag-touches">A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour</span>
+            </div>
+          </div>
+
+          <!-- L'archipel : une île par console, les jeux semés autour. Le
+               décor ne bouge pas, c'est la caméra qui survole. -->
+          <div class="arch" id="archipel" hidden>
+            <canvas class="arch-mer" id="archipel-mer"></canvas>
+            <div class="arch-tete">
+              <strong id="archipel-console">—</strong>
+              <span id="archipel-heure"></span>
+            </div>
+            <div class="arch-monde" id="archipel-monde"></div>
+            <div class="arch-legende">
+              <strong id="archipel-titre"></strong>
+              <span id="archipel-detail"></span>
+            </div>
+            <div class="arch-pied">
+              <span id="archipel-pied"></span>
+              <span class="arch-touches">A lancer · X favori · Y recadrer · L1/R1 consoles · L2/R2 lettre · B retour</span>
             </div>
           </div>
 
