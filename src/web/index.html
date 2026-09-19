@@ -562,6 +562,13 @@
         position: absolute;
         inset: 0;
         display: grid;
+        /* Une seule case, de la taille exacte de la boite. Sans ces deux
+           lignes, la rangee se dimensionne sur son contenu : la hauteur de
+           l'image devient indefinie, `height: 100%` ne resout rien, et
+           l'image reprend sa hauteur naturelle — plus haute que la carte.
+           « contain » n'avait alors plus rien a contenir, et le lisere
+           ceinturait une image qui debordait par le bas. */
+        grid-template: 100% / 100%;
         border-radius: calc(9px * var(--ech));
         background: var(--raised);
         box-shadow: 0 calc(8px * var(--ech)) calc(22px * var(--ech)) rgba(0, 0, 0, 0.55);
@@ -678,7 +685,13 @@
           0 0 calc(70px * var(--ech)) rgba(255, 255, 255, 0.05),
           0 calc(22px * var(--ech)) calc(52px * var(--ech)) rgba(0, 0, 0, 0.7);
       }
-      .sea-ecran .boite { position: absolute; inset: 0; display: grid; overflow: hidden; }
+      .sea-ecran .boite {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template: 100% / 100%;
+        overflow: hidden;
+      }
       .sea-ecran .boite > * { grid-area: 1 / 1; }
       .sea-ecran img {
         width: 100%;
@@ -727,6 +740,7 @@
         background: var(--raised);
         box-shadow: 0 calc(4px * var(--ech)) calc(10px * var(--ech)) rgba(0, 0, 0, 0.6);
         display: grid;
+        grid-template: 100% / 100%;
         overflow: hidden;
         cursor: pointer;
         will-change: transform;
