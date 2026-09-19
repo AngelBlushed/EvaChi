@@ -44,6 +44,7 @@ import {
   fileDrop,
   sweepDrop,
   knownFolders,
+  writePadBindings,
   directories,
   libraryFolders,
   listRoms,
@@ -105,6 +106,7 @@ import {
   BUTTON_COUNT,
   FALLBACK_KEY_LABELS,
   HEX_KEYPAD,
+  JOYPAD,
   choosePad,
   PAD_DOWN,
   PAD_L3,
@@ -7053,7 +7055,53 @@ function poserLiaisons(suivantes: AllOverrides): void {
   liaisons = suivantes;
   retenir(RETENU.liaisons, JSON.stringify(liaisons));
   buildKeypad();
+  void porterLesTouches(true);
 }
+
+/**
+ * Porte les touches jusqu'aux émulateurs autonomes.
+ *
+ * Un émulateur autonome est un autre programme : il garde sa correspondance
+ * dans son propre fichier, et ne sait rien de ce qu'on a réglé ici. Jusqu'à
+ * présent, réassigner un bouton dans EvaChi laissait donc Dolphin croire qu'on
+ * jouait au clavier — la seule chose de l'application qui ne suivît pas le
+ * réglage, et celle qu'on remarque, manette en main.
+ *
+ * La disposition envoyée est toujours celle de la manette, jamais le pavé
+ * hexadécimal du CHIP-8 : un émulateur de PlayStation 2 n'a que faire d'une
+ * touche « F ».
+ *
+ * @param discret vrai quand l'écriture suit un changement de liaison : on ne
+ *   dit alors que ce qui a changé, et rien quand rien n'a bougé.
+ */
+async function porterLesTouches(discret: boolean): Promise<void> {
+  if (!inShell) return;
+
+  // L'inverse de ce que garde la fenêtre : un émulateur demande « quel bouton
+  // fait la croix ? », et non « que fait ce bouton ? ».
+  const resolues = resolveBindings(JOYPAD.gamepad, liaisons[JOYPAD.id]);
+  const pour = new Array<number>(BUTTON_COUNT).fill(-1);
+  for (const [physique, cœur] of resolues) {
+    if (cœur >= 0 && cœur < pour.length) pour[cœur] = physique;
+  }
+
+  try {
+    const ecrits = await writePadBindings(pour);
+    const changes = ecrits.filter((ecrit) => ecrit.lignes > 0);
+    if (changes.length > 0) {
+      log(dit('touches portées : {0}', changes.map((ecrit) => ecrit.label).join(', ')), 'ok');
+    } else if (!discret) {
+      log(
+        ecrits.length > 0
+          ? t('les émulateurs externes avaient déjà ces touches')
+          : t('aucun émulateur externe n’a encore écrit ses réglages'),
+      );
+    }
+  } catch (error) {
+    log(reason(error), 'err');
+  }
+}
+
 
 /**
  * Regarde si un bouton vient d'être pressé, pour le lier à celui qui attend.
@@ -7115,6 +7163,8 @@ function capturerLiaison(): void {
 }
 
 const resetBindings = $<HTMLButtonElement>('controls-reset');
+const porterTouches = $<HTMLButtonElement>('controls-porter');
+porterTouches.addEventListener('click', () => void porterLesTouches(false));
 
 /** Écrit la zone morte sous la jauge, et la retient. */
 function renderZoneMorte(): void {

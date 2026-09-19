@@ -30,25 +30,13 @@ describe('les plans de la poussière', () => {
     }
   });
 
-  it('gardent la brume à part : la plus large, la plus lente, la seule fondue', () => {
-    // C'est elle qui remplit le vide entre les grains. Devenue étroite ou
-    // rapide, elle cesserait d'être un fond et deviendrait un motif.
-    //
-    // Son opacité n'est pas comparable aux autres : c'est un sommet au centre
-    // d'un dégradé, quand celle d'un point est une teinte plate. On demande
-    // seulement qu'elle ne soit jamais plus marquée que la poussière du
-    // premier plan — sans quoi ce serait elle qu'on regarderait.
-    const [brume, ...poussiere] = COUCHES;
-    assert.ok(brume.flou, 'la brume a repris un contour');
-    const premierPlan = poussiere[poussiere.length - 1];
-    assert.ok(brume.opacite <= premierPlan.opacite, 'la brume passe devant');
-    for (const couche of poussiere) {
-      assert.ok(brume.rayon[0] > couche.rayon[1], 'la brume n’est plus la plus large');
-      assert.ok(brume.vitesse[1] < couche.vitesse[0], 'la brume n’est plus la plus lente');
-      // Une tache large peinte d'une seule teinte se lit comme un rond posé
-      // sur le fond ; un point de deux pixels n'a pas de bord à fondre, et le
-      // dégradé y coûterait cher pour rien.
-      assert.ok(!couche.flou, 'un dégradé par point coûte cher pour rien');
+  it('restent des points, et jamais des taches', () => {
+    // La brume est partie : c'était la seule couche peinte au dégradé, et un
+    // flou se voit comme un flou. Le plus gros grain fait un centième de la
+    // hauteur — au-delà, ce n'est plus de la poussière, c'est une forme.
+    for (const couche of COUCHES) {
+      assert.ok(couche.rayon[1] < 0.02, `un grain de ${couche.rayon[1]} de hauteur`);
+      assert.ok(couche.opacite < 0.25, 'un plan qu’on regarderait au lieu des jaquettes');
     }
   });
 
@@ -142,11 +130,13 @@ describe('la peinture du fond', () => {
       beginPath: () => appels.push('debut'),
       arc: () => appels.push('rond'),
       fill: () => appels.push('remplit'),
-      createRadialGradient: () => {
-        appels.push('fondu');
-        return { addColorStop: () => {} };
-      },
+      moveTo: () => appels.push('va'),
+      lineTo: () => appels.push('trait'),
+      stroke: () => appels.push('trace'),
       fillStyle: '' as unknown,
+      strokeStyle: '' as unknown,
+      lineWidth: 0,
+      lineCap: '' as unknown,
     };
     return { ctx, appels };
   }
@@ -159,13 +149,15 @@ describe('la peinture du fond', () => {
 
     assert.equal(appels[0], 'efface');
     assert.ok(appels.filter((appel) => appel === 'rond').length >= GRAINS.length);
-    // Et les taches de brume passent bien par un dégradé.
-    assert.ok(appels.filter((appel) => appel === 'fondu').length >= COUCHES[0].combien);
+    // Et le courant est passé avant, en trois traits : sans lui, la poussière
+    // flotterait sur du noir.
+    assert.equal(appels.filter((appel) => appel === 'trace').length, 3);
+    assert.ok(appels.indexOf('trace') < appels.indexOf('rond'), 'le courant peint par-dessus');
   });
 
   it('repeint de l’autre côté le grain à cheval sur un bord', () => {
-    // Sans ce doublon, une tache de brume large de soixante pixels s'efface
-    // d'un coup au bord de l'écran.
+    // Sans ce doublon, un grain du premier plan s'efface d'un coup au bord de
+    // l'écran, ce qu'un fond ne doit pas faire remarquer.
     const total = (secondes: number) => {
       const { ctx, appels } = canevas();
       dessiner(ctx as unknown as CanvasRenderingContext2D, 900, 600, secondes, '0, 0, 0');

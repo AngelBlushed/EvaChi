@@ -29,6 +29,7 @@ mod sentinel;
 mod shots;
 mod skeleton;
 mod states;
+mod touches;
 mod triches;
 
 use evachi::libretro::Session;
@@ -215,6 +216,7 @@ fn main() {
             commands::file_drop,
             commands::sweep_drop,
             commands::known_folders,
+            commands::write_pad_bindings,
             commands::save_shot,
             commands::list_shots,
             commands::delete_shot,

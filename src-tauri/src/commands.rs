@@ -885,6 +885,49 @@ pub async fn delete_state_slot(
         .map_err(|error| format!("effacement interrompu : {error}"))?
 }
 
+/// Porte les touches d'EvaChi jusqu'aux émulateurs autonomes.
+///
+/// `bindings` donne, pour chaque bouton de la manette libretro, le numéro du
+/// bouton physique qui le tient — l'inverse de ce que garde la fenêtre, parce
+/// qu'un émulateur pose la question dans l'autre sens.
+#[tauri::command]
+pub async fn write_pad_bindings(
+    bindings: Vec<i32>,
+    paths: State<'_, Paths>,
+    app: tauri::AppHandle,
+) -> Result<Vec<crate::touches::Ecrit>, String> {
+    let emulateurs = paths.emulators.clone();
+    // Dolphin n'est pas portable : il range ses réglages chez l'utilisateur, et
+    // non dans le dossier où EvaChi l'a posé.
+    let personnel = app
+        .path()
+        .app_config_dir()
+        .ok()
+        .and_then(|chemin| chemin.parent().map(std::path::Path::to_path_buf))
+        .unwrap_or_else(|| emulateurs.clone());
+
+    let mut liaisons: crate::touches::Liaisons = [None; 16];
+    for (place, valeur) in liaisons.iter_mut().zip(bindings) {
+        *place = u8::try_from(valeur).ok().filter(|bouton| (*bouton as usize) < 16);
+    }
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut ecrits = Vec::new();
+        for cible in crate::touches::CIBLES {
+            match crate::touches::ecrire(cible, &emulateurs, &personnel, &liaisons) {
+                Ok(Some(ecrit)) => ecrits.push(ecrit),
+                // Un émulateur absent n'est pas une panne : il n'y a rien à
+                // écrire, et le dire à chaque fois serait du bruit.
+                Ok(None) => {}
+                Err(raison) => return Err(raison),
+            }
+        }
+        Ok(ecrits)
+    })
+    .await
+    .map_err(|erreur| format!("écriture des touches interrompue : {erreur}"))?
+}
+
 /// Ce qui attend dans le dépôt, et ce qu'on sait en faire.
 #[tauri::command]
 pub async fn list_drops(paths: State<'_, Paths>) -> Result<Vec<crate::tri::Depose>, String> {

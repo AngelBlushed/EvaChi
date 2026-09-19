@@ -467,6 +467,24 @@ export async function sweepDrop(): Promise<number> {
   return invoke<number>('sweep_drop');
 }
 
+/** Ce qu'une écriture de touches a changé chez un émulateur. */
+export interface Ecrit {
+  readonly label: string;
+  readonly fichier: string;
+  readonly lignes: number;
+  readonly sauvegarde: boolean;
+}
+
+/**
+ * Porte les touches d'EvaChi jusqu'aux émulateurs autonomes installés.
+ *
+ * `bindings` donne, pour chaque bouton de la manette libretro, le numéro du
+ * bouton physique qui le tient — ou -1 quand personne ne le tient.
+ */
+export async function writePadBindings(bindings: readonly number[]): Promise<Ecrit[]> {
+  return invoke<Ecrit[]>('write_pad_bindings', { bindings });
+}
+
 /** Les dossiers de consoles que l'ossature crée, dans l'ordre. */
 export async function knownFolders(): Promise<string[]> {
   return invoke<string[]>('known_folders');

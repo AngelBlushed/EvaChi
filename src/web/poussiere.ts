@@ -2,11 +2,15 @@
  * Le fond animé du carrousel.
  *
  * Une poussière qui monte : des grains de tailles inégales, répartis sur
- * quatre plans, qui traversent lentement l'écran en oblique. C'est le pendant
+ * trois plans, qui traversent lentement l'écran en oblique. C'est le pendant
  * des rubans du menu animé — même matière, même couleur prise au thème, rien
  * à télécharger — mais l'inverse de leur mouvement : là où les rubans sont de
  * larges nappes qui glissent de côté, ce sont ici de petits points qui
  * s'élèvent, et le fond respire au lieu d'ondoyer.
+ *
+ * Derrière eux, l'air qu'ils traversent : voir `courant.ts`. Il y avait là une
+ * couche de brume, des taches larges peintes au dégradé radial ; un flou se
+ * voit comme un flou, et rien d'autre.
  *
  * Les plans donnent la profondeur, et c'est la parallaxe qui la fait sentir :
  * un grain lointain est petit, pâle et lent ; un grain proche est gros, franc
@@ -15,6 +19,8 @@
  * Le calcul de la position est ici, à part du dessin, pour qu'il se vérifie
  * sans canevas : c'est lui qui décide si le mouvement est doux ou s'il saute.
  */
+
+import { dessinerCourant } from './courant.ts';
 
 /** Deux fois pi, écrit une fois. */
 const TOUR = Math.PI * 2;
@@ -35,31 +41,24 @@ export interface Couche {
   readonly vitesse: readonly [number, number];
   /** Opacité de référence des grains de ce plan. */
   readonly opacite: number;
-  /**
-   * Vrai quand les grains de ce plan s'éteignent vers leur bord.
-   *
-   * Un petit point se peint d'un trait sans qu'on voie son contour. Une tache
-   * large, non : peinte d'une seule teinte, elle se lit comme un rond posé sur
-   * le fond, ce qu'un fond ne doit surtout pas donner à voir.
-   */
-  readonly flou: boolean;
 }
 
 /**
- * Les quatre plans.
+ * Les trois plans.
  *
- * Le premier n'est pas de la poussière mais de la brume : quelques taches
- * larges et presque invisibles, qui remplissent le vide entre les grains. Sans
- * elles, le fond est un semis de points sur du noir et se lit comme un écran
- * de veille ; avec elles, il a une épaisseur. C'est pour cela qu'il fait
- * exception à la règle des trois autres — le plus grand, le plus lent, le plus
- * pâle.
+ * Du plus lointain au plus proche : petit, pâle et lent, puis gros, franc et
+ * rapide. C'est l'écart entre les trois qui fait la profondeur ; sans lui, la
+ * poussière se lit comme un motif plat.
+ *
+ * Il y avait ici un quatrième plan, de la brume : dix taches larges peintes au
+ * dégradé, censées remplir le vide entre les grains. Elles le remplissaient,
+ * mais elles se voyaient — et c'est le courant qui tient désormais ce rôle,
+ * sans flou et pour dix fois moins cher.
  */
 export const COUCHES: readonly Couche[] = [
-  { combien: 10, rayon: [0.06, 0.11], vitesse: [0.003, 0.007], opacite: 0.11, flou: true },
-  { combien: 24, rayon: [0.0025, 0.0045], vitesse: [0.008, 0.014], opacite: 0.08, flou: false },
-  { combien: 18, rayon: [0.0045, 0.0075], vitesse: [0.014, 0.024], opacite: 0.12, flou: false },
-  { combien: 12, rayon: [0.008, 0.013], vitesse: [0.024, 0.04], opacite: 0.19, flou: false },
+  { combien: 24, rayon: [0.0025, 0.0045], vitesse: [0.008, 0.014], opacite: 0.08 },
+  { combien: 18, rayon: [0.0045, 0.0075], vitesse: [0.014, 0.024], opacite: 0.12 },
+  { combien: 12, rayon: [0.008, 0.013], vitesse: [0.024, 0.04], opacite: 0.19 },
 ];
 
 /** Un grain : où il est parti, à quelle allure, et de quelle taille. */
@@ -79,8 +78,6 @@ export interface Grain {
   /** Tours par seconde de ce va-et-vient. */
   readonly cadence: number;
   readonly opacite: number;
-  /** Vrai si le grain s'éteint vers son bord au lieu d'avoir un contour. */
-  readonly flou: boolean;
 }
 
 /**
@@ -123,9 +120,8 @@ export function semer(graine = 20_260_918): Grain[] {
         balan: entre(0.004, 0.018),
         cadence: entre(0.01, 0.045),
         // Les grains d'un même plan ne sont pas jumeaux : sans cet écart, la
-        // poussière se voit comme quatre nappes de points identiques.
+        // poussière se voit comme trois nappes de points identiques.
         opacite: couche.opacite * entre(0.7, 1.15),
-        flou: couche.flou,
       });
     }
   }
@@ -160,9 +156,9 @@ export function situer(grain: Grain, secondes: number): { x: number; y: number }
 /**
  * Pose un grain.
  *
- * Les grands s'éteignent vers leur bord, les petits non : un dégradé par point
- * coûterait soixante fois plus cher par trame pour un fondu large de deux
- * pixels, que personne ne verrait.
+ * D'une seule teinte, sans fondu : un point de deux à quinze pixels n'a pas de
+ * bord qu'on distingue, et un dégradé par grain coûterait soixante fois plus
+ * cher par trame pour ce que personne ne verrait.
  */
 function poser(
   ctx: CanvasRenderingContext2D,
@@ -172,14 +168,7 @@ function poser(
   rayon: number,
   encre: string,
 ): void {
-  if (grain.flou) {
-    const fondu = ctx.createRadialGradient(x, y, 0, x, y, rayon);
-    fondu.addColorStop(0, `rgba(${encre}, ${grain.opacite})`);
-    fondu.addColorStop(1, `rgba(${encre}, 0)`);
-    ctx.fillStyle = fondu;
-  } else {
-    ctx.fillStyle = `rgba(${encre}, ${grain.opacite})`;
-  }
+  ctx.fillStyle = `rgba(${encre}, ${grain.opacite})`;
   ctx.beginPath();
   ctx.arc(x, y, rayon, 0, TOUR);
   ctx.fill();
@@ -204,6 +193,9 @@ export function dessiner(
   encre: string,
 ): void {
   ctx.clearRect(0, 0, largeur, hauteur);
+  // L'air d'abord, les grains dessus : c'est l'ordre du sens, et le seul qui
+  // laisse les traits derrière la poussière plutôt que par-dessus.
+  dessinerCourant(ctx, largeur, hauteur, secondes, encre);
 
   for (const grain of GRAINS) {
     const rayon = grain.rayon * hauteur;
