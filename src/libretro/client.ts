@@ -5,6 +5,7 @@ import type {
   Frame,
   Framebuffer,
   InputState,
+  SensorState,
   StickState,
   SystemInfo,
 } from '../core/types.ts';
@@ -884,6 +885,7 @@ export class LibretroCore implements AsyncEmulatorCore {
     trames = 1,
     image = true,
     manches: StickState = [],
+    capteurs: SensorState = [],
   ): Promise<Frame> {
     // La manette libretro compte seize boutons ; l'interface envoie un tableau
     // plat de booléens, converti ici en pressions 0 ou 1.
@@ -897,9 +899,17 @@ export class LibretroCore implements AsyncEmulatorCore {
       Math.round(Math.max(-1, Math.min(1, manches[index] ?? 0)) * 32_767),
     );
 
+    // Les capteurs voyagent en nombres à virgule : une accélération se lit en
+    // fractions de g, et l'arrondir à l'entier rendrait toute inclinaison nulle.
+    const sensors = Array.from({ length: 6 }, (_, index) => {
+      const valeur = capteurs[index] ?? 0;
+      return Number.isFinite(valeur) ? valeur : 0;
+    });
+
     const raw = await invoke<ArrayBuffer>('run_frame', {
       input: buttons,
       axes,
+      sensors,
       frames: trames,
       video: image,
     });

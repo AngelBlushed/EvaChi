@@ -30,6 +30,7 @@ const AUDIO_FRAMES: usize = 735;
 const NO_BUTTONS: Entrees = Entrees {
     boutons: [0; 16],
     manches: [0; 4],
+    capteurs: [0.0; 6],
 };
 
 /// Localise la bibliothèque du cœur d'essai à côté du binaire de test.

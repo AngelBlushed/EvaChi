@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 
-use super::super::abi::{Entrees, JOYPAD_BUTTONS, MANCHES};
+use super::super::abi::{Entrees, CAPTEURS, JOYPAD_BUTTONS, MANCHES};
 
 /// Taille de l'en-tête de cadrage, en octets.
 pub const ENTETE: usize = 12;
@@ -139,7 +139,7 @@ impl Tranche {
 
 /// La requête d'une trame, en octets fixes plutôt qu'en JSON : c'est la seule
 /// qui parte soixante fois par seconde, et parfois cinq cents.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Requete {
     pub entrees: Entrees,
     /// Combien de trames faire tourner d'affilée. En avance rapide, demander
@@ -157,7 +157,7 @@ impl Requete {
     /// Les manches sont écrits à la suite des boutons : c'est la seule requête
     /// qui part soixante fois par seconde, et quatre mots de plus se lisent
     /// sans rien coûter là où un objet sérialisé aurait coûté cher.
-    pub const TAILLE: usize = (JOYPAD_BUTTONS + MANCHES) * 2 + 8;
+    pub const TAILLE: usize = (JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4 + 8;
 
     pub fn ecrire(&self) -> Vec<u8> {
         let mut octets = Vec::with_capacity(Self::TAILLE);
@@ -166,6 +166,12 @@ impl Requete {
         }
         for axe in self.entrees.manches {
             octets.extend_from_slice(&axe.to_le_bytes());
+        }
+        // Les capteurs en nombres à virgule : une accélération se lit en
+        // fractions de g, et l'arrondir à l'entier rendrait toute inclinaison
+        // nulle.
+        for valeur in self.entrees.capteurs {
+            octets.extend_from_slice(&valeur.to_le_bytes());
         }
         octets.extend_from_slice(&self.trames.to_le_bytes());
         octets.extend_from_slice(&u32::from(self.image).to_le_bytes());
@@ -188,7 +194,17 @@ impl Requete {
         for (rang, place) in entrees.manches.iter_mut().enumerate() {
             *place = mot(JOYPAD_BUTTONS + rang);
         }
-        let base = (JOYPAD_BUTTONS + MANCHES) * 2;
+        let apres_manches = (JOYPAD_BUTTONS + MANCHES) * 2;
+        for (rang, place) in entrees.capteurs.iter_mut().enumerate() {
+            let debut = apres_manches + rang * 4;
+            *place = f32::from_le_bytes([
+                octets[debut],
+                octets[debut + 1],
+                octets[debut + 2],
+                octets[debut + 3],
+            ]);
+        }
+        let base = apres_manches + CAPTEURS * 4;
         let nombre = |debut: usize| {
             u32::from_le_bytes([
                 octets[debut],
@@ -468,6 +484,9 @@ mod tests {
         // Un manche poussé à fond, un autre à moitié en arrière : sans eux,
         // l'aller-retour ne dirait rien des quatre mots ajoutés.
         entrees.manches = [i16::MAX, -16_384, 0, 1];
+        // Et la pesanteur, penchee et secouee : sans elle, l'aller-retour ne
+        // dirait rien des vingt-quatre octets ajoutes.
+        entrees.capteurs = [0.5, -0.81, 0.25, 1.5, -2.25, 0.0];
         let requete = Requete {
             entrees,
             trames: 9,
@@ -490,7 +509,7 @@ mod tests {
         .ecrire();
         assert_eq!(Requete::lire(&brut).expect("zéro").trames, 1);
 
-        let base = (JOYPAD_BUTTONS + MANCHES) * 2;
+        let base = (JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4;
         brut[base..base + 4].copy_from_slice(&1_000_000u32.to_le_bytes());
         assert_eq!(Requete::lire(&brut).expect("trop").trames, 64);
     }

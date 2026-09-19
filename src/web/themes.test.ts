@@ -17,8 +17,8 @@ const LISIBLE = 4.5;
 const SECONDAIRE = 3;
 
 describe('habillages', () => {
-  it('en propose dix', () => {
-    assert.equal(THEMES.length, 10);
+  it('en propose vingt-cinq', () => {
+    assert.equal(THEMES.length, 25);
   });
 
   it('ne donne jamais deux fois le même identifiant', () => {

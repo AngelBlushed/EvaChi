@@ -161,10 +161,11 @@ import { forget, formatPlaytime, formatWhen, parse as parseRecents, remember } f
 import type { Recent } from './recents.ts';
 import type { Direction } from './navigation.ts';
 import { draw as dessinerRubans } from './ribbon.ts';
-import { fenetre, place } from './carrousel.ts';
+import { bandes, fenetre, place } from './carrousel.ts';
 import { dessiner as dessinerPoussiere } from './poussiere.ts';
 import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
 import { SELECTEUR_ACTIF, gestePour, premierUtile, tourne } from './focus.ts';
+import { DUREE_SECOUSSE, enSix, ressenti } from './capteurs.ts';
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const element = document.getElementById(id);
@@ -255,7 +256,11 @@ const langueMenu = $<HTMLDivElement>('menu-langue');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
 const etirementList = $<HTMLDivElement>('etirement-list');
+const croquisManette = $<HTMLTemplateElement>('croquis-manette');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
+const secousseBoite = $<HTMLDListElement>('raccourci-secousse');
+const zoneMorteJauge = $<HTMLInputElement>('zone-morte');
+const zoneMorteValeur = $<HTMLElement>('zone-morte-valeur');
 const galerieBoite = $<HTMLDivElement>('galerie');
 const galerieVide = $<HTMLElement>('gallery-vide');
 const galerieDossier = $<HTMLButtonElement>('gallery-folder');
@@ -335,6 +340,7 @@ const RETENU = {
   echelle: 'evachi.echelle',
   lissage: 'evachi.lissage',
   etirement: 'evachi.etirement',
+  zoneMorte: 'evachi.zone-morte',
   etats: 'evachi.etats',
   emplacement: 'evachi.emplacement',
   recents: 'evachi.recents',
@@ -1706,16 +1712,7 @@ async function repartirDeZero(): Promise<void> {
   if (rom) await play(coeur, rom);
 }
 
-/**
- * Ce que font les raccourcis : droit à l'emplacement visé, sans rien demander.
- *
- * C'est leur seule raison d'être. Par le menu, on choisit ; par la touche, on
- * va vite — et le panneau dit lequel des quatre est visé.
- */
-function raccourciEtat(quoi: 'sauver' | 'charger'): void {
-  if (quoi === 'sauver') void sauverEmplacement(emplacementVise);
-  else void chargerEmplacement(emplacementVise);
-}
+
 
 // --- Sauvegarde rapide ------------------------------------------------------
 
@@ -1739,22 +1736,38 @@ interface Raccourci {
 // Select + L1 pour sauvegarder, Select + R1 pour charger : les numéros du
 // format standard du W3C, écrits ici plutôt que pris dans la table des boutons,
 // qui est déclarée plus bas avec le reste de la navigation.
-const RACCOURCIS_PAR_DEFAUT: Record<'sauver' | 'charger', Raccourci> = {
+type Geste = 'sauver' | 'charger' | 'secousse';
+
+/** Les trois gestes, dans l'ordre où ils s'affichent. */
+const GESTES: readonly Geste[] = ['sauver', 'charger', 'secousse'];
+
+const RACCOURCIS_PAR_DEFAUT: Record<Geste, Raccourci> = {
   sauver: { clavier: 'F2', pad: [8, 4] },
   charger: { clavier: 'F4', pad: [8, 5] },
+  // Select et A : les quatre autres combinaisons avec Select sont déjà prises
+  // — B les triches, X le plein écran, Y la capture, Start le retour.
+  secousse: { clavier: 'F6', pad: [8, 0] },
 };
 
-let raccourcisEtat: Record<'sauver' | 'charger', Raccourci> = lireRaccourcis();
+let raccourcisEtat: Record<Geste, Raccourci> = lireRaccourcis();
 
-function lireRaccourcis(): Record<'sauver' | 'charger', Raccourci> {
+function lireRaccourcis(): Record<Geste, Raccourci> {
   try {
     const brut = JSON.parse(retenu(RETENU.etats) ?? 'null');
     if (!brut || typeof brut !== 'object') return structuredClone(RACCOURCIS_PAR_DEFAUT);
-    const lu = (quoi: 'sauver' | 'charger'): Raccourci => ({
-      clavier: typeof brut[quoi]?.clavier === 'string' ? brut[quoi].clavier : '',
-      pad: Array.isArray(brut[quoi]?.pad) ? brut[quoi].pad.filter(Number.isInteger) : [],
+    const lu = (quoi: Geste): Raccourci => ({
+      // Un réglage écrit par une version qui ne connaissait pas la secousse
+      // n'en porte rien : on reprend alors le raccourci d'origine plutôt que
+      // de laisser un geste sans touche.
+      clavier:
+        typeof brut[quoi]?.clavier === 'string'
+          ? brut[quoi].clavier
+          : RACCOURCIS_PAR_DEFAUT[quoi].clavier,
+      pad: Array.isArray(brut[quoi]?.pad)
+        ? brut[quoi].pad.filter(Number.isInteger)
+        : [...RACCOURCIS_PAR_DEFAUT[quoi].pad],
     });
-    return { sauver: lu('sauver'), charger: lu('charger') };
+    return { sauver: lu('sauver'), charger: lu('charger'), secousse: lu('secousse') };
   } catch {
     return structuredClone(RACCOURCIS_PAR_DEFAUT);
   }
@@ -1771,14 +1784,22 @@ function direRaccourci(raccourci: Raccourci): string {
 }
 
 /** Le raccourci qu'on est en train de redéfinir, s'il y en a un. */
-let raccourciEnAttente: 'sauver' | 'charger' | null = null;
+let raccourciEnAttente: Geste | null = null;
 
-function renderRaccourcisEtat(): void {
-  raccourcisEtatBoite.replaceChildren();
+/** Le nom d'un geste, tel qu'il s'écrit dans le panneau. */
+function nomDuGeste(quoi: Geste): string {
+  if (quoi === 'sauver') return t('Sauvegarder');
+  if (quoi === 'charger') return t('Charger');
+  return t('Secouer');
+}
 
-  for (const quoi of ['sauver', 'charger'] as const) {
+/** Dessine une liste de raccourcis, chacun cliquable pour être redéfini. */
+function renderRaccourcis(boite: HTMLElement, gestes: readonly Geste[]): void {
+  boite.replaceChildren();
+
+  for (const quoi of gestes) {
     const dt = document.createElement('dt');
-    dt.textContent = quoi === 'sauver' ? t('Sauvegarder') : t('Charger');
+    dt.textContent = nomDuGeste(quoi);
 
     const dd = document.createElement('dd');
     const bouton = document.createElement('button');
@@ -1791,11 +1812,16 @@ function renderRaccourcisEtat(): void {
       renderRaccourcisEtat();
     });
     dd.append(bouton);
-    raccourcisEtatBoite.append(dt, dd);
+    boite.append(dt, dd);
   }
 }
 
-function poserRaccourci(quoi: 'sauver' | 'charger', raccourci: Partial<Raccourci>): void {
+function renderRaccourcisEtat(): void {
+  renderRaccourcis(raccourcisEtatBoite, ['sauver', 'charger']);
+  renderRaccourcis(secousseBoite, ['secousse']);
+}
+
+function poserRaccourci(quoi: Geste, raccourci: Partial<Raccourci>): void {
   raccourcisEtat = {
     ...raccourcisEtat,
     [quoi]: { ...raccourcisEtat[quoi], ...raccourci },
@@ -1810,7 +1836,13 @@ function raccourciTenu(pad: Gamepad, boutons: readonly number[]): boolean {
   return boutons.length > 0 && boutons.every((index) => pad.buttons[index]?.pressed);
 }
 
-const etats = { sauver: new Held(1200, 1200), charger: new Held(1200, 1200) };
+const etats: Record<Geste, Held> = {
+  sauver: new Held(1200, 1200),
+  charger: new Held(1200, 1200),
+  // Plus court pour la secousse : on en enchaîne parfois plusieurs, et
+  // attendre une seconde entre deux rendrait le geste inutile.
+  secousse: new Held(600, 600),
+};
 
 /**
  * Regarde si un raccourci de sauvegarde vient d'être fait à la manette.
@@ -1821,13 +1853,28 @@ const etats = { sauver: new Held(1200, 1200), charger: new Held(1200, 1200) };
  */
 function surveillerEtats(pad: Gamepad, maintenant: number): void {
   if (!core) return;
-  for (const quoi of ['sauver', 'charger'] as const) {
+  for (const quoi of GESTES) {
     const tenu = raccourciTenu(pad, raccourcisEtat[quoi].pad);
     if (etats[quoi].update(tenu, maintenant).pressed) {
       if (sonsVoulus()) ticValidation();
-      raccourciEtat(quoi);
+      faireLeGeste(quoi);
     }
   }
+}
+
+/**
+ * L'instant où la secousse a commencé, ou rien quand la machine est calme.
+ *
+ * Gardé en millisecondes de l'horloge de la page : c'est elle qui rythme les
+ * trames, et une secousse mesurée sur une autre horloge se décalerait.
+ */
+let secousseDepuis: number | null = null;
+
+/** Ce que fait un raccourci : droit au but, sans rien demander. */
+function faireLeGeste(quoi: Geste): void {
+  if (quoi === 'sauver') void sauverEmplacement(emplacementVise);
+  else if (quoi === 'charger') void chargerEmplacement(emplacementVise);
+  else secousseDepuis = performance.now();
 }
 
 // --- Graphisme --------------------------------------------------------------
@@ -2020,8 +2067,21 @@ const manches: number[] = [0, 0, 0, 0];
  * Bien plus fin que le seuil des directions : celui-ci décide d'un oui ou d'un
  * non, alors qu'ici on transmet la position elle-même, et un jeu qui attend un
  * pas prudent doit pouvoir le recevoir.
+ *
+ * Réglable, parce qu'une manette usée ne revient plus au centre : douze pour
+ * cent suffisent à une manette neuve et laissent dériver une vieille, où il en
+ * faut parfois trente.
  */
-const REPOS_MANCHE = 0.12;
+const REPOS_PAR_DEFAUT = 12;
+
+function zoneMorte(): number {
+  const garde = Number(retenu(RETENU.zoneMorte));
+  const cran = Number.isFinite(garde) && garde >= 4 && garde <= 40 ? garde : REPOS_PAR_DEFAUT;
+  return cran / 100;
+}
+
+/** Les six capteurs, tels qu'ils partiront au cœur à la trame suivante. */
+const capteurs: number[] = enSix(ressenti(0, 0, null));
 const buttonCells = new Map<number, HTMLElement>();
 
 /**
@@ -2456,7 +2516,7 @@ async function runLoop(): Promise<void> {
 
     let frame: Frame;
     try {
-      frame = await core.runFrame(buttons, lot, peindra, manches);
+      frame = await core.runFrame(buttons, lot, peindra, manches, capteurs);
     } catch (error) {
       if (token === loopToken) {
         setRunning(false);
@@ -3828,10 +3888,10 @@ document.addEventListener(
       return;
     }
 
-    for (const quoi of ['sauver', 'charger'] as const) {
+    for (const quoi of GESTES) {
       if (raccourcisEtat[quoi].clavier && raccourcisEtat[quoi].clavier === event.key) {
         event.preventDefault();
-        raccourciEtat(quoi);
+        faireLeGeste(quoi);
       }
     }
   },
@@ -4532,6 +4592,25 @@ function renderConsolesCarr(): void {
  * images demandées au serveur pour en montrer treize — et l'observateur qui les
  * guette ne voit rien tant qu'elles sont retirées de la mise en page.
  */
+/**
+ * Resserre le liseré de la sélection sur l'image plutôt que sur la case.
+ *
+ * Une jaquette recadrée à la main est montrée entière, et laisse donc des
+ * bandes vides quand sa forme ne suit pas celle de la case. On les mesure une
+ * fois, au chargement de l'image, et le CSS s'en sert pour poser le liseré là
+ * où la jaquette s'arrête vraiment.
+ */
+function resserrerLisere(boite: HTMLElement, image: HTMLImageElement): void {
+  if (!image.classList.contains('recadree') || image.naturalHeight === 0) {
+    boite.style.removeProperty('--bande-x');
+    boite.style.removeProperty('--bande-y');
+    return;
+  }
+  const { x, y } = bandes(image.naturalWidth / image.naturalHeight);
+  boite.style.setProperty('--bande-x', `${(x * 100).toFixed(3)}%`);
+  boite.style.setProperty('--bande-y', `${(y * 100).toFixed(3)}%`);
+}
+
 function renderCartesCarr(): void {
   carrCartes.replaceChildren();
   cartesCarr = [];
@@ -4574,6 +4653,7 @@ function renderCartesCarr(): void {
       jaquette.dataset.chemin = item.rom.path;
       jaquette.addEventListener('load', () => {
         marque.hidden = true;
+        resserrerLisere(boite, jaquette);
       });
       boite.append(jaquette);
       regarderJaquette(jaquette);
@@ -6611,6 +6691,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   },
   controls: () => {
     renderRaccourcisEtat();
+    renderZoneMorte();
     openDialog(dialogs.controls);
   },
   settings: () => {
@@ -6855,7 +6936,7 @@ function sampleInput(): void {
       const pousse = pad.axes[axe] ?? 0;
       // Un manche au repos ne rend jamais exactement zéro : sans ce seuil, le
       // personnage dérive tout seul, manette posée sur la table.
-      manches[axe] = Math.abs(pousse) < REPOS_MANCHE ? 0 : pousse;
+      manches[axe] = Math.abs(pousse) < zoneMorte() ? 0 : pousse;
     }
   }
 
@@ -6874,10 +6955,41 @@ function sampleInput(): void {
     if (tenue(PAD_DOWN)) manches[1] = 1;
   }
 
+  // Ce que la console croit sentir : le manche droit la penche, et la
+  // secousse s'y ajoute le temps qu'elle dure.
+  const depuis = secousseDepuis === null ? null : (performance.now() - secousseDepuis) / 1000;
+  if (depuis !== null && depuis >= DUREE_SECOUSSE) secousseDepuis = null;
+  const senti = enSix(
+    ressenti(manches[2], manches[3], depuis !== null && depuis < DUREE_SECOUSSE ? depuis : null),
+  );
+  for (const [rang, valeur] of senti.entries()) capteurs[rang] = valeur;
+
   if (dialogs.controls.open) {
     for (const [index, cell] of buttonCells) {
       cell.classList.toggle('down', buttons[index]);
     }
+    eclairerCroquis(pad);
+  }
+}
+
+/**
+ * Allume sur le portrait ce que la manette a sous les doigts.
+ *
+ * C'est la réponse à « est-ce qu'elle est branchée ? » : une case qui
+ * s'allume dans une liste se cherche, une touche qui s'allume sur un dessin de
+ * manette se voit sans lever les yeux.
+ */
+function eclairerCroquis(pad: Gamepad | null): void {
+  for (const [index, piece] of piecesManette) {
+    piece.classList.toggle('presse', pad?.buttons[index]?.pressed ?? false);
+  }
+  const repos = zoneMorte();
+  for (const [manche, capuchon] of manchesManette) {
+    const x = pad?.axes[manche * 2] ?? 0;
+    const y = pad?.axes[manche * 2 + 1] ?? 0;
+    const dx = Math.abs(x) < repos ? 0 : Math.max(-1, Math.min(1, x));
+    const dy = Math.abs(y) < repos ? 0 : Math.max(-1, Math.min(1, y));
+    capuchon.style.transform = `translate(${(dx * 5).toFixed(2)}px, ${(dy * 5).toFixed(2)}px)`;
   }
 }
 
@@ -7004,6 +7116,18 @@ function capturerLiaison(): void {
 
 const resetBindings = $<HTMLButtonElement>('controls-reset');
 
+/** Écrit la zone morte sous la jauge, et la retient. */
+function renderZoneMorte(): void {
+  const cran = Math.round(zoneMorte() * 100);
+  zoneMorteJauge.value = String(cran);
+  zoneMorteValeur.textContent = `${cran} %`;
+}
+
+zoneMorteJauge.addEventListener('input', () => {
+  retenir(RETENU.zoneMorte, zoneMorteJauge.value);
+  renderZoneMorte();
+});
+
 resetBindings.addEventListener('click', () => {
   if (!liaisons[layout.id]) return;
   enAttente = null;
@@ -7022,14 +7146,19 @@ resetBindings.addEventListener('click', () => {
  * Le pavé hexadécimal du CHIP-8 n'y figure pas : c'est un objet réel, carré,
  * et le dessiner tel quel vaut mieux que de le découper.
  */
-const ZONES: Record<string, readonly (readonly [string, readonly number[]])[]> = {
+const ZONES: Record<string, readonly (readonly [string, string, readonly number[]])[]> = {
   joypad: [
-    [aTraduire('Croix directionnelle'), [4, 5, 6, 7]],
-    [aTraduire('Boutons'), [8, 0, 9, 1]],
-    [aTraduire('Gâchettes'), [10, 11, 12, 13, 14, 15]],
-    [aTraduire('Système'), [2, 3]],
+    ['zone-croix', aTraduire('Croix directionnelle'), [4, 5, 6, 7]],
+    ['zone-boutons', aTraduire('Boutons'), [8, 0, 9, 1]],
+    ['zone-gachettes', aTraduire('Gâchettes'), [10, 11, 12, 13, 14, 15]],
+    ['zone-systeme', aTraduire('Système'), [2, 3]],
   ],
 };
+
+/** Les pièces du portrait, par le numéro que le navigateur donne au bouton. */
+const piecesManette = new Map<number, SVGElement>();
+/** Les deux capuchons de manche, par leur rang. */
+const manchesManette = new Map<number, SVGElement>();
 
 let keyLabels: Map<string, string> | null = null;
 
@@ -7117,6 +7246,8 @@ function buildKeypad(): void {
   const zones = ZONES[layout.id];
   keypadBox.classList.toggle('zones', zones !== undefined);
   keypadBox.classList.toggle('grille', zones === undefined);
+  piecesManette.clear();
+  manchesManette.clear();
 
   if (!zones) {
     for (const index of layout.display) {
@@ -7125,9 +7256,26 @@ function buildKeypad(): void {
     return;
   }
 
-  for (const [titre, boutons] of zones) {
+  // Le portrait au milieu, les liaisons autour : c'est ainsi qu'on cherche un
+  // bouton — par l'endroit où il est sous les doigts, pas par son nom dans une
+  // liste.
+  const place = document.createElement('div');
+  place.className = 'croquis-place';
+  const dessin = croquisManette.content.firstElementChild?.cloneNode(true);
+  if (dessin instanceof SVGElement) {
+    for (const piece of dessin.querySelectorAll<SVGElement>('[data-bouton]')) {
+      piecesManette.set(Number(piece.dataset.bouton), piece);
+    }
+    for (const capuchon of dessin.querySelectorAll<SVGElement>('[data-manche]')) {
+      manchesManette.set(Number(capuchon.dataset.manche), capuchon);
+    }
+    place.append(dessin);
+  }
+  keypadBox.append(place);
+
+  for (const [ou, titre, boutons] of zones) {
     const zone = document.createElement('div');
-    zone.className = 'zone';
+    zone.className = `zone ${ou}`;
 
     const nom = document.createElement('h4');
     nom.textContent = t(titre);

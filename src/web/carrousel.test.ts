@@ -9,7 +9,7 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { MARGE, RAYON, fenetre, place } from './carrousel.ts';
+import { MARGE, RATIO_CARTE, RAYON, bandes, fenetre, place } from './carrousel.ts';
 
 /** La place d'une jaquette, avec la certitude qu'elle en a une. */
 function posee(ecart: number) {
@@ -17,6 +17,45 @@ function posee(ecart: number) {
   assert.ok(trouvee, `aucune place pour l'écart ${ecart}`);
   return trouvee;
 }
+
+describe('les bandes vides d’une jaquette recadrée', () => {
+  it('n’en laisse aucune quand la jaquette a la forme de sa case', () => {
+    const vide = bandes(RATIO_CARTE);
+    assert.equal(vide.x, 0);
+    assert.equal(vide.y, 0);
+  });
+
+  it('en laisse en haut et en bas quand la jaquette est large', () => {
+    // Une jaquette carrée dans une case en trois quarts : elle touche les
+    // bords gauche et droit, et il reste un huitième de vide de chaque côté.
+    const carree = bandes(1);
+    assert.equal(carree.x, 0);
+    assert.ok(Math.abs(carree.y - 0.125) < 1e-9, `${carree.y} au lieu de 0,125`);
+  });
+
+  it('en laisse à gauche et à droite quand la jaquette est étroite', () => {
+    const haute = bandes(0.5);
+    assert.equal(haute.y, 0);
+    assert.ok(Math.abs(haute.x - 1 / 6) < 1e-9, `${haute.x} au lieu d'un sixième`);
+  });
+
+  it('ne resserre rien sur une image sans dimensions', () => {
+    // Une image qui n'a pas chargé rend zéro : sans cette garde, le liseré
+    // disparaîtrait ou se refermerait sur lui-même.
+    for (const impossible of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
+      assert.deepEqual(bandes(impossible), { x: 0, y: 0 }, `pour ${impossible}`);
+    }
+  });
+
+  it('ne rend jamais une bande qui mangerait la moitié de la case', () => {
+    // Une bande d'une demi-case fermerait le liseré sur un trait.
+    for (const rapport of [0.01, 0.3, 1, 3, 100]) {
+      const trouvee = bandes(rapport);
+      assert.ok(trouvee.x < 0.5 && trouvee.y < 0.5, `${rapport} : ${JSON.stringify(trouvee)}`);
+      assert.ok(trouvee.x >= 0 && trouvee.y >= 0);
+    }
+  });
+});
 
 describe('la place d’une jaquette', () => {
   it('met celle qu’on regarde droite, entière et devant', () => {

@@ -17,6 +17,43 @@
  */
 
 /** Combien de jaquettes se voient de part et d'autre de celle qu'on regarde. */
+/**
+ * Le rapport d'une case, largeur sur hauteur.
+ *
+ * Trois quarts : c'est la forme d'une boîte de jeu, et c'est elle que le CSS
+ * donne à chaque carte. Écrit ici parce que la géométrie en dépend.
+ */
+export const RATIO_CARTE = 3 / 4;
+
+/**
+ * Les bandes vides que laisse une image montrée en entier dans une case.
+ *
+ * Une jaquette recadrée à la main est affichée entière — « contain » — et non
+ * rognée : si sa forme ne suit pas celle de la case, il reste du vide en haut
+ * et en bas, ou à gauche et à droite. Ce vide n'est pas la jaquette, et le
+ * liseré de la sélection n'a donc rien à y faire : ceinturer la case entière
+ * revient à entourer du noir, et c'est ce qu'on voit.
+ *
+ * Rend la part de la case occupée par une bande, de chaque côté : zéro quand
+ * les deux formes coïncident, un quart quand l'image est deux fois plus large
+ * que sa case.
+ *
+ * @param image rapport largeur sur hauteur de l'image.
+ * @param case_ rapport largeur sur hauteur de la case.
+ */
+export function bandes(image: number, case_ = RATIO_CARTE): { x: number; y: number } {
+  // Une image sans dimensions connues n'apprend rien : on ne resserre pas.
+  if (!Number.isFinite(image) || image <= 0 || !Number.isFinite(case_) || case_ <= 0) {
+    return { x: 0, y: 0 };
+  }
+  if (image > case_) {
+    // Plus large que la case : elle touche les bords gauche et droit, et laisse
+    // du vide au-dessus et au-dessous.
+    return { x: 0, y: (1 - case_ / image) / 2 };
+  }
+  return { x: (1 - image / case_) / 2, y: 0 };
+}
+
 export const RAYON = 6;
 
 /**

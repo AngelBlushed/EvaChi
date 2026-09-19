@@ -380,6 +380,25 @@ pub unsafe extern "C" fn audio_sample_batch(data: *const i16, frames: usize) -> 
 }
 
 /// # Safety
+/// Appelé par le cœur, à n'importe quel moment.
+///
+/// Rien à allumer ni à éteindre : les six valeurs sont déposées avant chaque
+/// trame, qu'on les lise ou non. On répond oui, parce qu'un refus ferait
+/// conclure au cœur qu'aucun capteur n'existe — et il cesserait de demander.
+pub unsafe extern "C" fn set_sensor_state(port: c_uint, _action: c_uint, _rate: c_uint) -> bool {
+    port == 0
+}
+
+/// # Safety
+/// Appelé par le cœur pendant `retro_run`.
+pub unsafe extern "C" fn get_sensor_input(port: c_uint, id: c_uint) -> f32 {
+    if port != 0 {
+        return 0.0;
+    }
+    with_host(|host| host.input.capteur(id))
+}
+
+/// # Safety
 /// Appelé par le cœur pendant `retro_run`.
 pub unsafe extern "C" fn input_poll() {
     // L'état des manettes est déposé avant `retro_run` : rien à relever ici.
@@ -545,6 +564,17 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
                 }
                 None => false,
             }
+        }
+
+        ENV_GET_SENSOR_INTERFACE => {
+            if data.is_null() {
+                return false;
+            }
+            data.cast::<SensorInterface>().write(SensorInterface {
+                set_sensor_state,
+                get_sensor_input,
+            });
+            true
         }
 
         ENV_GET_SYSTEM_DIRECTORY => {

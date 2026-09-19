@@ -22,6 +22,7 @@ const AUDIO_FRAMES: usize = 735;
 const NO_BUTTONS: Entrees = Entrees {
     boutons: [0; 16],
     manches: [0; 4],
+    capteurs: [0.0; 6],
 };
 
 /// Les quatre boutons qui demandent au cœur d'essai de mal tourner : L2, R2,

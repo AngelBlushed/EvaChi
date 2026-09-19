@@ -2805,19 +2805,24 @@ fn pack_frame(video: Option<&VideoFrame>, audio: &[i16], shutdown: bool) -> Vec<
 pub async fn run_frame(
     input: Vec<i16>,
     axes: Option<Vec<i16>>,
+    sensors: Option<Vec<f64>>,
     frames: Option<u32>,
     video: Option<bool>,
     session: State<'_, Arc<Session>>,
 ) -> Result<Response, String> {
-    // Les deux tableaux sont recopiés dans des tableaux de taille fixe plutôt
+    // Les trois tableaux sont recopiés dans des tableaux de taille fixe plutôt
     // que crus sur parole : ce qui vient de la fenêtre peut être plus court, ou
-    // plus long, et un cœur lit toujours les seize et les quatre.
+    // plus long, et un cœur lit toujours les seize, les quatre et les six.
     let mut entrees = Entrees::default();
     for (slot, value) in entrees.boutons.iter_mut().zip(input) {
         *slot = value;
     }
     for (slot, value) in entrees.manches.iter_mut().zip(axes.unwrap_or_default()) {
         *slot = value;
+    }
+    for (slot, value) in entrees.capteurs.iter_mut().zip(sensors.unwrap_or_default()) {
+        // Un capteur qui rendrait l'infini ferait sortir le jeu de sa carte.
+        *slot = if value.is_finite() { value as f32 } else { 0.0 };
     }
 
     let combien = frames.unwrap_or(1).clamp(1, 64);

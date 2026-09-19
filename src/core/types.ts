@@ -68,6 +68,16 @@ export type InputState = readonly boolean[];
  */
 export type StickState = readonly number[];
 
+/**
+ * Ce que la machine émulée croit sentir : trois axes d'accélération en g, puis
+ * trois de rotation en radians par seconde.
+ *
+ * Quelques cartouches ne se jouent pas qu'aux boutons — on penche la console,
+ * on la secoue — et le cœur réclame alors ces six nombres. Sans eux le jeu ne
+ * bouge pas, et rien ne dit pourquoi.
+ */
+export type SensorState = readonly number[];
+
 /** Résultat d'une trame émulée. */
 export interface Frame {
   readonly video: Framebuffer;
@@ -133,6 +143,7 @@ export interface AsyncEmulatorCore {
     trames?: number,
     image?: boolean,
     manches?: StickState,
+    capteurs?: SensorState,
   ): Promise<Frame>;
   saveState(): Promise<Uint8Array>;
   loadState(state: Uint8Array): Promise<void>;

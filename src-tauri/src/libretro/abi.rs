@@ -51,6 +51,10 @@ pub const MEMORY_SAVE_RAM: c_uint = 0;
 /// La RAM de travail de la console. La seule que les triches écrivent.
 pub const MEMORY_SYSTEM_RAM: c_uint = 2;
 pub const ENV_GET_LOG_INTERFACE: c_uint = 27;
+/// Le même numéro que le journal, mais marqué expérimental : c'est ainsi que
+/// libretro distingue les deux, et les confondre rendrait au cœur une table de
+/// fonctions à la place de l'autre.
+pub const ENV_GET_SENSOR_INTERFACE: c_uint = 27 | ENV_EXPERIMENTAL;
 pub const ENV_GET_CORE_ASSETS_DIRECTORY: c_uint = 30;
 pub const ENV_GET_SAVE_DIRECTORY: c_uint = 31;
 pub const ENV_SET_GEOMETRY: c_uint = 37;
@@ -176,17 +180,43 @@ pub const JOYPAD_BUTTONS: usize = 16;
 /// Les quatre axes : X et Y du manche gauche, puis X et Y du droit.
 pub const MANCHES: usize = 4;
 
+/// Les six capteurs : accélération sur trois axes, rotation sur trois autres.
+///
+/// Quelques cartouches ne se jouent pas qu'aux boutons — on penche la console,
+/// on la secoue. Le cœur réclame alors cette interface-ci, et s'il n'obtient
+/// rien, le jeu ne bouge pas sans qu'aucun message ne le dise.
+pub const CAPTEURS: usize = 6;
+
+/// Ce qu'un cœur demande d'allumer ou d'éteindre, par la première fonction.
+pub const SENSOR_ACCELEROMETER_ENABLE: c_uint = 0;
+pub const SENSOR_ACCELEROMETER_DISABLE: c_uint = 1;
+pub const SENSOR_GYROSCOPE_ENABLE: c_uint = 2;
+pub const SENSOR_GYROSCOPE_DISABLE: c_uint = 3;
+
+/// La table de fonctions que le cœur reçoit pour lire les capteurs.
+#[repr(C)]
+pub struct SensorInterface {
+    pub set_sensor_state: unsafe extern "C" fn(c_uint, c_uint, c_uint) -> bool,
+    pub get_sensor_input: unsafe extern "C" fn(c_uint, c_uint) -> f32,
+}
+
 /// Ce que la manette envoie pour une trame.
 ///
 /// Les deux choses voyagent ensemble parce qu'elles décrivent le même instant :
 /// séparées, un manche en retard d'une trame sur les boutons donnerait un saut
 /// qui part dans la mauvaise direction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+///
+/// Les capteurs y sont aussi : ils décrivent le même instant que les boutons,
+/// et une inclinaison en retard d'une trame sur un saut envoie le personnage
+/// du mauvais côté.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct Entrees {
     /// Pression de chaque bouton, dans l'ordre de l'ABI.
     pub boutons: [i16; JOYPAD_BUTTONS],
     /// Position des axes, de -32768 à 32767, zéro au repos.
     pub manches: [i16; MANCHES],
+    /// Accélération en g sur trois axes, puis rotation en radians par seconde.
+    pub capteurs: [f32; CAPTEURS],
 }
 
 impl Entrees {
@@ -198,7 +228,13 @@ impl Entrees {
         Self {
             boutons,
             manches: [0; MANCHES],
+            capteurs: [0.0; CAPTEURS],
         }
+    }
+
+    /// Ce que vaut un capteur, ou zéro quand le cœur en invente un.
+    pub fn capteur(&self, id: c_uint) -> f32 {
+        self.capteurs.get(id as usize).copied().unwrap_or(0.0)
     }
 
     /// L'axe demandé, ou zéro quand le cœur en invente un.
@@ -301,6 +337,7 @@ mod tests {
         let entrees = Entrees {
             boutons: [0; JOYPAD_BUTTONS],
             manches: [1, 2, 3, 4],
+            capteurs: [0.0; CAPTEURS],
         };
         assert_eq!(entrees.axe(ANALOG_GAUCHE, 0), 1);
         assert_eq!(entrees.axe(ANALOG_GAUCHE, 1), 2);
@@ -313,7 +350,11 @@ mod tests {
         let entrees = Entrees {
             boutons: [0; JOYPAD_BUTTONS],
             manches: [1, 2, 3, 4],
+            capteurs: [1.0, 2.0, 3.0, 4.0, 5.0, 6.0],
         };
+        assert_eq!(entrees.capteur(0), 1.0);
+        assert_eq!(entrees.capteur(5), 6.0);
+        assert_eq!(entrees.capteur(6), 0.0, "un septieme capteur");
         assert_eq!(entrees.axe(2, 0), 0, "un troisieme manche");
         assert_eq!(entrees.axe(ANALOG_GAUCHE, 2), 0, "un axe Z");
         assert_eq!(entrees.axe(99, 99), 0);
