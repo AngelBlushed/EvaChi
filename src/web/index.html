@@ -582,21 +582,37 @@
          entière revenait à entourer du noir ; ceinturer par-dessus revenait à
          peindre un trait rouge sur les trois millimètres de jaquette qu'on
          était venu regarder. */
+      /* Le liseré d'une jaquette qui remplit la carte : la carte elle-même,
+         puisque l'image en occupe exactement la surface. */
       .paq-carte .boite::after {
         content: "";
         position: absolute;
-        inset: var(--marge-haut, 0) var(--marge-droite, 0) var(--marge-bas, 0)
-          var(--marge-gauche, 0);
+        inset: 0;
         border-radius: calc(9px * var(--ech));
         box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
         opacity: 0;
         transition: opacity 140ms ease;
         pointer-events: none;
       }
-      /* Une jaquette recadrée a les coins carrés : un liseré très arrondi
-         laisserait l'image dépasser aux quatre coins. */
-      .paq-carte .boite.recadree::after { border-radius: calc(3px * var(--ech)); }
       .paq-carte[aria-selected="true"] .boite::after { opacity: 1; }
+      /* Une jaquette recadrée, elle, est montrée en entier et ne remplit donc
+         pas la carte. Plutôt que de calculer où elle tombe — un calcul qui peut
+         se désaccorder de ce qui est affiché, et qui l'a fait — on la laisse
+         prendre sa taille naturelle, et le liseré est posé sur elle. Le
+         navigateur place l'image, le liseré la suit : il n'y a plus rien à
+         accorder. */
+      .paq-carte .boite.recadree { place-items: center; }
+      .paq-carte .boite.recadree::after { display: none; }
+      .paq-carte .boite.recadree img {
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: calc(3px * var(--ech));
+      }
+      .paq-carte[aria-selected="true"] .boite.recadree img {
+        box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
+      }
       .paq-carte img {
         width: 100%;
         height: 100%;
@@ -1573,11 +1589,13 @@
       .carr-carte .boite {
         position: relative;
         display: grid;
+        /* Une seule case, de la taille de la boite : sans quoi la hauteur de
+           l'image reste indefinie et l'image reprend sa taille naturelle. */
+        grid-template: 100% / 100%;
         place-items: center;
         width: 100%;
         height: 100%;
         border-radius: calc(9px * var(--ech));
-        overflow: hidden;
         background: var(--raised);
         box-shadow: 0 calc(18px * var(--ech)) calc(38px * var(--ech)) rgba(0, 0, 0, 0.5);
       }
@@ -1588,13 +1606,24 @@
       .carr-carte .boite::after {
         content: "";
         position: absolute;
-        inset: var(--marge-haut, 0) var(--marge-droite, 0) var(--marge-bas, 0)
-          var(--marge-gauche, 0);
+        inset: 0;
         border-radius: calc(9px * var(--ech));
         box-shadow: inset 0 0 0 calc(2px * var(--ech)) var(--accent);
         opacity: 0;
         transition: opacity 140ms ease;
         pointer-events: none;
+      }
+      /* Comme au paquet : une jaquette recadrée porte son liseré elle-même. */
+      .carr-carte .boite.recadree { place-items: center; }
+      .carr-carte .boite.recadree::after { display: none; }
+      .carr-carte .boite.recadree img {
+        width: auto;
+        height: auto;
+        max-width: 100%;
+        max-height: 100%;
+      }
+      .carr-carte[aria-selected="true"] .boite.recadree img {
+        box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
       }
       .carr-carte .boite > * { grid-area: 1 / 1; }
       .carr-carte .initiale {
@@ -1607,6 +1636,7 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        border-radius: inherit;
         opacity: 0;
         transition: opacity 260ms ease;
       }
