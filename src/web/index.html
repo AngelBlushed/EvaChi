@@ -563,31 +563,37 @@
         inset: 0;
         display: grid;
         border-radius: calc(9px * var(--ech));
-        overflow: hidden;
         background: var(--raised);
         box-shadow: 0 calc(8px * var(--ech)) calc(22px * var(--ech)) rgba(0, 0, 0, 0.55);
       }
       .paq-carte .boite.recadree { background: transparent; box-shadow: none; }
       .paq-carte .boite > * { grid-area: 1 / 1; }
-      /* Le liseré de la sélection, posé sur l'image et non sur la carte.
-         Une jaquette recadrée est montrée entière : si sa forme ne suit pas
-         celle de la carte, il reste des bandes vides que le code mesure et
-         reporte ici. Ceinturer la carte entière revenait à entourer du noir. */
+      /* Le liseré de la sélection, posé sur l'image et non sur la carte, et
+         posé *autour* d'elle et non dessus. Une jaquette recadrée est montrée
+         entière : si sa forme ne suit pas celle de la carte, il reste des
+         bandes vides que le code mesure et reporte ici. Ceinturer la carte
+         entière revenait à entourer du noir ; ceinturer par-dessus revenait à
+         peindre un trait rouge sur les trois millimètres de jaquette qu'on
+         était venu regarder. */
       .paq-carte .boite::after {
         content: "";
         position: absolute;
         inset: var(--bande-y, 0) var(--bande-x, 0);
         border-radius: calc(9px * var(--ech));
-        box-shadow: inset 0 0 0 calc(2px * var(--ech)) var(--accent);
+        box-shadow: 0 0 0 calc(2px * var(--ech)) var(--accent);
         opacity: 0;
         transition: opacity 140ms ease;
         pointer-events: none;
       }
+      /* Une jaquette recadrée a les coins carrés : un liseré très arrondi
+         laisserait l'image dépasser aux quatre coins. */
+      .paq-carte .boite.recadree::after { border-radius: calc(3px * var(--ech)); }
       .paq-carte[aria-selected="true"] .boite::after { opacity: 1; }
       .paq-carte img {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        border-radius: inherit;
         opacity: 0;
         transition: opacity 240ms ease;
       }
@@ -606,6 +612,13 @@
       /* Une jaquette recadrée n'a pas de fond : une ombre portée dessinerait
          le contour de la carte au lieu de celui de l'image. */
       .paq-carte[aria-selected="true"] .boite.recadree { box-shadow: none; }
+      /* `hidden` pose `display: none`, mais une regle d'auteur qui donne un
+         `display` l'emporte : sans cette ligne, la lettre d'attente reste
+         affichee sous la jaquette une fois celle-ci arrivee. Le carrousel n'y
+         echappait que parce qu'il ne donne pas de `display` a la sienne. */
+      .paq-carte .initiale[hidden],
+      .sea-lamelle .initiale[hidden],
+      .sea-ecran .initiale[hidden] { display: none; }
       .paq-carte .etoile {
         position: absolute;
         top: calc(6px * var(--ech));
