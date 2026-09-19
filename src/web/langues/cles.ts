@@ -422,7 +422,7 @@ export const CLES: readonly string[] = [
   "Ranger",
   "Ranger les jeux déposés…",
   "Vous voyez 47 vies : tapez 47 dans « Valeur », puis « Chercher ». Perdez-en une, tapez 46, puis « Vaut ». Si le chiffre n'est écrit nulle part, laissez « Valeur » vide et dites seulement « Plus », « Moins », « Différent » ou « Identique » entre deux moments de jeu. « Figer » maintient ensuite la valeur trouvée. « Largeur » est la taille du nombre : 1 jusqu'à 255, 2 au-delà, 4 pour les grands compteurs.",
-  "{0} rangés",
+  "rangement : {0}",
   "aucune sauvegarde à effacer",
   "Boutons",
   "Déjà dans la bibliothèque : {0}",

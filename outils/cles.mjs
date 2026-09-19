@@ -245,6 +245,9 @@ const RENOMMEES = new Map([
     "Appuyez sur un bouton de la manette : la touche correspondante s'allume. Pour en changer une, passez en réassignation, cliquez la touche à modifier, puis pressez le bouton voulu.",
     "Pressez un bouton de la manette : la commande correspondante s'allume. Pour en changer une, cliquez la case du bas, puis pressez le bouton voulu. Le bouton change alors de main : deux commandes sur le même bouton passeraient pour une panne.",
   ],
+  // « 1 jeu rangés » : l'adjectif s'accordait avec le nombre, pas avec le nom
+  // que le trou reçoit. Un nom d'action ne s'accorde avec rien.
+  ['{0} rangés', 'rangement : {0}'],
   // Les trois qui suivent ne sont pas des réécritures mais des reprises de
   // rang : « Réassigner… », « Terminer » et l'ancien libellé d'un emplacement
   // ont disparu de l'interface, et trois phrases neuves prennent leur place

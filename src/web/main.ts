@@ -5837,11 +5837,18 @@ async function rangerDepot(silencieux: boolean): Promise<void> {
   }
 
   if (ranges > 0) {
-    log(dit('{0} rangés', plural(ranges, 'jeu', 'jeux')), 'ok');
+    log(dit('rangement : {0}', plural(ranges, 'jeu', 'jeux')), 'ok');
     await refreshLibrary();
   }
 
   renderQuestionsTri(adecider);
+
+  // Rien à décider, et personne n'a rien demandé : la fenêtre se retire d'elle
+  // -même, le temps qu'on voie la barre pleine. Ouverte à chaque lancement pour
+  // dire « c'est fait », elle deviendrait une porte à refermer tous les matins.
+  if (silencieux && adecider.length === 0) {
+    setTimeout(() => dialogs.tri.close(), 1400);
+  }
 }
 
 /** Avance la barre, et dit où l'on en est. */
@@ -5961,7 +5968,7 @@ triAppliquer.addEventListener('click', async () => {
   }
 
   if (ranges > 0) {
-    log(dit('{0} rangés', plural(ranges, 'jeu', 'jeux')), 'ok');
+    log(dit('rangement : {0}', plural(ranges, 'jeu', 'jeux')), 'ok');
     await refreshLibrary();
   }
   await rangerDepot(false);
