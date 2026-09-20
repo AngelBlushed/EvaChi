@@ -1694,6 +1694,83 @@ pub fn remove_external_system(
     Ok(config.external)
 }
 
+/// Porte la langue des jeux chez les émulateurs autonomes qui la gardent.
+///
+/// EvaChi demande cette langue aux cœurs qu'elle charge elle-même, mais un
+/// émulateur autonome garde la sienne dans son propre fichier : un jeu Wii U
+/// démarrait donc dans la langue que Cemu avait retenue, et l'on ne pouvait
+/// pas la changer — lancé directement dans le jeu, il ne montre jamais sa
+/// fenêtre de réglages.
+///
+/// Rend une ligne par écriture, vide quand il n'y avait rien à faire.
+#[tauri::command]
+pub async fn write_console_language(
+    code: String,
+    paths: State<'_, Paths>,
+) -> Result<Vec<String>, String> {
+    let declares = read_config(&paths).external;
+    let errant = roaming_dir();
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut dites = Vec::new();
+        for cible in crate::parler::CIBLES {
+            let Some(declare) = declares.iter().find(|known| known.name == cible.systeme) else {
+                continue;
+            };
+            match crate::parler::ecrire(
+                cible,
+                Path::new(&declare.executable),
+                &errant,
+                &code,
+            ) {
+                // Le chemin est dit : selon que l'émulateur est portable ou
+                // non, ses réglages sont à côté de lui ou dans le dossier
+                // personnel, et savoir lequel a changé évite de chercher.
+                Ok(Some(ecrit)) => dites.push(format!(
+                    "{} : langue de la console {} → {} ({})",
+                    ecrit.label, ecrit.avant, ecrit.apres, ecrit.chemin
+                )),
+                Ok(None) => {}
+                Err(erreur) => dites.push(erreur),
+            }
+        }
+        dites
+    })
+    .await
+    .map_err(|erreur| format!("écriture interrompue : {erreur}"))
+}
+
+/// Ouvre un émulateur autonome sur sa propre fenêtre, sans jeu.
+///
+/// EvaChi le lance d'ordinaire avec un jeu et en plein écran : c'est ce qu'on
+/// veut quand on choisit un jeu, et c'est aussi ce qui fait qu'on ne voit
+/// jamais sa fenêtre. Or il garde des réglages qu'EvaChi ne connaît pas — la
+/// langue de la console de Cemu, par exemple — et cette fenêtre est le seul
+/// endroit où les atteindre. Sans jeu ni argument, il s'ouvre sur lui-même.
+#[tauri::command]
+pub fn open_external(system: String, paths: State<'_, Paths>) -> Result<String, String> {
+    let config = read_config(&paths);
+    let Some(target) = config.external.iter().find(|known| known.name == system) else {
+        return Err(format!("émulateur inconnu : {system}"));
+    };
+
+    if !Path::new(&target.executable).is_file() {
+        return Err(format!("{} : programme introuvable", target.executable));
+    }
+
+    let mut command = std::process::Command::new(&target.executable);
+    // Aucun argument : ceux qu'on garde pour jouer demandent tous le plein
+    // écran et un jeu, et rendraient la fenêtre aussi invisible qu'avant.
+    if let Some(home) = Path::new(&target.executable).parent() {
+        command.current_dir(home);
+    }
+
+    command
+        .spawn()
+        .map(|child| format!("{} ouvert (processus {})", target.name, child.id()))
+        .map_err(|error| format!("{} : {error}", target.executable))
+}
+
 /// Lance un jeu dans son émulateur autonome.
 ///
 /// Le processus est laissé libre : EvaChi ne l'attend pas et ne le surveille
@@ -2033,6 +2110,16 @@ pub fn adopt_to_stdout(source: &Path) -> i32 {
 
 /// Le dossier « Documents » de l'utilisateur, où plusieurs émulateurs rangent
 /// leurs réglages.
+/// Le dossier où les programmes rangent leurs réglages sous Windows.
+///
+/// Le dossier itinérant, celui que Windows appelle APPDATA : c'est là que
+/// Cemu met les siens quand il n'est pas installé en mode portable.
+fn roaming_dir() -> PathBuf {
+    std::env::var_os("APPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_default()
+}
+
 fn documents_dir() -> PathBuf {
     std::env::var_os("USERPROFILE")
         .map(PathBuf::from)

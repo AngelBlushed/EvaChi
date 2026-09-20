@@ -468,4 +468,6 @@ export const fi: readonly string[] = [
   /* 459 */ "Rakomaski",
   /* 460 */ "Kuvaputki",
   /* 461 */ "Joka toinen juova tummennettuna, kuten televisiossa",
+  /* 462 */ "Avaa emulaattorin sen omaan ikkunaan, ilman peliä",
+  /* 463 */ "Avaa",
 ];

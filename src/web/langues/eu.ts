@@ -469,4 +469,6 @@ export const eu: readonly string[] = [
   /* 459 */ "Sareta",
   /* 460 */ "Izpi katodikoen hodia",
   /* 461 */ "Bi lerrotik bat ilundua, telebistan bezala",
+  /* 462 */ "Emulagailua bere leihoan irekitzen du, jokorik gabe",
+  /* 463 */ "Ireki",
 ];

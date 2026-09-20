@@ -468,4 +468,6 @@ export const pt: readonly string[] = [
   /* 459 */ "Grelha",
   /* 460 */ "Tubo catódico",
   /* 461 */ "Uma linha em cada duas escurecida, como num televisor",
+  /* 462 */ "Abre o emulador na sua própria janela, sem jogo",
+  /* 463 */ "Abrir",
 ];

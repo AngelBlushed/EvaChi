@@ -471,4 +471,6 @@ export const tr: readonly string[] = [
   /* 459 */ "Yarık maskesi",
   /* 460 */ "Katot ışınlı tüp",
   /* 461 */ "İki satırdan biri koyulaştırılmış, televizyondaki gibi",
+  /* 462 */ "Öykünücüyü kendi penceresinde, oyunsuz açar",
+  /* 463 */ "Aç",
 ];

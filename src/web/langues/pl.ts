@@ -469,4 +469,6 @@ export const pl: readonly string[] = [
   /* 459 */ "Maska szczelinowa",
   /* 460 */ "Kineskop",
   /* 461 */ "Co druga linia przyciemniona, jak w telewizorze",
+  /* 462 */ "Otwiera emulator w jego własnym oknie, bez gry",
+  /* 463 */ "Otwórz",
 ];

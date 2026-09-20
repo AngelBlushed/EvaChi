@@ -469,4 +469,6 @@ export const de: readonly string[] = [
   /* 459 */ "Schlitzmaske",
   /* 460 */ "Bildröhre",
   /* 461 */ "Jede zweite Zeile abgedunkelt, wie auf einem Fernseher",
+  /* 462 */ "Öffnet den Emulator in seinem eigenen Fenster, ohne Spiel",
+  /* 463 */ "Öffnen",
 ];

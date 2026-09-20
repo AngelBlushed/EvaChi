@@ -468,4 +468,6 @@ export const af: readonly string[] = [
   /* 459 */ "Roostermasker",
   /* 460 */ "Katodestraalbuis",
   /* 461 */ "Elke tweede lyn verdonker, soos op ’n televisie",
+  /* 462 */ "Open die emuleerder in sy eie venster, sonder ’n speletjie",
+  /* 463 */ "Open",
 ];

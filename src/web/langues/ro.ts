@@ -468,4 +468,6 @@ export const ro: readonly string[] = [
   /* 459 */ "Grilă",
   /* 460 */ "Tub catodic",
   /* 461 */ "O linie din două întunecată, ca la televizor",
+  /* 462 */ "Deschide emulatorul în propria fereastră, fără joc",
+  /* 463 */ "Deschide",
 ];

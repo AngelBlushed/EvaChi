@@ -482,6 +482,8 @@ export const CLES: readonly string[] = [
   "Quadrillage",
   "Tube cathodique",
   "Une ligne sur deux assombrie, comme sur un téléviseur",
+  "Ouvre l’émulateur sur sa propre fenêtre, sans jeu",
+  "Ouvrir",
 ];
 
 /**

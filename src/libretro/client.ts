@@ -670,6 +670,16 @@ export async function launchExternal(system: string, rom: string): Promise<strin
   return invoke<string>('launch_external', { system, rom });
 }
 
+/** Porte la langue des jeux chez les émulateurs autonomes qui la gardent. */
+export async function writeConsoleLanguage(code: string): Promise<string[]> {
+  return invoke<string[]>('write_console_language', { code });
+}
+
+/** Ouvre un émulateur autonome sur sa propre fenêtre, sans jeu. */
+export async function openExternal(system: string): Promise<string> {
+  return invoke<string>('open_external', { system });
+}
+
 /** Identité déclarée par un cœur une fois sa bibliothèque chargée. */
 export interface CoreIdentity {
   readonly name: string;

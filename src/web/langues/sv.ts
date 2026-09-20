@@ -469,4 +469,6 @@ export const sv: readonly string[] = [
   /* 459 */ "Spaltmask",
   /* 460 */ "Bildrör",
   /* 461 */ "Varannan linje mörkare, som på en tv",
+  /* 462 */ "Öppnar emulatorn i dess eget fönster, utan spel",
+  /* 463 */ "Öppna",
 ];

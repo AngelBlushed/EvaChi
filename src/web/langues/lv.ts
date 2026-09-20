@@ -468,4 +468,6 @@ export const lv: readonly string[] = [
   /* 459 */ "Režģis",
   /* 460 */ "Kineskops",
   /* 461 */ "Katra otrā rinda tumšāka, kā televizorā",
+  /* 462 */ "Atver emulatoru tā paša logā, bez spēles",
+  /* 463 */ "Atvērt",
 ];

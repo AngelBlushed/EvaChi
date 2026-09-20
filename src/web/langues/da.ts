@@ -469,4 +469,6 @@ export const da: readonly string[] = [
   /* 459 */ "Maskegitter",
   /* 460 */ "Billedrør",
   /* 461 */ "Hver anden linje mørkere, som på et fjernsyn",
+  /* 462 */ "Åbner emulatoren i dens eget vindue, uden spil",
+  /* 463 */ "Åbn",
 ];

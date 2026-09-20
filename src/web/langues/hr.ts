@@ -469,4 +469,6 @@ export const hr: readonly string[] = [
   /* 459 */ "Rešetka",
   /* 460 */ "Katodna cijev",
   /* 461 */ "Svaki drugi redak potamnjen, kao na televizoru",
+  /* 462 */ "Otvara emulator u njegovu vlastitom prozoru, bez igre",
+  /* 463 */ "Otvori",
 ];

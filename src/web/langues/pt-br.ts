@@ -468,4 +468,6 @@ export const ptBR: readonly string[] = [
   /* 459 */ "Grade",
   /* 460 */ "Tubo de raios catódicos",
   /* 461 */ "Uma linha a cada duas escurecida, como numa televisão",
+  /* 462 */ "Abre o emulador na própria janela, sem jogo",
+  /* 463 */ "Abrir",
 ];

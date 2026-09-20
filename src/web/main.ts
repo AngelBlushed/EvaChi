@@ -75,6 +75,8 @@ import {
   externalSystems,
   knownExternals,
   launchExternal,
+  openExternal,
+  writeConsoleLanguage,
   pickExecutable,
   removeExternalSystem,
   setExternalSystem,
@@ -652,6 +654,27 @@ function choisirParler(code: string): void {
   retenir(RETENU.parler, code);
   renderLangues();
   log(dit('Langue des jeux : {0}. Elle vaudra au prochain lancement.', nomDuParler()), 'ok');
+  void porterLaLangue();
+}
+
+/**
+ * Porte la langue des jeux chez les émulateurs autonomes qui la gardent.
+ *
+ * Un cœur chargé ici reçoit la langue au lancement. Un émulateur autonome, lui,
+ * garde la sienne dans son propre fichier — et comme EvaChi le lance dans le
+ * jeu et en plein écran, il ne montre jamais la fenêtre où l'on pourrait la
+ * changer. Le réglage existait donc sans qu'on puisse l'atteindre.
+ *
+ * Comme pour les touches : l'émulateur réécrit son fichier en se fermant, et
+ * l'écriture ne vaut donc que s'il ne tourne pas.
+ */
+async function porterLaLangue(): Promise<void> {
+  if (!inShell) return;
+  try {
+    for (const dite of (await writeConsoleLanguage(langueDesJeux())) ?? []) log(dite, 'ok');
+  } catch (error) {
+    log(reason(error), 'err');
+  }
 }
 
 /** La langue à demander au prochain cœur chargé. */
@@ -7181,6 +7204,20 @@ function renderEmulators(): void {
       actions.append(button);
     }
 
+    // Et de quoi l'ouvrir sur lui-même, dès qu'il est installé : c'est le
+    // seul endroit où atteindre ses réglages à lui, et EvaChi le lance
+    // toujours dans un jeu. Le bouton est ici comme dans la liste des systèmes
+    // déclarés, parce que c'est ici qu'on regarde un émulateur qu'on vient
+    // d'installer.
+    if (offer.owned || offer.declared) {
+      const ouvrir = document.createElement('button');
+      ouvrir.type = 'button';
+      ouvrir.textContent = t('Ouvrir');
+      ouvrir.title = t('Ouvre l’émulateur sur sa propre fenêtre, sans jeu');
+      ouvrir.addEventListener('click', () => void ouvrirExterne(offer.system));
+      actions.append(ouvrir);
+    }
+
     // Toujours de quoi désigner le sien. Sans ce bouton, une console dont la
     // forge refuse les robots — la Switch — n'offrait aucune issue depuis cette
     // fenêtre : le texte disait où aller chercher l'émulateur, et rien ne
@@ -7485,6 +7522,15 @@ function renderExternals(): void {
     actions.className = 'actions';
 
     if (declared) {
+      // Ouvrir l'émulateur sur lui-même : c'est le seul endroit où atteindre
+      // ses réglages à lui, et EvaChi le lance sinon toujours dans un jeu.
+      const ouvrir = document.createElement('button');
+      ouvrir.type = 'button';
+      ouvrir.textContent = t('Ouvrir');
+      ouvrir.title = t('Ouvre l’émulateur sur sa propre fenêtre, sans jeu');
+      ouvrir.addEventListener('click', () => void ouvrirExterne(preset.system));
+      actions.append(ouvrir);
+
       const remove = document.createElement('button');
       remove.type = 'button';
       remove.textContent = t('Retirer');
@@ -7513,6 +7559,21 @@ function renderExternals(): void {
 
     item.append(name, actions, state);
     presetList.append(item);
+  }
+}
+
+/**
+ * Ouvre un émulateur autonome sur sa propre fenêtre.
+ *
+ * Il garde des réglages qu'EvaChi ne connaît pas, et sa fenêtre est le seul
+ * endroit où les atteindre. Lancé toujours avec un jeu et en plein écran, il
+ * ne la montrait jamais.
+ */
+async function ouvrirExterne(systeme: string): Promise<void> {
+  try {
+    log(await openExternal(systeme), 'ok');
+  } catch (error) {
+    log(`${systeme} — ${reason(error)}`, 'err');
   }
 }
 

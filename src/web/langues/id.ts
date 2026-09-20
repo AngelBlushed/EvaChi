@@ -468,4 +468,6 @@ export const id: readonly string[] = [
   /* 459 */ "Kisi",
   /* 460 */ "Tabung sinar katode",
   /* 461 */ "Satu garis dari tiap dua digelapkan, seperti di televisi",
+  /* 462 */ "Membuka emulator di jendelanya sendiri, tanpa gim",
+  /* 463 */ "Buka",
 ];

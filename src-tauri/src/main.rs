@@ -23,6 +23,7 @@ mod emulators;
 mod install;
 mod manual;
 mod pads;
+mod parler;
 mod piles;
 mod tri;
 mod sentinel;
@@ -187,6 +188,8 @@ fn main() {
             commands::set_external_system,
             commands::remove_external_system,
             commands::launch_external,
+            commands::open_external,
+            commands::write_console_language,
             commands::known_externals,
             commands::adopt_external,
             commands::installable_cores,

@@ -468,4 +468,6 @@ export const gl: readonly string[] = [
   /* 459 */ "Reixa",
   /* 460 */ "Tubo catódico",
   /* 461 */ "Unha liña de cada dúas escurecida, coma nun televisor",
+  /* 462 */ "Abre o emulador na súa propia xanela, sen xogo",
+  /* 463 */ "Abrir",
 ];
