@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
 use tauri::{Manager, State};
 
-use evachi::libretro::{AvInfo, CoreInfo, Entrees, Session, VideoFrame};
+use evachi::libretro::{AvInfo, CoreInfo, Entrees, Manettes, Session, VideoFrame};
 
 /// Au-delà, un état de jeu n'en est plus un.
 ///
@@ -2924,6 +2924,17 @@ fn pack_frame(video: Option<&VideoFrame>, audio: &[i16], shutdown: bool) -> Vec<
     out
 }
 
+/// Ce qu'une manette d'un autre port envoie pour une trame.
+///
+/// Pas de capteurs : ils décrivent la console — son inclinaison, sa secousse —
+/// et non le joueur. Une console n'en a qu'une.
+#[derive(Debug, Deserialize)]
+pub struct Autre {
+    pub input: Vec<i16>,
+    #[serde(default)]
+    pub axes: Vec<i16>,
+}
+
 /// Émule une ou plusieurs trames et renvoie image et son au format décrit sur
 /// [`pack_frame`].
 ///
@@ -2936,6 +2947,7 @@ pub async fn run_frame(
     input: Vec<i16>,
     axes: Option<Vec<i16>>,
     sensors: Option<Vec<f64>>,
+    others: Option<Vec<Autre>>,
     frames: Option<u32>,
     video: Option<bool>,
     session: State<'_, Arc<Session>>,
@@ -2955,12 +2967,27 @@ pub async fn run_frame(
         *slot = if value.is_finite() { value as f32 } else { 0.0 };
     }
 
+    // Les autres joueurs prennent les ports suivants, dans l'ordre reçu. Une
+    // manette de trop est ignorée plutôt que de déborder sur rien.
+    let mut manettes = Manettes::from(entrees);
+    for (rang, autre) in others.unwrap_or_default().into_iter().enumerate() {
+        let Some(place) = manettes.ports.get_mut(rang + 1) else {
+            break;
+        };
+        for (slot, value) in place.boutons.iter_mut().zip(autre.input) {
+            *slot = value;
+        }
+        for (slot, value) in place.manches.iter_mut().zip(autre.axes) {
+            *slot = value;
+        }
+    }
+
     let combien = frames.unwrap_or(1).clamp(1, 64);
     let image = video.unwrap_or(true);
 
     let session = Arc::clone(&session);
     let bloc = au_travail(move || {
-        let frame = session.run_frames(entrees, combien, image)?;
+        let frame = session.run_frames(manettes, combien, image)?;
         Ok(pack_frame(
             frame.video.as_ref(),
             &frame.audio,

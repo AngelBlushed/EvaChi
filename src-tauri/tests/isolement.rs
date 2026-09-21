@@ -12,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use evachi::libretro::{Consignes, Entrees, Poke, Session};
+use evachi::libretro::{Consignes, Entrees, Manettes, Poke, Session};
 
 /// Dimensions annoncées par le cœur d'essai.
 const WIDTH: u32 = 32;
@@ -541,6 +541,34 @@ fn le_dechargement_laisse_au_coeur_le_temps_d_ecrire() {
     // Le processus est parti avec le cœur : plus rien ne répond, et c'est dit.
     let erreur = session.run_frame(NO_BUTTONS).expect_err("plus de cœur");
     assert!(erreur.contains("aucun cœur"), "{erreur}");
+}
+
+#[test]
+fn le_deuxieme_joueur_traverse_la_frontiere() {
+    // Les entrées voyagent en octets fixes jusqu'au processus voisin : un port
+    // de plus, c'est un format de plus, et un décalage d'un port ferait jouer
+    // le premier joueur à la place du second sans que rien ne le dise.
+    let (session, _bac) = partie();
+
+    let mut manettes = Manettes::default();
+    manettes.ports[1].boutons[3] = 1;
+
+    let trame = session.run_frame(manettes).expect("trame");
+    let image = trame.video.expect("image");
+
+    /// La couleur dont le cœur d'essai marque un bouton tenu.
+    const ALLUME: [u8; 3] = [0x9e, 0xe3, 0x7d];
+
+    // Ligne 2 : le deuxième port. Ligne 1 : le premier, qui doit rester noir.
+    let tenu = |ligne: u32, x: u32| {
+        let debut = ((ligne * WIDTH + x) * 4) as usize;
+        image.rgba[debut..debut + 3] == ALLUME
+    };
+    assert!(tenu(2, 3), "le bouton du deuxième joueur doit se voir");
+    assert!(!tenu(2, 4), "et lui seul");
+    for x in 0..16 {
+        assert!(!tenu(1, x), "le premier joueur ne touche à rien : bouton {x}");
+    }
 }
 
 #[test]

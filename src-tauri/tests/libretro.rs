@@ -10,7 +10,7 @@
 use std::path::PathBuf;
 use std::sync::{Mutex, MutexGuard};
 
-use evachi::libretro::{Entrees, Session};
+use evachi::libretro::{Entrees, Manettes, Session};
 
 /// Un cœur libretro range son état en global : chargé deux fois dans le même
 /// processus, il n'existe toujours qu'en un exemplaire. Les tests s'exécutant
@@ -331,6 +331,40 @@ fn le_dechargement_libere_le_coeur() {
 
     let error = session.run_frame(NO_BUTTONS).expect_err("doit échouer après déchargement");
     assert!(error.contains("aucun cœur"), "message inattendu : {error}");
+}
+
+#[test]
+fn le_deuxieme_joueur_atteint_le_coeur() {
+    // Le manque : l'hôte ne répondait que pour le premier port, et rendait zéro
+    // pour tous les autres. Le jeu démarrait à deux, et le deuxième joueur
+    // n'existait pas.
+    let (_guard, session, _scratch) = session_with_content();
+
+    let mut manettes = Manettes::default();
+    manettes.ports[1].boutons[3] = 1;
+
+    let frame = session.run_frame(manettes).expect("trame");
+    let video = frame.video.expect("image");
+
+    // Le cœur d'essai allume un pixel de la ligne 2 par bouton tenu au
+    // deuxième port, comme il le fait ligne 1 pour le premier : l'image dit
+    // donc ce qu'il a réellement lu.
+    const ALLUME: [u8; 4] = [0x9e, 0xe3, 0x7d, 0xff];
+    const ETEINT: [u8; 4] = [0x00, 0x00, 0x00, 0xff];
+
+    for index in 0..16u32 {
+        let attendu = if index == 3 { ALLUME } else { ETEINT };
+        assert_eq!(pixel(&video.rgba, index, 2), attendu, "deuxième joueur, bouton {index}");
+    }
+
+    // Et le premier port reste au repos : les deux ne doivent pas se mélanger.
+    for index in 0..16u32 {
+        assert_eq!(
+            pixel(&video.rgba, index, 1),
+            ETEINT,
+            "premier joueur, bouton {index}"
+        );
+    }
 }
 
 /// Le bouton par lequel le cœur d'essai sauvegarde dans sa pile, et celui par

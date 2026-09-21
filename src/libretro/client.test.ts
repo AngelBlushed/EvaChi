@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { decodeFrame } from './client.ts';
+import { decodeFrame, portsSuivants } from './client.ts';
 
 const HEADER_BYTES = 16;
 const FLAG_VIDEO = 1 << 0;
@@ -130,5 +130,32 @@ describe('décodage des trames', () => {
     view.setUint32(8, FLAG_VIDEO, true);
 
     assert.throws(() => decodeFrame(buffer), /tronquée/);
+  });
+});
+
+describe('manettes des joueurs suivants', () => {
+  it('convertit les pressions et les axes comme pour le premier joueur', () => {
+    const [deuxieme] = portsSuivants([
+      { boutons: [false, true], manches: [1, -1, 0, 0.5] },
+    ]);
+
+    assert.equal(deuxieme?.input.length, 16, 'un cœur lit toujours les seize');
+    assert.equal(deuxieme?.input[0], 0);
+    assert.equal(deuxieme?.input[1], 1);
+    assert.deepEqual(deuxieme?.axes, [32767, -32767, 0, 16384]);
+  });
+
+  it('borne un axe qui déborde plutôt que de le faire tourner', () => {
+    // Une manette mal calibrée rend parfois 1,02 : sans borne, le tour du
+    // compteur enverrait « à fond à gauche » pour un joueur qui pousse à
+    // droite.
+    const [manette] = portsSuivants([{ boutons: [], manches: [1.02, -3, 0, 0] }]);
+
+    assert.equal(manette?.axes[0], 32767);
+    assert.equal(manette?.axes[1], -32767);
+  });
+
+  it('ne rend rien quand personne d’autre ne joue', () => {
+    assert.deepEqual(portsSuivants([]), []);
   });
 });

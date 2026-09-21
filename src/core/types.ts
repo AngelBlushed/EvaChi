@@ -117,6 +117,17 @@ export interface EmulatorCore {
 }
 
 /**
+ * Une manette d'un autre port : ses boutons, et ses manches.
+ *
+ * Pas de capteurs : ils décrivent la console — son inclinaison, sa secousse —
+ * et non le joueur. Une console n'en a qu'une.
+ */
+export interface AutreManette {
+  readonly boutons: readonly boolean[];
+  readonly manches: readonly number[];
+}
+
+/**
  * Même contrat, mais asynchrone.
  *
  * Un cœur qui vit dans le processus courant répond immédiatement ; un cœur
@@ -144,6 +155,7 @@ export interface AsyncEmulatorCore {
     image?: boolean,
     manches?: StickState,
     capteurs?: SensorState,
+    autres?: readonly AutreManette[],
   ): Promise<Frame>;
   saveState(): Promise<Uint8Array>;
   loadState(state: Uint8Array): Promise<void>;

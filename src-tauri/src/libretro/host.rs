@@ -32,8 +32,8 @@ pub struct HostState {
     pub video: VideoFrame,
     /// Faux quand le cœur a demandé de réafficher la trame précédente.
     pub video_fresh: bool,
-    /// État de la manette du port 0. Les autres ports renvoient zéro.
-    pub input: Entrees,
+    /// État des manettes, port par port.
+    pub input: Manettes,
     pub system_dir: CString,
     pub save_dir: CString,
     /// Géométrie redemandée en cours de partie par certains cœurs.
@@ -97,7 +97,7 @@ impl Default for HostState {
             pixel_format: PixelFormat::default(),
             video: VideoFrame::default(),
             video_fresh: false,
-            input: Entrees::default(),
+            input: Manettes::default(),
             system_dir: CString::default(),
             save_dir: CString::default(),
             geometry: None,
@@ -395,7 +395,7 @@ pub unsafe extern "C" fn get_sensor_input(port: c_uint, id: c_uint) -> f32 {
     if port != 0 {
         return 0.0;
     }
-    with_host(|host| host.input.capteur(id))
+    with_host(|host| host.input.port(0).capteur(id))
 }
 
 /// # Safety
@@ -412,16 +412,13 @@ pub unsafe extern "C" fn input_state(
     index: c_uint,
     id: c_uint,
 ) -> i16 {
-    if port != 0 {
-        return 0;
-    }
     match device {
         RETRO_DEVICE_JOYPAD if (id as usize) < JOYPAD_BUTTONS => {
-            with_host(|host| host.input.boutons[id as usize])
+            with_host(|host| host.input.port(port).boutons[id as usize])
         }
         // Ici, le rang désigne le manche et l'identifiant désigne l'axe :
         // l'inverse de la manette numérique, où le rang ne sert à rien.
-        RETRO_DEVICE_ANALOG => with_host(|host| host.input.axe(index, id)),
+        RETRO_DEVICE_ANALOG => with_host(|host| host.input.port(port).axe(index, id)),
         _ => 0,
     }
 }

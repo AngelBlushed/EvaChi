@@ -258,8 +258,8 @@ const CURSOR: u32 = 0x009e_e37d;
 /// pour la mauvaise raison.
 pub const PADDING_POISON: u32 = 0x00ff_00ff;
 
-/// Première ligne utile du fond : les deux premières servent au diagnostic.
-const FIELD_TOP: u32 = 2;
+/// Première ligne utile du fond : les trois premières servent au diagnostic.
+const FIELD_TOP: u32 = 3;
 
 /// Couleur attendue à la position donnée, en 0x00RRGGBB.
 ///
@@ -267,14 +267,16 @@ const FIELD_TOP: u32 = 2;
 ///
 /// - ligne 0 : rouge, vert, bleu, blanc purs — un hôte qui inverse rouge et
 ///   bleu s'y trahit immédiatement ;
-/// - ligne 1 : un pixel allumé par bouton enfoncé, ce qui rend visible ce que
-///   le cœur a réellement lu ;
+/// - ligne 1 : un pixel allumé par bouton enfoncé au premier port, ce qui rend
+///   visible ce que le cœur a réellement lu ;
+/// - ligne 2 : la même chose pour le deuxième port, sans quoi rien ne dirait
+///   si le second joueur existe ;
 /// - en dessous : un fond sombre parcouru par un curseur qui avance d'un pixel
 ///   par trame, ce qui montre l'avancement sans agresser l'œil.
 ///
 /// Une première version remplissait le fond de bruit coloré. C'était tout aussi
 /// vérifiable et parfaitement insoutenable à regarder.
-pub fn expected_pixel(x: u32, y: u32, frame: u64, buttons: u16) -> u32 {
+pub fn expected_pixel(x: u32, y: u32, frame: u64, buttons: u16, deuxieme: u16) -> u32 {
     if y == 0 {
         match x {
             0 => return 0x00ff_0000, // rouge pur
@@ -287,6 +289,10 @@ pub fn expected_pixel(x: u32, y: u32, frame: u64, buttons: u16) -> u32 {
 
     if y == 1 && x < 16 {
         return if buttons & (1 << x) != 0 { CURSOR } else { 0x0000_0000 };
+    }
+
+    if y == 2 && x < 16 {
+        return if deuxieme & (1 << x) != 0 { CURSOR } else { 0x0000_0000 };
     }
 
     let field = WIDTH as u64 * (HEIGHT - FIELD_TOP) as u64;
@@ -531,12 +537,19 @@ pub unsafe extern "C" fn retro_run() {
         poll();
     }
 
-    // On lit les seize boutons du port 0 et on les compacte en un masque.
+    // On lit les seize boutons des deux premiers ports et on les compacte en
+    // deux masques. Le deuxième port est interrogé comme le premier : c'est
+    // ainsi qu'un vrai cœur s'y prend, et le seul moyen de voir si l'hôte sait
+    // répondre pour un deuxième joueur.
     let mut buttons: u16 = 0;
+    let mut deuxieme: u16 = 0;
     if let Some(state) = INPUT_STATE {
         for id in 0..16u32 {
             if state(0, RETRO_DEVICE_JOYPAD, 0, id) != 0 {
                 buttons |= 1 << id;
+            }
+            if state(1, RETRO_DEVICE_JOYPAD, 0, id) != 0 {
+                deuxieme |= 1 << id;
             }
         }
     }
@@ -575,7 +588,7 @@ pub unsafe extern "C" fn retro_run() {
             // Au-delà de la largeur visible commence le rembourrage, qu'on
             // empoisonne pour qu'un hôte négligeant `pitch` se dénonce.
             buffer[(y * STRIDE + x) as usize] = if x < WIDTH {
-                expected_pixel(x, y, frame, buttons)
+                expected_pixel(x, y, frame, buttons, deuxieme)
             } else {
                 PADDING_POISON
             };

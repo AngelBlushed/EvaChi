@@ -15,7 +15,7 @@ use std::io::{Read, Write};
 
 use serde::{Deserialize, Serialize};
 
-use super::super::abi::{Entrees, CAPTEURS, JOYPAD_BUTTONS, MANCHES};
+use super::super::abi::{Manettes, CAPTEURS, JOYPAD_BUTTONS, MANCHES, PORTS};
 
 /// Taille de l'en-tête de cadrage, en octets.
 pub const ENTETE: usize = 12;
@@ -141,7 +141,7 @@ impl Tranche {
 /// qui parte soixante fois par seconde, et parfois cinq cents.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Requete {
-    pub entrees: Entrees,
+    pub manettes: Manettes,
     /// Combien de trames faire tourner d'affilée. En avance rapide, demander
     /// les trames une par une paie l'aller-retour autant de fois ; on ne
     /// regarde de toute façon que la dernière image.
@@ -152,26 +152,32 @@ pub struct Requete {
 }
 
 impl Requete {
+    /// Taille d'un port une fois écrit : ses boutons, ses manches, ses capteurs.
+    const PAR_PORT: usize = (JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4;
+
     /// Taille de la requête une fois écrite.
     ///
-    /// Les manches sont écrits à la suite des boutons : c'est la seule requête
-    /// qui part soixante fois par seconde, et quatre mots de plus se lisent
-    /// sans rien coûter là où un objet sérialisé aurait coûté cher.
-    pub const TAILLE: usize = (JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4 + 8;
+    /// Les manches sont écrits à la suite des boutons, et les quatre ports à la
+    /// suite les uns des autres : c'est la seule requête qui part soixante fois
+    /// par seconde, et trois cents octets fixes se lisent sans rien coûter là
+    /// où un objet sérialisé aurait coûté cher.
+    pub const TAILLE: usize = PORTS * Self::PAR_PORT + 8;
 
     pub fn ecrire(&self) -> Vec<u8> {
         let mut octets = Vec::with_capacity(Self::TAILLE);
-        for bouton in self.entrees.boutons {
-            octets.extend_from_slice(&bouton.to_le_bytes());
-        }
-        for axe in self.entrees.manches {
-            octets.extend_from_slice(&axe.to_le_bytes());
-        }
-        // Les capteurs en nombres à virgule : une accélération se lit en
-        // fractions de g, et l'arrondir à l'entier rendrait toute inclinaison
-        // nulle.
-        for valeur in self.entrees.capteurs {
-            octets.extend_from_slice(&valeur.to_le_bytes());
+        for entrees in &self.manettes.ports {
+            for bouton in entrees.boutons {
+                octets.extend_from_slice(&bouton.to_le_bytes());
+            }
+            for axe in entrees.manches {
+                octets.extend_from_slice(&axe.to_le_bytes());
+            }
+            // Les capteurs en nombres à virgule : une accélération se lit en
+            // fractions de g, et l'arrondir à l'entier rendrait toute
+            // inclinaison nulle.
+            for valeur in entrees.capteurs {
+                octets.extend_from_slice(&valeur.to_le_bytes());
+            }
         }
         octets.extend_from_slice(&self.trames.to_le_bytes());
         octets.extend_from_slice(&u32::from(self.image).to_le_bytes());
@@ -186,25 +192,31 @@ impl Requete {
                 Self::TAILLE
             ));
         }
-        let mot = |rang: usize| i16::from_le_bytes([octets[rang * 2], octets[rang * 2 + 1]]);
-        let mut entrees = Entrees::default();
-        for (rang, place) in entrees.boutons.iter_mut().enumerate() {
-            *place = mot(rang);
+        let mut manettes = Manettes::default();
+        for (port, entrees) in manettes.ports.iter_mut().enumerate() {
+            let base = port * Self::PAR_PORT;
+            let mot = |rang: usize| {
+                let debut = base + rang * 2;
+                i16::from_le_bytes([octets[debut], octets[debut + 1]])
+            };
+            for (rang, place) in entrees.boutons.iter_mut().enumerate() {
+                *place = mot(rang);
+            }
+            for (rang, place) in entrees.manches.iter_mut().enumerate() {
+                *place = mot(JOYPAD_BUTTONS + rang);
+            }
+            let apres_manches = base + (JOYPAD_BUTTONS + MANCHES) * 2;
+            for (rang, place) in entrees.capteurs.iter_mut().enumerate() {
+                let debut = apres_manches + rang * 4;
+                *place = f32::from_le_bytes([
+                    octets[debut],
+                    octets[debut + 1],
+                    octets[debut + 2],
+                    octets[debut + 3],
+                ]);
+            }
         }
-        for (rang, place) in entrees.manches.iter_mut().enumerate() {
-            *place = mot(JOYPAD_BUTTONS + rang);
-        }
-        let apres_manches = (JOYPAD_BUTTONS + MANCHES) * 2;
-        for (rang, place) in entrees.capteurs.iter_mut().enumerate() {
-            let debut = apres_manches + rang * 4;
-            *place = f32::from_le_bytes([
-                octets[debut],
-                octets[debut + 1],
-                octets[debut + 2],
-                octets[debut + 3],
-            ]);
-        }
-        let base = apres_manches + CAPTEURS * 4;
+        let base = PORTS * Self::PAR_PORT;
         let nombre = |debut: usize| {
             u32::from_le_bytes([
                 octets[debut],
@@ -214,7 +226,7 @@ impl Requete {
             ])
         };
         Ok(Self {
-            entrees,
+            manettes,
             trames: nombre(base).clamp(1, 64),
             image: nombre(base + 4) != 0,
         })
@@ -432,6 +444,7 @@ pub fn decomposer(octets: &[u8]) -> Result<(Vec<String>, Vec<u8>), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::super::abi::Entrees;
 
     #[test]
     fn un_message_cadre_se_relit_tel_quel() {
@@ -478,17 +491,25 @@ mod tests {
 
     #[test]
     fn une_requete_de_trame_fait_l_aller_retour() {
-        let mut entrees = Entrees::default();
-        entrees.boutons[0] = 1;
-        entrees.boutons[JOYPAD_BUTTONS - 1] = 1;
+        let mut manettes = Manettes::default();
+        let premiere = &mut manettes.ports[0];
+        premiere.boutons[0] = 1;
+        premiere.boutons[JOYPAD_BUTTONS - 1] = 1;
         // Un manche poussé à fond, un autre à moitié en arrière : sans eux,
         // l'aller-retour ne dirait rien des quatre mots ajoutés.
-        entrees.manches = [i16::MAX, -16_384, 0, 1];
+        premiere.manches = [i16::MAX, -16_384, 0, 1];
         // Et la pesanteur, penchee et secouee : sans elle, l'aller-retour ne
         // dirait rien des vingt-quatre octets ajoutes.
-        entrees.capteurs = [0.5, -0.81, 0.25, 1.5, -2.25, 0.0];
+        premiere.capteurs = [0.5, -0.81, 0.25, 1.5, -2.25, 0.0];
+
+        // Le dernier port aussi, et différemment : deux ports qui se
+        // ressembleraient laisseraient passer un décalage d'un port entier.
+        let dernier = &mut manettes.ports[PORTS - 1];
+        dernier.boutons[3] = 1;
+        dernier.manches = [-1, 2, -3, 4];
+
         let requete = Requete {
-            entrees,
+            manettes,
             trames: 9,
             image: false,
         };
@@ -498,18 +519,41 @@ mod tests {
     }
 
     #[test]
+    fn chaque_port_reste_chez_lui() {
+        // Le défaut qu'une relecture symétrique ne verrait pas : un port dont
+        // les octets glissent chez le voisin. On n'en remplit qu'un, et les
+        // autres doivent ressortir au repos.
+        let mut manettes = Manettes::default();
+        manettes.ports[1].boutons[5] = 1;
+
+        let relue = Requete::lire(
+            &Requete {
+                manettes,
+                trames: 1,
+                image: true,
+            }
+            .ecrire(),
+        )
+        .expect("relecture");
+
+        assert_eq!(relue.manettes.ports[1].boutons[5], 1, "le deuxième joueur");
+        assert_eq!(relue.manettes.ports[0], Entrees::default(), "le premier");
+        assert_eq!(relue.manettes.ports[2], Entrees::default(), "le troisième");
+    }
+
+    #[test]
     fn un_nombre_de_trames_aberrant_est_ramene_dans_ses_bornes() {
         // Zéro trame ferait une réponse vide que la fenêtre attendrait pour
         // rien ; un million bloquerait le processus voisin pour de bon.
         let mut brut = Requete {
-            entrees: Entrees::default(),
+            manettes: Manettes::default(),
             trames: 0,
             image: true,
         }
         .ecrire();
         assert_eq!(Requete::lire(&brut).expect("zéro").trames, 1);
 
-        let base = (JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4;
+        let base = PORTS * ((JOYPAD_BUTTONS + MANCHES) * 2 + CAPTEURS * 4);
         brut[base..base + 4].copy_from_slice(&1_000_000u32.to_le_bytes());
         assert_eq!(Requete::lire(&brut).expect("trop").trames, 64);
     }

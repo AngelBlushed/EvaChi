@@ -163,3 +163,70 @@ export function choosePad(pads: readonly (PadSlot | null | undefined)[], current
   if (current >= 0 && pads[current]?.connected) return current;
   return pads.findIndex((pad) => pad?.connected);
 }
+
+/**
+ * Combien de manettes une console peut recevoir chez nous.
+ *
+ * Le même nombre que du côté du cœur — voir `PORTS` dans `abi.rs`. Les deux
+ * doivent s'accorder : une manette de plus ici n'irait nulle part.
+ */
+export const PORTS = 4;
+
+/** Ce qu'on a besoin de savoir d'une manette pour la lire. */
+export interface PadLu {
+  readonly buttons: readonly { readonly pressed: boolean }[];
+  readonly axes: readonly number[];
+}
+
+/** Ce qu'une manette envoie pour une trame. */
+export interface Manette {
+  readonly boutons: boolean[];
+  readonly manches: number[];
+}
+
+/**
+ * Lit une manette : ses boutons, sa croix, ses manches.
+ *
+ * Sortie de la boucle de trame pour servir à tous les joueurs et non au seul
+ * premier. Le clavier ne passe pas par ici : il n'appartient qu'au joueur un,
+ * et les deux sources se rejoignent chez l'appelant.
+ *
+ * `seuilCroix` décide à partir de quand le manche gauche vaut une direction —
+ * bien des manettes récentes n'ont qu'un manche confortable, et bien des jeux
+ * n'attendent que la croix. `zoneMorte` est bien plus fin : il ne décide pas
+ * d'un oui ou d'un non mais empêche un manche usé de dériver tout seul.
+ */
+export function lireManette(
+  pad: PadLu,
+  liaisons: ReadonlyMap<number, number>,
+  seuilCroix: number,
+  zoneMorte: number,
+): Manette {
+  const boutons: boolean[] = new Array(BUTTON_COUNT).fill(false);
+
+  for (const [source, cible] of liaisons) {
+    if (pad.buttons[source]?.pressed) boutons[cible] = true;
+  }
+
+  const [x = 0, y = 0] = pad.axes;
+  const croix: [number, boolean][] = [
+    [PAD_LEFT, x < -seuilCroix],
+    [PAD_RIGHT, x > seuilCroix],
+    [PAD_UP, y < -seuilCroix],
+    [PAD_DOWN, y > seuilCroix],
+  ];
+  for (const [source, tenue] of croix) {
+    const cible = liaisons.get(source);
+    if (tenue && cible !== undefined) boutons[cible] = true;
+  }
+
+  // Et le manche tel quel, en plus de la croix qu'il imite : ce sont deux
+  // commandes différentes sur la machine émulée. La Nintendo 64 a une croix
+  // *et* un manche, et ses jeux lisent le second.
+  const manches = [0, 1, 2, 3].map((axe) => {
+    const pousse = pad.axes[axe] ?? 0;
+    return Math.abs(pousse) < zoneMorte ? 0 : pousse;
+  });
+
+  return { boutons, manches };
+}

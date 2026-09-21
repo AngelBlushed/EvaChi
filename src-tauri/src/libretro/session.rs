@@ -26,7 +26,7 @@ use std::sync::mpsc::{channel, Sender};
 use std::sync::Mutex;
 use std::thread;
 
-use super::abi::Entrees;
+use super::abi::Manettes;
 use super::core::{AvInfo, Core, CoreInfo};
 use super::host::VideoFrame;
 
@@ -78,7 +78,7 @@ enum Request {
         reply: Reply<AvInfo>,
     },
     RunFrame {
-        input: Entrees,
+        input: Manettes,
         trames: u32,
         reply: Reply<FramePayload>,
     },
@@ -272,7 +272,7 @@ impl Locale {
 /// Partagé par les deux façons de tenir un cœur : la fenêtre doit obtenir la
 /// même chose de l'une et de l'autre, sans quoi l'un des deux chemins finirait
 /// par diverger sans que rien ne le dise.
-fn tourner(core: &mut Core, input: Entrees, trames: u32) -> Result<FramePayload, String> {
+fn tourner(core: &mut Core, input: Manettes, trames: u32) -> Result<FramePayload, String> {
     let mut audio: Vec<i16> = Vec::new();
     let mut messages: Vec<String> = Vec::new();
     let mut video = None;
@@ -547,7 +547,7 @@ impl Session {
     }
 
     /// Fait tourner une trame.
-    pub fn run_frame(&self, input: Entrees) -> Result<FramePayload, String> {
+    pub fn run_frame(&self, input: impl Into<Manettes>) -> Result<FramePayload, String> {
         self.run_frames(input, 1, true)
     }
 
@@ -559,10 +559,11 @@ impl Session {
     /// par une paierait l'aller-retour neuf fois.
     pub fn run_frames(
         &self,
-        input: Entrees,
+        input: impl Into<Manettes>,
         trames: u32,
         image: bool,
     ) -> Result<FramePayload, String> {
+        let input = input.into();
         let mut tenant = self.tenant();
         let payload = match &mut *tenant {
             Tenant::Local(locale) => locale.call(|reply| Request::RunFrame {
@@ -574,7 +575,7 @@ impl Session {
             Tenant::Distant(_) => {
                 use super::distant::protocole::Requete;
                 let requete = Requete {
-                    entrees: input,
+                    manettes: input,
                     trames,
                     image,
                 };
@@ -752,6 +753,7 @@ impl Session {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::libretro::abi::Entrees;
 
     #[test]
     fn une_session_locale_se_dit_locale() {

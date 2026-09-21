@@ -257,6 +257,46 @@ impl Entrees {
     }
 }
 
+/// Combien de manettes une console peut recevoir chez nous.
+///
+/// Quatre : c'est ce que la Nintendo 64 et la GameCube ont d'origine, et les
+/// consoles qui n'en ont que deux ignorent simplement les ports suivants.
+/// Au-delà il faudrait un multitap, que rien ne réclame ici.
+pub const PORTS: usize = 4;
+
+/// Ce que toutes les manettes envoient pour une même trame.
+///
+/// Un cœur interroge ses ports un par un, et l'hôte doit pouvoir répondre pour
+/// chacun. Tant qu'il n'y avait qu'une manette, le deuxième port rendait zéro
+/// quoi qu'il arrive : à deux, le jeu démarrait et le second joueur n'existait
+/// pas.
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
+pub struct Manettes {
+    pub ports: [Entrees; PORTS],
+}
+
+/// Une manette seule vaut la première, les autres au repos : c'est le cas de
+/// presque tout le code et de toutes les épreuves d'avant.
+impl From<Entrees> for Manettes {
+    fn from(premiere: Entrees) -> Self {
+        let mut ports = [Entrees::default(); PORTS];
+        ports[0] = premiere;
+        Self { ports }
+    }
+}
+
+impl Manettes {
+    /// L'état d'un port. Un port que la console invente est au repos.
+    pub fn port(&self, rang: c_uint) -> &Entrees {
+        static REPOS: Entrees = Entrees {
+            boutons: [0; JOYPAD_BUTTONS],
+            manches: [0; MANCHES],
+            capteurs: [0.0; CAPTEURS],
+        };
+        self.ports.get(rang as usize).unwrap_or(&REPOS)
+    }
+}
+
 // --- Structures échangées ---------------------------------------------------
 
 /// Identité du cœur, disponible avant tout chargement de contenu.

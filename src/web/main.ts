@@ -110,16 +110,18 @@ import {
   HEX_KEYPAD,
   JOYPAD,
   choosePad,
+  lireManette,
   PAD_DOWN,
   PAD_L3,
   PAD_LEFT,
   PAD_R3,
   PAD_RIGHT,
   PAD_UP,
+  PORTS,
   STICK_DEADZONE,
   vitesseAvance,
 } from './input.ts';
-import type { ButtonLayout } from './input.ts';
+import type { ButtonLayout, Manette } from './input.ts';
 import type { Depose } from '../libretro/client.ts';
 import { THEMES, applyTheme, themeById } from './themes.ts';
 import { COMME_INTERFACE, PARLERS, langueDemandee, parlerParCode } from './parlers.ts';
@@ -2196,6 +2198,15 @@ const keyboard: boolean[] = new Array(BUTTON_COUNT).fill(false);
 const manches: number[] = [0, 0, 0, 0];
 
 /**
+ * Les manettes des autres joueurs, dans l'ordre des ports.
+ *
+ * Le clavier n'y est pas : il appartient au premier joueur, et lui seul. Une
+ * manette branchée après la sienne prend le port suivant, dans l'ordre où le
+ * navigateur les présente.
+ */
+const autresManettes: Manette[] = [];
+
+/**
  * En deçà, un manche est tenu pour centré.
  *
  * Bien plus fin que le seuil des directions : celui-ci décide d'un oui ou d'un
@@ -2229,6 +2240,8 @@ const BOUTON = { a: 0, b: 1, x: 2, y: 3, select: 8, start: 9, guide: 16 } as con
 
 /** Index de la manette utilisée, ou -1 tant qu'aucune n'est branchée. */
 let padIndex = -1;
+/** Combien de manettes étaient branchées au dernier coup d'œil. */
+let padsBranchees = 0;
 
 let catalog: CatalogEntry[] = [];
 let entry: CatalogEntry | null = null;
@@ -2690,7 +2703,7 @@ async function runLoop(): Promise<void> {
 
     let frame: Frame;
     try {
-      frame = await core.runFrame(buttons, lot, peindra, manches, capteurs);
+      frame = await core.runFrame(buttons, lot, peindra, manches, capteurs, autresManettes);
     } catch (error) {
       if (token === loopToken) {
         setRunning(false);
@@ -7995,11 +8008,20 @@ function setButton(index: number, down: boolean): void {
 function currentPad(): Gamepad | null {
   const pads = navigator.getGamepads?.() ?? [];
   const found = choosePad(pads, padIndex);
-  if (found !== padIndex) {
+  const branchees = pads.filter((autre): autre is Gamepad => !!autre?.connected);
+
+  // Le nombre compte autant que le choix : brancher une deuxième manette ne
+  // change pas celle qu'on suit, et sans cela rien ne dirait que le deuxième
+  // joueur existe — il faudrait lancer un jeu à deux pour le découvrir.
+  if (found !== padIndex || branchees.length !== padsBranchees) {
     padIndex = found;
+    padsBranchees = branchees.length;
     const pad = found >= 0 ? pads[found] : null;
-    padStatus.textContent = pad ? dit('Manette : {0}', pad.id) : t('Aucune manette détectée.');
-    log(pad ? dit('manette : {0}', pad.id) : t('manette débranchée'), pad ? 'ok' : 'info');
+    // La sienne d'abord, les autres derrière, dans l'ordre des ports.
+    const noms = pad ? [pad, ...branchees.filter((autre) => autre !== pad)] : branchees;
+    const dites = noms.map((manette) => manette.id).join(' · ');
+    padStatus.textContent = dites ? dit('Manette : {0}', dites) : t('Aucune manette détectée.');
+    log(dites ? dit('manette : {0}', dites) : t('manette débranchée'), dites ? 'ok' : 'info');
   }
   return padIndex >= 0 ? pads[padIndex] : null;
 }
@@ -8016,38 +8038,26 @@ function sampleInput(): void {
   }
 
   const pad = currentPad();
-  if (pad) {
-    for (const [source, target] of padBindings()) {
-      if (pad.buttons[source]?.pressed) buttons[target] = true;
-    }
-
-    // Le manche gauche double la croix directionnelle : bien des manettes
-    // récentes n'ont qu'un manche confortable, et bien des jeux n'attendent
-    // que la croix.
-    const [x = 0, y = 0] = pad.axes;
-    const stick: [number, boolean][] = [
-      [PAD_LEFT, x < -STICK_DEADZONE],
-      [PAD_RIGHT, x > STICK_DEADZONE],
-      [PAD_UP, y < -STICK_DEADZONE],
-      [PAD_DOWN, y > STICK_DEADZONE],
-    ];
-    for (const [source, active] of stick) {
-      const target = padBindings().get(source);
-      if (active && target !== undefined) buttons[target] = true;
-    }
-  }
-
-  // Et le manche tel quel, en plus de la croix qu'il imite. Les deux, parce
-  // que ce sont deux commandes différentes sur la machine émulée : la
-  // Nintendo 64 a une croix *et* un manche, et ses jeux lisent le second.
   manches.fill(0);
   if (pad) {
-    for (let axe = 0; axe < manches.length; axe += 1) {
-      const pousse = pad.axes[axe] ?? 0;
-      // Un manche au repos ne rend jamais exactement zéro : sans ce seuil, le
-      // personnage dérive tout seul, manette posée sur la table.
-      manches[axe] = Math.abs(pousse) < zoneMorte() ? 0 : pousse;
+    const lue = lireManette(pad, padBindings(), STICK_DEADZONE, zoneMorte());
+    for (const [index, tenu] of lue.boutons.entries()) {
+      if (tenu) buttons[index] = true;
     }
+    // Le manche tel quel, en plus de la croix qu'il imite. Les deux, parce
+    // que ce sont deux commandes différentes sur la machine émulée : la
+    // Nintendo 64 a une croix *et* un manche, et ses jeux lisent le second.
+    for (const [axe, valeur] of lue.manches.entries()) manches[axe] = valeur;
+  }
+
+  // Les autres joueurs : chaque manette branchée après la sienne prend le
+  // port suivant. Sans clavier — il n'appartient qu'au premier — et sans
+  // capteurs, qui décrivent la console et non le joueur.
+  autresManettes.length = 0;
+  for (const [rang, autre] of (navigator.getGamepads?.() ?? []).entries()) {
+    if (rang === padIndex || !autre?.connected) continue;
+    if (autresManettes.length >= PORTS - 1) break;
+    autresManettes.push(lireManette(autre, padBindings(), STICK_DEADZONE, zoneMorte()));
   }
 
   // Un clavier n'a pas de manche. Ses flèches en tiennent lieu, à fond, tant

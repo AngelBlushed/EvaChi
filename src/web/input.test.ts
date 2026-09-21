@@ -9,7 +9,14 @@
 import { strict as assert } from 'node:assert';
 import { describe, it } from 'node:test';
 
-import { AVANCE_RAPIDE, choosePad, vitesseAvance } from './input.ts';
+import {
+  AVANCE_RAPIDE,
+  choosePad,
+  lireManette,
+  PAD_LEFT,
+  PAD_UP,
+  vitesseAvance,
+} from './input.ts';
 
 /** Un emplacement rempli, comme le navigateur en présente. */
 const branchée = { connected: true };
@@ -71,5 +78,68 @@ describe('avance rapide', () => {
     // traîne sur les manches.
     assert.equal(vitesseAvance(9, true), 9);
     assert.equal(vitesseAvance(AVANCE_RAPIDE, true), AVANCE_RAPIDE);
+  });
+});
+
+/** Une manette au repos : seize boutons relâchés, quatre axes centrés. */
+function manetteVide(): { buttons: { pressed: boolean }[]; axes: number[] } {
+  return {
+    buttons: Array.from({ length: 16 }, () => ({ pressed: false })),
+    axes: [0, 0, 0, 0],
+  };
+}
+
+/** Une correspondance minuscule, pour que l'épreuve dise ce qu'elle vérifie. */
+const LIAISONS = new Map([
+  [0, 8],
+  [1, 0],
+  [PAD_LEFT, 6],
+  [PAD_UP, 4],
+]);
+
+describe('lecture d’une manette', () => {
+  it('traduit les boutons par la correspondance qu’on lui donne', () => {
+    const pad = manetteVide();
+    pad.buttons[0] = { pressed: true };
+
+    const lue = lireManette(pad, LIAISONS, 0.5, 0.12);
+
+    assert.equal(lue.boutons[8], true, 'le bouton du bas vaut A');
+    assert.equal(lue.boutons[0], false, 'et rien d’autre');
+  });
+
+  it('fait valoir le manche gauche pour la croix', () => {
+    // Bien des manettes récentes n’ont qu’un manche confortable, et bien des
+    // jeux n’attendent que la croix.
+    const pad = manetteVide();
+    pad.axes = [-0.9, 0, 0, 0];
+
+    const lue = lireManette(pad, LIAISONS, 0.5, 0.12);
+
+    assert.equal(lue.boutons[6], true, 'poussé à gauche, la croix va à gauche');
+    assert.equal(lue.boutons[4], false);
+  });
+
+  it('laisse un manche usé tranquille', () => {
+    // Une manette posée sur la table ne rend jamais exactement zéro : sans
+    // cette zone morte, le personnage dérive tout seul.
+    const pad = manetteVide();
+    pad.axes = [0.05, -0.3, 0, 0];
+
+    const lue = lireManette(pad, LIAISONS, 0.5, 0.12);
+
+    assert.equal(lue.manches[0], 0, 'sous le seuil, au repos');
+    assert.equal(lue.manches[1], -0.3, 'au-dessus, tel quel');
+  });
+
+  it('rend toujours seize boutons et quatre axes, manette muette comprise', () => {
+    // Le navigateur présente parfois une manette sans axes ni boutons : le
+    // cœur, lui, lit toujours les seize et les quatre.
+    const lue = lireManette({ buttons: [], axes: [] }, LIAISONS, 0.5, 0.12);
+
+    assert.equal(lue.boutons.length, 16);
+    assert.equal(lue.manches.length, 4);
+    assert.ok(lue.boutons.every((tenu) => tenu === false));
+    assert.ok(lue.manches.every((axe) => axe === 0));
   });
 });

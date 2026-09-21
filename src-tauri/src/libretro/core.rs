@@ -321,7 +321,7 @@ impl Core {
         }
         self.content_loaded = true;
 
-        // Dire quelle manette est branchée sur le premier port.
+        // Dire quelle manette est branchée sur chaque port.
         //
         // L'ABI le prévoit après le chargement du contenu, et beaucoup de cœurs
         // s'en passent : ils supposent une manette ordinaire et lisent les
@@ -330,8 +330,15 @@ impl Core {
         // s'affiche, et ne répond à rien. Le silence était complet : aucun
         // message, aucune erreur, juste un jeu qui ignore les boutons.
         //
+        // Les quatre ports, et non le premier seul : c'est à cet appel-là que
+        // le cœur décide combien de joueurs existent, et un deuxième port
+        // jamais déclaré est un deuxième joueur qui n'existe pas. Une console
+        // qui n'a que deux prises ignore simplement les suivantes.
+        //
         // SAFETY : le contenu est chargé, ce que l'ABI exige pour cet appel.
-        unsafe { (self.api.set_controller_port_device)(0, DEVICE_JOYPAD) };
+        for port in 0..PORTS {
+            unsafe { (self.api.set_controller_port_device)(port as c_uint, DEVICE_JOYPAD) };
+        }
 
         // Le jeu retrouve ici la pile qu'il avait laissée, et pas avant : la
         // zone n'existe qu'une fois le contenu chargé.
@@ -442,7 +449,7 @@ impl Core {
     }
 
     /// Émule une trame et récupère ce que les rappels ont déposé.
-    pub fn run_frame(&mut self, input: Entrees) -> Result<Frame, CoreError> {
+    pub fn run_frame(&mut self, input: Manettes) -> Result<Frame, CoreError> {
         if !self.content_loaded {
             return Err(CoreError::NoContent);
         }

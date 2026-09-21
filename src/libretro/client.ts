@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import type {
   AsyncEmulatorCore,
+  AutreManette,
   Frame,
   Framebuffer,
   InputState,
@@ -810,6 +811,27 @@ export function decodeFrame(raw: ArrayBuffer): DecodedFrame {
  * L'objet ne détient rien : le cœur vit côté Rust, sur son propre thread. Cette
  * classe n'est que la façade qui lui donne la forme attendue par l'interface.
  */
+/**
+ * Ce que les joueurs suivants envoient, au format de la commande de trame.
+ *
+ * Les mêmes conversions que pour le premier : seize pressions, et des axes
+ * bornés avant d'être mis à l'échelle — une manette mal calibrée rend parfois
+ * 1,02, et le tour du compteur enverrait « à fond à gauche » là où le joueur
+ * poussait à fond à droite.
+ *
+ * Pas de capteurs : ils décrivent la console, et une console n'en a qu'une.
+ */
+export function portsSuivants(
+  autres: readonly AutreManette[],
+): { input: number[]; axes: number[] }[] {
+  return autres.map((manette) => ({
+    input: Array.from({ length: 16 }, (_, index) => (manette.boutons[index] ? 1 : 0)),
+    axes: Array.from({ length: 4 }, (_, index) =>
+      Math.round(Math.max(-1, Math.min(1, manette.manches[index] ?? 0)) * 32_767),
+    ),
+  }));
+}
+
 export class LibretroCore implements AsyncEmulatorCore {
   #info: SystemInfo;
   #identity: CoreIdentity;
@@ -914,6 +936,7 @@ export class LibretroCore implements AsyncEmulatorCore {
     image = true,
     manches: StickState = [],
     capteurs: SensorState = [],
+    autres: readonly AutreManette[] = [],
   ): Promise<Frame> {
     // La manette libretro compte seize boutons ; l'interface envoie un tableau
     // plat de booléens, converti ici en pressions 0 ou 1.
@@ -934,10 +957,15 @@ export class LibretroCore implements AsyncEmulatorCore {
       return Number.isFinite(valeur) ? valeur : 0;
     });
 
+    // Les autres joueurs, dans l'ordre des ports. Le tableau est vide tant
+    // qu'une seule manette est branchée, et ne coûte alors rien.
+    const others = portsSuivants(autres);
+
     const raw = await invoke<ArrayBuffer>('run_frame', {
       input: buttons,
       axes,
       sensors,
+      others,
       frames: trames,
       video: image,
     });
