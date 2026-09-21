@@ -361,8 +361,9 @@ pub struct Installed {
 
 /// Télécharge un émulateur autonome et l'installe sous `into`.
 ///
-/// Le dossier de destination est remplacé : une installation à moitié écrite
-/// par une tentative précédente ne doit pas se mélanger à la nouvelle.
+/// L'archive est déballée à côté, puis posée sur l'installation en place par
+/// [`settle`] : la mise à jour remplace l'émulateur sans emporter ce que
+/// l'utilisateur a mis à côté de lui.
 pub fn install(known: &Standalone, into: &Path) -> Result<Installed, String> {
     // Deux forges, une seule suite : on demande d'abord où prendre l'archive,
     // le reste ne dépend plus de qui la publie.
@@ -403,41 +404,332 @@ pub fn install(known: &Standalone, into: &Path) -> Result<Installed, String> {
         return Err(error);
     }
 
-    let Some(found) = locate(&staging, known.executable) else {
-        let _ = std::fs::remove_dir_all(&staging);
-        return Err(format!(
-            "{} : {} introuvable dans l'archive",
-            known.label, known.executable
-        ));
-    };
-
-    // Réglages chez soi plutôt que dans le profil : c'est ce qui rend
-    // l'ensemble transportable, et ce que ces émulateurs prévoient eux-mêmes.
-    if !known.portable.is_empty() {
-        let home = found.parent().unwrap_or(&staging);
-        let marker = home.join(known.portable.trim_end_matches('/'));
-        let _ = if known.portable.ends_with('/') {
-            std::fs::create_dir_all(&marker)
-        } else {
-            std::fs::write(&marker, b"")
-        };
-    }
-
-    let relative = found
-        .strip_prefix(&staging)
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|_| PathBuf::from(known.executable));
-
-    let _ = std::fs::remove_dir_all(into);
-    std::fs::rename(&staging, into).map_err(|error| {
-        let _ = std::fs::remove_dir_all(&staging);
-        format!("{} : {error}", into.display())
-    })?;
+    let relative = settle(&staging, into, known, &pick.version)?;
 
     Ok(Installed {
         executable: into.join(relative),
         version: pick.version,
     })
+}
+
+/// Le relevé de ce qu'EvaChi a déballé la dernière fois, laissé sur place.
+///
+/// Sans lui, rien ne distingue un fichier de l'émulateur d'un fichier de
+/// l'utilisateur, et la mise à jour effaçait le dossier entier — les BIOS, les
+/// cartes mémoire et les réglages par jeu que l'émulateur y range avec. Le
+/// relevé dit ce qu'EvaChi a posé ; le reste ne lui appartient pas.
+const MANIFEST: &str = ".evachi-installe.json";
+
+/// Ce qu'une installation a déposé dans le dossier.
+#[derive(Default, Serialize, Deserialize)]
+struct Manifest {
+    /// La version posée, telle que la forge la nomme.
+    version: String,
+    /// L'exécutable, relatif au dossier ; son parent est le foyer.
+    executable: String,
+    /// Tout ce qui a été déballé, relatif au dossier, séparé par des `/`.
+    files: Vec<String>,
+}
+
+/// Lit le relevé d'une installation. Une installation plus ancienne que lui,
+/// ou faite à la main, n'en a pas : on n'y touchera alors à rien.
+fn read_manifest(into: &Path) -> Manifest {
+    std::fs::read_to_string(into.join(MANIFEST))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok())
+        .unwrap_or_default()
+}
+
+/// Un chemin relatif écrit avec des `/`, pour se comparer et se retenir.
+fn slashed(path: &Path) -> String {
+    path.components()
+        .map(|part| part.as_os_str().to_string_lossy().into_owned())
+        .collect::<Vec<_>>()
+        .join("/")
+}
+
+/// Le dossier d'un chemin relatif, vide s'il est à la racine.
+fn parent_of(relative: &str) -> String {
+    match relative.rsplit_once('/') {
+        Some((parent, _)) => parent.to_owned(),
+        None => String::new(),
+    }
+}
+
+/// Le contenu d'un dossier : chaque chemin relatif, et s'il est un dossier.
+///
+/// Les dossiers en font partie : une archive peut en contenir un vide, et
+/// l'émulateur compter dessus.
+fn contents(root: &Path) -> Vec<(String, bool)> {
+    let mut found = Vec::new();
+    let mut queue = vec![root.to_path_buf()];
+
+    while let Some(current) = queue.pop() {
+        let Ok(entries) = std::fs::read_dir(&current) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let directory = path.is_dir();
+            if directory {
+                queue.push(path.clone());
+            }
+            if let Ok(relative) = path.strip_prefix(root) {
+                found.push((slashed(relative), directory));
+            }
+        }
+    }
+    found
+}
+
+/// Les fichiers seuls, sans les dossiers.
+fn files_of(root: &Path) -> Vec<String> {
+    contents(root)
+        .into_iter()
+        .filter(|(_, directory)| !directory)
+        .map(|(path, _)| path)
+        .collect()
+}
+
+/// Le même chemin, mais sous le nouveau foyer.
+///
+/// Cemu et Azahar écrivent le numéro de version dans le nom de leur dossier :
+/// d'une version à l'autre, tout change de place. Sans cette translation, la
+/// version d'avant resterait à côté de la neuve, et les sauvegardes de
+/// l'utilisateur avec elle.
+fn moved(relative: &str, from: &str, to: &str) -> String {
+    if from == to {
+        return relative.to_owned();
+    }
+    if from.is_empty() {
+        return format!("{to}/{relative}");
+    }
+    match relative.strip_prefix(&format!("{from}/")) {
+        Some(rest) if to.is_empty() => rest.to_owned(),
+        Some(rest) => format!("{to}/{rest}"),
+        None => relative.to_owned(),
+    }
+}
+
+/// Déplace un fichier, en écartant ce qui occupe déjà la place.
+fn transfer(source: &Path, destination: &Path) -> Result<(), String> {
+    if let Some(parent) = destination.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|error| format!("{} : {error}", parent.display()))?;
+    }
+    if destination.is_dir() {
+        let _ = std::fs::remove_dir_all(destination);
+    } else {
+        let _ = std::fs::remove_file(destination);
+    }
+    std::fs::rename(source, destination)
+        .map_err(|error| format!("{} : {error}", destination.display()))
+}
+
+/// Retire les dossiers que ces départs ont laissés vides, en remontant.
+fn prune(into: &Path, departed: &[String]) {
+    for relative in departed {
+        let mut folder = into.join(relative);
+        while folder.pop() && folder.as_path() != into {
+            if std::fs::remove_dir(&folder).is_err() {
+                break;
+            }
+        }
+    }
+}
+
+/// Vrai si l'on peut écrire sur ce fichier maintenant.
+///
+/// Windows verrouille l'image d'un programme tant qu'il tourne. Sans cette
+/// question posée avant de rien déplacer, la mise à jour s'arrêterait au
+/// milieu : moitié ancienne version, moitié neuve.
+fn writable(path: &Path) -> bool {
+    !path.exists() || std::fs::OpenOptions::new().write(true).open(path).is_ok()
+}
+
+/// Pose une version fraîchement déballée par-dessus celle qui est en place.
+///
+/// Trois règles, dans cet ordre :
+///
+/// - ce que l'utilisateur a mis là reste, et suit l'exécutable si l'archive a
+///   changé le nom de son dossier ;
+/// - ce que la nouvelle version apporte écrase ce qui portait le même nom ;
+/// - ce qu'EvaChi avait posé et que la nouvelle version n'apporte plus s'en va.
+///
+/// À défaut de relevé — une installation plus ancienne que lui — rien n'est
+/// effacé qui ne soit aussitôt remplacé : on ne devine pas ce qui appartient à
+/// l'émulateur, on ne touche qu'à ce que l'archive recouvre elle-même.
+fn overlay(staging: &Path, into: &Path, known: &Standalone, new_exe: &Path) -> Result<(), String> {
+    let manifest = read_manifest(into);
+    let brought: std::collections::HashSet<String> = manifest.files.into_iter().collect();
+    let arriving: std::collections::HashSet<String> = files_of(staging).into_iter().collect();
+    let before = files_of(into);
+
+    // Le foyer : le dossier où se tient l'exécutable, relatif à l'installation.
+    let new_home = parent_of(&slashed(new_exe));
+    let old_home = if manifest.executable.is_empty() {
+        locate(into, known.executable)
+            .and_then(|exe| exe.strip_prefix(into).ok().map(slashed))
+            .map(|exe| parent_of(&exe))
+            .unwrap_or_default()
+    } else {
+        parent_of(&manifest.executable)
+    };
+
+    // À l'émulateur : ce qu'on avait posé, ou ce que l'archive rapporte au même
+    // endroit — le même chemin, au changement de foyer près.
+    let his = |relative: &String| {
+        brought.contains(relative) || arriving.contains(&moved(relative, &old_home, &new_home))
+    };
+
+    let mut departed: Vec<String> = Vec::new();
+
+    // 1. Ce qui est à l'utilisateur suit l'émulateur dans son nouveau dossier.
+    if old_home != new_home {
+        // Les dossiers vides d'abord, tant qu'on peut encore les reconnaître :
+        // Cemu range ses sauvegardes par compte et par titre, et un compte sans
+        // partie n'est rien d'autre qu'un dossier vide. Les autres dossiers
+        // suivront leurs fichiers.
+        for (relative, directory) in contents(into) {
+            let vide = directory
+                && std::fs::read_dir(into.join(&relative))
+                    .map(|mut entries| entries.next().is_none())
+                    .unwrap_or(false);
+            if !vide {
+                continue;
+            }
+            let destination = moved(&relative, &old_home, &new_home);
+            if destination == relative {
+                continue;
+            }
+            std::fs::create_dir_all(into.join(&destination))
+                .map_err(|error| format!("{destination} : {error}"))?;
+        }
+
+        for relative in before.iter() {
+            if relative == MANIFEST || his(relative) {
+                continue;
+            }
+            let destination = moved(relative, &old_home, &new_home);
+            if destination == *relative {
+                continue;
+            }
+            transfer(&into.join(relative), &into.join(&destination))?;
+            departed.push(relative.clone());
+        }
+    }
+
+    // 2. La nouvelle version se pose par-dessus.
+    for (relative, directory) in contents(staging) {
+        let destination = into.join(&relative);
+        if directory {
+            std::fs::create_dir_all(&destination)
+                .map_err(|error| format!("{} : {error}", destination.display()))?;
+            continue;
+        }
+        transfer(&staging.join(&relative), &destination)?;
+    }
+
+    // 3. Ce qu'EvaChi avait posé et que l'archive n'apporte plus s'efface.
+    for relative in before.iter() {
+        if relative == MANIFEST || arriving.contains(relative) || !his(relative) {
+            continue;
+        }
+        let _ = std::fs::remove_file(into.join(relative));
+        departed.push(relative.clone());
+    }
+
+    prune(into, &departed);
+
+    // 4. Le foyer d'avant n'a plus lieu d'être — mais seulement s'il ne reste
+    // vraiment rien dedans : un fichier oublié vaut mieux qu'un fichier perdu.
+    if old_home != new_home && !old_home.is_empty() {
+        let ancien = into.join(&old_home);
+        if files_of(&ancien).is_empty() {
+            let _ = std::fs::remove_dir_all(&ancien);
+        }
+    }
+
+    let _ = std::fs::remove_dir_all(staging);
+    Ok(())
+}
+
+/// Met en place ce qui vient d'être déballé, et note ce qu'on a posé.
+///
+/// Sortie de [`install`] pour être vérifiable : c'est ici que se joue la
+/// conservation des données de l'utilisateur, et une erreur y coûterait un
+/// BIOS ou une carte mémoire. Rend le chemin de l'exécutable, relatif à
+/// l'installation.
+fn settle(
+    staging: &Path,
+    into: &Path,
+    known: &Standalone,
+    version: &str,
+) -> Result<PathBuf, String> {
+    let Some(found) = locate(staging, known.executable) else {
+        let _ = std::fs::remove_dir_all(staging);
+        return Err(format!(
+            "{} : {} introuvable dans l'archive",
+            known.label, known.executable
+        ));
+    };
+    let relative = found
+        .strip_prefix(staging)
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|_| PathBuf::from(known.executable));
+
+    let laid = files_of(staging);
+
+    if into.exists() {
+        // Un émulateur qui tourne garde son programme sous clé : on le dit
+        // avant d'avoir rien déplacé, plutôt que de s'arrêter au milieu.
+        if let Some(running) = locate(into, known.executable) {
+            if !writable(&running) {
+                let _ = std::fs::remove_dir_all(staging);
+                return Err(format!(
+                    "{} : l'émulateur tourne encore, à fermer avant de le mettre à jour",
+                    known.label
+                ));
+            }
+        }
+        overlay(staging, into, known, &relative)?;
+    } else {
+        if let Some(parent) = into.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        std::fs::rename(staging, into).map_err(|error| format!("{} : {error}", into.display()))?;
+    }
+
+    // Réglages chez soi plutôt que dans le profil : c'est ce qui rend
+    // l'ensemble transportable, et ce que ces émulateurs prévoient eux-mêmes.
+    // Posé après coup, et seulement s'il manque : le marqueur de PCSX2 est un
+    // fichier que l'émulateur remplit, et celui de Cemu un dossier plein de
+    // sauvegardes.
+    if !known.portable.is_empty() {
+        let home = into.join(&relative);
+        let home = home.parent().unwrap_or(into);
+        let marker = home.join(known.portable.trim_end_matches('/'));
+        if !marker.exists() {
+            let _ = if known.portable.ends_with('/') {
+                std::fs::create_dir_all(&marker)
+            } else {
+                std::fs::write(&marker, b"")
+            };
+        }
+    }
+
+    // Le relevé, pour que la prochaine mise à jour sache ce qui est à elle. S'il
+    // ne s'écrit pas, la suivante se contentera de ne rien effacer.
+    let manifest = Manifest {
+        version: version.to_owned(),
+        executable: slashed(&relative),
+        files: laid,
+    };
+    if let Ok(text) = serde_json::to_string_pretty(&manifest) {
+        let _ = std::fs::write(into.join(MANIFEST), text);
+    }
+
+    Ok(relative)
 }
 
 /// Déballe une archive zip, en refusant les chemins qui sortent du dossier.
@@ -628,6 +920,177 @@ mod tests {
                 known.system
             );
         }
+    }
+
+    /// Un dossier de travail à soi, vidé s'il traînait d'une fois d'avant.
+    fn atelier(nom: &str) -> PathBuf {
+        let base = std::env::temp_dir().join(format!("evachi-{nom}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&base).expect("dossier de test");
+        base
+    }
+
+    /// Écrit un fichier, et les dossiers qu'il lui faut.
+    fn poser(root: &Path, relative: &str, contenu: &str) {
+        let chemin = root.join(relative);
+        if let Some(parent) = chemin.parent() {
+            std::fs::create_dir_all(parent).expect("dossier");
+        }
+        std::fs::write(chemin, contenu).expect("fichier");
+    }
+
+    fn lire(root: &Path, relative: &str) -> Option<String> {
+        std::fs::read_to_string(root.join(relative)).ok()
+    }
+
+    #[test]
+    fn la_mise_a_jour_garde_ce_que_l_utilisateur_a_mis_la() {
+        // Le manque qui a motivé tout ceci : « Mettre à jour » effaçait le
+        // dossier entier, BIOS et cartes mémoire compris.
+        let base = atelier("garde");
+        let into = base.join("PlayStation-2");
+        let pcsx2 = known("PlayStation 2");
+
+        let premier = base.join("premier");
+        poser(&premier, "pcsx2-qt.exe", "v1");
+        poser(&premier, "Qt6Core.dll", "v1");
+        poser(&premier, "translations/fr.qm", "v1");
+        settle(&premier, &into, pcsx2, "v1").expect("première installation");
+
+        // Ce que l'utilisateur et l'émulateur déposent ensuite.
+        poser(&into, "bios/scph39001.bin", "le bios");
+        poser(&into, "memcards/Mcd001.ps2", "la carte");
+        poser(&into, "portable.ini", "[UI]");
+
+        let second = base.join("second");
+        poser(&second, "pcsx2-qt.exe", "v2");
+        poser(&second, "Qt6Core.dll", "v2");
+        settle(&second, &into, pcsx2, "v2").expect("mise à jour");
+
+        let bios = lire(&into, "bios/scph39001.bin");
+        let carte = lire(&into, "memcards/Mcd001.ps2");
+        let reglages = lire(&into, "portable.ini");
+        let programme = lire(&into, "pcsx2-qt.exe");
+        let ancienne = into.join("translations").exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(bios.as_deref(), Some("le bios"), "le BIOS doit survivre");
+        assert_eq!(carte.as_deref(), Some("la carte"), "la carte mémoire aussi");
+        assert_eq!(
+            reglages.as_deref(),
+            Some("[UI]"),
+            "le marqueur portable ne doit pas être vidé"
+        );
+        assert_eq!(programme.as_deref(), Some("v2"), "le programme est remplacé");
+        assert!(!ancienne, "ce qu'EvaChi avait posé et qui ne vient plus s'en va");
+    }
+
+    #[test]
+    fn sans_releve_rien_ne_s_efface() {
+        // Les installations d'avant le relevé : impossible de dire ce qui
+        // appartient à l'émulateur. On ne remplace alors que ce que l'archive
+        // recouvre elle-même, et on ne devine rien.
+        let base = atelier("sans-releve");
+        let into = base.join("PlayStation-2");
+        let pcsx2 = known("PlayStation 2");
+
+        poser(&into, "pcsx2-qt.exe", "v1");
+        poser(&into, "Qt6Core.dll", "v1");
+        poser(&into, "inconnu.dll", "v1");
+        poser(&into, "bios/scph39001.bin", "le bios");
+
+        let neuf = base.join("neuf");
+        poser(&neuf, "pcsx2-qt.exe", "v2");
+        poser(&neuf, "Qt6Core.dll", "v2");
+        settle(&neuf, &into, pcsx2, "v2").expect("mise à jour");
+
+        let inconnu = lire(&into, "inconnu.dll");
+        let bios = lire(&into, "bios/scph39001.bin");
+        let programme = lire(&into, "pcsx2-qt.exe");
+        let releve = into.join(MANIFEST).exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(inconnu.as_deref(), Some("v1"), "dans le doute, on garde");
+        assert_eq!(bios.as_deref(), Some("le bios"), "le BIOS doit survivre");
+        assert_eq!(programme.as_deref(), Some("v2"), "le programme est remplacé");
+        assert!(releve, "la mise à jour laisse un relevé pour la suivante");
+    }
+
+    #[test]
+    fn les_sauvegardes_suivent_cemu_quand_il_change_de_dossier() {
+        // L'archive de Cemu porte le numéro de version dans le nom de son
+        // dossier : `Cemu_2.6` devient `Cemu_2.7`, et tout ce que l'utilisateur
+        // gardait dans `portable/` doit faire le voyage.
+        let base = atelier("foyer");
+        let into = base.join("Wii-U");
+        let cemu = known("Wii U");
+
+        let premier = base.join("premier");
+        poser(&premier, "Cemu_2.6/Cemu.exe", "2.6");
+        poser(&premier, "Cemu_2.6/resources/fr.txt", "2.6");
+        settle(&premier, &into, cemu, "2.6").expect("première installation");
+        assert!(
+            into.join("Cemu_2.6/portable").is_dir(),
+            "le mode portable doit être posé à la première installation"
+        );
+
+        poser(&into, "Cemu_2.6/portable/mlc01/save.dat", "ma partie");
+        poser(&into, "Cemu_2.6/keys.txt", "mes clés");
+
+        let second = base.join("second");
+        poser(&second, "Cemu_2.7/Cemu.exe", "2.7");
+        poser(&second, "Cemu_2.7/resources/fr.txt", "2.7");
+        let relative = settle(&second, &into, cemu, "2.7").expect("mise à jour");
+
+        let partie = lire(&into, "Cemu_2.7/portable/mlc01/save.dat");
+        let cles = lire(&into, "Cemu_2.7/keys.txt");
+        let programme = lire(&into, "Cemu_2.7/Cemu.exe");
+        let ancien = into.join("Cemu_2.6").exists();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(slashed(&relative), "Cemu_2.7/Cemu.exe");
+        assert_eq!(partie.as_deref(), Some("ma partie"), "la sauvegarde suit");
+        assert_eq!(cles.as_deref(), Some("mes clés"), "le reste aussi");
+        assert_eq!(programme.as_deref(), Some("2.7"), "la version neuve est là");
+        assert!(!ancien, "l'ancien dossier ne reste pas à traîner");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn un_emulateur_qui_tourne_arrete_la_mise_a_jour() {
+        // Windows verrouille l'image d'un programme tant qu'il tourne : mieux
+        // vaut le dire avant d'avoir rien déplacé qu'échouer au milieu.
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let base = atelier("verrou");
+        let into = base.join("PlayStation-2");
+        let pcsx2 = known("PlayStation 2");
+
+        poser(&into, "pcsx2-qt.exe", "v1");
+        poser(&into, "bios/scph39001.bin", "le bios");
+
+        let neuf = base.join("neuf");
+        poser(&neuf, "pcsx2-qt.exe", "v2");
+
+        // Ouvert sans rien partager : c'est ce que fait Windows d'un programme
+        // en cours d'exécution.
+        let tenu = std::fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0)
+            .open(into.join("pcsx2-qt.exe"))
+            .expect("ouverture exclusive");
+
+        let refus = settle(&neuf, &into, pcsx2, "v2").err();
+        drop(tenu);
+
+        let programme = lire(&into, "pcsx2-qt.exe");
+        let bios = lire(&into, "bios/scph39001.bin");
+        let _ = std::fs::remove_dir_all(&base);
+
+        let refus = refus.expect("une mise à jour sur un émulateur ouvert doit refuser");
+        assert!(refus.contains("tourne encore"), "refus peu clair : {refus}");
+        assert_eq!(programme.as_deref(), Some("v1"), "rien ne doit avoir bougé");
+        assert_eq!(bios.as_deref(), Some("le bios"), "le BIOS non plus");
     }
 
     #[test]
