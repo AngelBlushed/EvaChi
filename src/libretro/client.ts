@@ -47,6 +47,18 @@ export function note(message: string): void {
   void invoke('note', { message }).catch(() => {});
 }
 
+/**
+ * Dit à la machine qu'on joue, pour qu'elle ne s'endorme pas.
+ *
+ * Windows ne compte que le clavier et la souris pour décider qu'on s'est
+ * absenté : une manette ne réveille rien, et l'écran s'éteint au milieu d'un
+ * niveau. Un échec ici ne doit rien interrompre — au pire l'écran s'éteint,
+ * ce qui est exactement l'état d'avant.
+ */
+export function tenirEveille(enJeu: boolean): void {
+  void invoke('keep_awake', { playing: enJeu }).catch(() => {});
+}
+
 /** Relève les messages émis par le cœur depuis le dernier appel. */
 export async function takeMessages(): Promise<string[]> {
   return invoke<string[]>('take_messages');

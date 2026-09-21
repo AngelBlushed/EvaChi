@@ -470,4 +470,5 @@ export const is: readonly string[] = [
   /* 461 */ "Önnur hver lína dekkri, eins og í sjónvarpi",
   /* 462 */ "Opnar hermi í hans eigin glugga, án leiks",
   /* 463 */ "Opna",
+  /* 464 */ "Hljóðstyrkur",
 ];

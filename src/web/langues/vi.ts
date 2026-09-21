@@ -470,4 +470,5 @@ export const vi: readonly string[] = [
   /* 461 */ "Cứ hai dòng thì một dòng tối đi, như trên tivi",
   /* 462 */ "Mở trình giả lập trong cửa sổ của chính nó, không có trò chơi",
   /* 463 */ "Mở",
+  /* 464 */ "Âm lượng",
 ];

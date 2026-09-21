@@ -471,4 +471,5 @@ export const ga: readonly string[] = [
   /* 461 */ "Gach dara líne dorchaithe, mar a bhí ar an teilifís",
   /* 462 */ "Osclaíonn sé an t-aithriseoir ina fhuinneog féin, gan chluiche",
   /* 463 */ "Oscail",
+  /* 464 */ "Airde",
 ];

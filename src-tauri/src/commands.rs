@@ -2998,6 +2998,25 @@ pub async fn run_frame(
     Ok(Response::new(bloc))
 }
 
+/// Tient l'écran allumé tant qu'une partie dure.
+///
+/// Appelée à l'entrée et à la sortie de la boucle de trames, quelle que soit
+/// la raison de la sortie : une pause, un jeu qu'on quitte, un cœur qui tombe.
+/// Voir [`crate::veille`] pour ce que Windows en fait.
+#[tauri::command]
+pub fn keep_awake(playing: bool, paths: State<'_, Paths>) {
+    if crate::veille::veiller(playing) {
+        // Au journal, et seulement au changement : c'est la seule trace de ce
+        // réglage-là, que rien n'affiche et que `powercfg /requests` ne dit
+        // qu'à un administrateur.
+        let dit = match playing {
+            true => "écran tenu allumé le temps de la partie",
+            false => "écran rendu à ses habitudes",
+        };
+        write_log(&paths, dit);
+    }
+}
+
 #[tauri::command]
 pub async fn reset(session: State<'_, Arc<Session>>) -> Result<(), String> {
     let session = Arc::clone(&session);

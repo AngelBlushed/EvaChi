@@ -470,4 +470,5 @@ export const et: readonly string[] = [
   /* 461 */ "Iga teine rida tumedam, nagu teleris",
   /* 462 */ "Avab emulaatori tema enda aknas, ilma mänguta",
   /* 463 */ "Ava",
+  /* 464 */ "Helitugevus",
 ];

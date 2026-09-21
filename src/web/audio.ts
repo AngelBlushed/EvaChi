@@ -43,6 +43,21 @@ export function resampleStereo(interleaved: Float32Array, outFrames: number) {
 }
 
 /**
+ * Le niveau retenu, de 0 à 1, à partir de ce que le stockage rend.
+ *
+ * Rien d'écrit vaut plein, et non muet. La nuance a l'air d'une broutille :
+ * `Number(null)` vaut zéro, qui est un volume parfaitement valide, et la
+ * première ouverture se faisait donc en silence — une panne qu'on cherche
+ * partout sauf dans le réglage qu'on n'a jamais touché.
+ */
+export function niveauRetenu(brut: string | null): number {
+  if (brut === null || brut.trim() === '') return 1;
+  const pourcent = Number(brut);
+  if (!Number.isFinite(pourcent) || pourcent < 0 || pourcent > 100) return 1;
+  return pourcent / 100;
+}
+
+/**
  * Sortie audio par file d'attente.
  *
  * Chaque trame émulée dépose ses échantillons sur une horloge qui court devant
@@ -55,6 +70,8 @@ export class AudioSink {
   #gain: GainNode | null = null;
   #cursor = 0;
   #enabled = true;
+  /** Le niveau voulu, de 0 à 1. Retenu même avant l'ouverture du contexte. */
+  #volume = 1;
 
   /** Marge de sécurité : sans elle, le moindre à-coup se traduit par un clic. */
   readonly #latency = 0.09;
@@ -64,10 +81,28 @@ export class AudioSink {
     if (!this.#context) {
       this.#context = new AudioContext();
       this.#gain = this.#context.createGain();
-      this.#gain.gain.value = 0.6;
+      this.#gain.gain.value = this.#sortie();
       this.#gain.connect(this.#context.destination);
     }
     if (this.#context.state === 'suspended') await this.#context.resume();
+  }
+
+  /**
+   * Le niveau de sortie, de 0 à 1.
+   *
+   * Plein régime vaut soixante pour cent du maximum, et non cent : un cœur
+   * rend des échantillons déjà proches de la butée, et sommer deux voies
+   * saturées ferait craquer la sortie. C'est le réglage qui existait, figé ;
+   * il devient réglable sans changer ce qu'on entendait jusqu'ici.
+   */
+  #sortie(): number {
+    return 0.6 * Math.max(0, Math.min(1, this.#volume));
+  }
+
+  /** Règle le volume du jeu, de 0 à 1. Prend effet immédiatement. */
+  setVolume(niveau: number): void {
+    this.#volume = Number.isFinite(niveau) ? niveau : 1;
+    if (this.#gain) this.#gain.gain.value = this.#sortie();
   }
 
   setEnabled(enabled: boolean): void {

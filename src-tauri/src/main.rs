@@ -30,6 +30,7 @@ mod shots;
 mod skeleton;
 mod states;
 mod touches;
+mod veille;
 mod triches;
 
 use evachi::libretro::Session;
@@ -171,6 +172,7 @@ fn main() {
             commands::poser_triches,
             commands::lire_memoire,
             commands::run_frame,
+            commands::keep_awake,
             commands::reset,
             commands::take_messages,
             commands::save_state,

@@ -471,4 +471,5 @@ export const nl: readonly string[] = [
   /* 461 */ "Om de andere lijn donkerder, zoals op een televisie",
   /* 462 */ "Opent de emulator in zijn eigen venster, zonder spel",
   /* 463 */ "Openen",
+  /* 464 */ "Volume",
 ];

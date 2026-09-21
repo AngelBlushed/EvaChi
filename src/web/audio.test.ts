@@ -1,7 +1,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { resampleStereo } from './audio.ts';
+import { niveauRetenu, resampleStereo } from './audio.ts';
 
 /** Construit un flux entrelacé à partir des deux canaux. */
 function interleave(left: number[], right: number[]): Float32Array {
@@ -88,5 +88,27 @@ describe('rééchantillonnage stéréo', () => {
     const { left, right } = resampleStereo(interleave([0.5], [-0.5]), 4);
     assert.ok(left.every((v) => v === 0.5), 'la valeur unique est tenue');
     assert.ok(right.every((v) => v === -0.5));
+  });
+});
+
+describe('niveau de volume retenu', () => {
+  it('vaut plein quand rien n’a jamais été réglé', () => {
+    // Le piège : `Number(null)` vaut zéro, qui est un volume valide. La
+    // première ouverture se faisait donc en silence.
+    assert.equal(niveauRetenu(null), 1);
+    assert.equal(niveauRetenu(''), 1);
+    assert.equal(niveauRetenu('   '), 1);
+  });
+
+  it('rend la part écrite, zéro compris', () => {
+    assert.equal(niveauRetenu('0'), 0);
+    assert.equal(niveauRetenu('50'), 0.5);
+    assert.equal(niveauRetenu('100'), 1);
+  });
+
+  it('ignore ce qui n’est pas un réglage', () => {
+    assert.equal(niveauRetenu('beaucoup'), 1);
+    assert.equal(niveauRetenu('-10'), 1);
+    assert.equal(niveauRetenu('1000'), 1);
   });
 });

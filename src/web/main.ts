@@ -64,6 +64,7 @@ import {
   setManualCover,
   note,
   takeMessages,
+  tenirEveille,
   adoptExternal,
   lireMemoire,
   poserTriches,
@@ -82,7 +83,7 @@ import {
   setExternalSystem,
 } from '../libretro/client.ts';
 
-import { AudioSink } from './audio.ts';
+import { AudioSink, niveauRetenu } from './audio.ts';
 import {
   discover,
   discoveryErrors,
@@ -176,7 +177,14 @@ import { NUANCES, Peintre, nuanceParId } from './nuances.ts';
 import { dessinerFaisceau, panier as panierSeance } from './seance.ts';
 import { dessinerCourant } from './courant.ts';
 import { dessiner as dessinerPoussiere } from './poussiere.ts';
-import { arreterMusique, demarrerMusique, musiqueEnCours, ticDeplacement, ticValidation } from './sound.ts';
+import {
+  arreterMusique,
+  demarrerMusique,
+  musiqueEnCours,
+  poserVolume,
+  ticDeplacement,
+  ticValidation,
+} from './sound.ts';
 import { SELECTEUR_ACTIF, gestePour, premierUtile, tourne } from './focus.ts';
 import { DUREE_SECOUSSE, enSix, ressenti } from './capteurs.ts';
 
@@ -332,6 +340,8 @@ const speedInput = $<HTMLInputElement>('speed');
 const speedValue = $<HTMLElement>('speed-value');
 const tempoInput = $<HTMLInputElement>('tempo');
 const tempoValue = $<HTMLElement>('tempo-value');
+const volumeInput = $<HTMLInputElement>('volume');
+const volumeValue = $<HTMLElement>('volume-value');
 const soundToggle = $<HTMLInputElement>('sound');
 
 const dialogs = {
@@ -383,6 +393,7 @@ const RETENU = {
   langue: 'evachi.langue',
   parler: 'evachi.langue-jeux',
   tempo: 'evachi.tempo',
+  volume: 'evachi.volume',
 } as const;
 
 /** Lit une valeur retenue, en survivant à un stockage indisponible. */
@@ -504,9 +515,10 @@ function choisirLangue(code: string): void {
   // ici.
   buildKeypad();
   renderRaccourcisEtat();
-  // Le pourcentage de la jauge passe par `Intl` : « 100 % » en français,
+  // Le pourcentage des jauges passe par `Intl` : « 100 % » en français,
   // « 100% » en anglais.
   renderTempo();
+  renderVolume();
   refreshMenus();
 }
 
@@ -2625,6 +2637,31 @@ function tempoJeu(): number {
 }
 
 /**
+ * Le volume voulu, de 0 à 1. Plein par défaut.
+ *
+ * Un réglage hors bornes — un stockage abîmé, une main sur le fichier — vaut
+ * plein plutôt que muet : une application muette sans raison se diagnostique
+ * mal, et personne ne pense au volume.
+ */
+function volumeVoulu(): number {
+  return niveauRetenu(retenu(RETENU.volume));
+}
+
+/** Écrit le niveau à côté de la jauge, et le porte aux deux sorties. */
+function renderVolume(): void {
+  const niveau = volumeVoulu();
+  volumeInput.value = String(Math.round(niveau * 100));
+  volumeValue.textContent = pourcentage(niveau);
+  audio.setVolume(niveau);
+  poserVolume(niveau);
+}
+
+volumeInput.addEventListener('input', () => {
+  retenir(RETENU.volume, volumeInput.value);
+  renderVolume();
+});
+
+/**
  * Une part écrite en pourcentage, dans la langue en cours.
  *
  * `Intl` sait où va le signe et s'il prend une espace : « 100 % » en français,
@@ -2675,6 +2712,11 @@ async function runLoop(): Promise<void> {
   let next = performance.now();
 
   let dernierDessin = 0;
+
+  // Tant que la boucle tourne, la machine ne s'endort pas : Windows ne compte
+  // que le clavier et la souris pour décider qu'on s'est absenté, et l'écran
+  // s'éteignait au milieu d'un niveau joué à la manette.
+  if (inShell) tenirEveille(true);
 
   while (running && core && token === loopToken) {
     // Relue à chaque trame : la jauge se glisse en cours de partie, et la
@@ -2750,6 +2792,10 @@ async function runLoop(): Promise<void> {
     if (delay < -frameMs * 4) next = performance.now();
     if (delay > 0) await sleep(delay);
   }
+
+  // Et la machine reprend son cours ordinaire — sauf si une autre boucle a
+  // pris la suite entre-temps, auquel cas c'est à elle de décider.
+  if (inShell && !running) tenirEveille(false);
 }
 
 /**
@@ -7819,6 +7865,7 @@ const actions: Record<string, () => void | Promise<void>> = {
   },
   settings: () => {
     renderTempo();
+    renderVolume();
     openDialog(dialogs.settings);
   },
   triches: () => void ouvrirPanneauFiches(),
@@ -8524,6 +8571,9 @@ async function start(): Promise<void> {
   // doit donc être rempli au démarrage, et non à l'ouverture d'un dialogue.
   renderLangues();
   renderTempo();
+  // Le volume dès le démarrage : les deux sorties doivent naître au niveau
+  // choisi, et non à plein avant de se corriger au premier réglage.
+  renderVolume();
 
   // Les jaquettes posées à la main sont relues une fois, avant le premier
   // dessin : les chercher après ferait clignoter la bibliothèque.

@@ -470,4 +470,5 @@ export const es: readonly string[] = [
   /* 461 */ "Una línea de cada dos oscurecida, como en un televisor",
   /* 462 */ "Abre el emulador en su propia ventana, sin juego",
   /* 463 */ "Abrir",
+  /* 464 */ "Volumen",
 ];

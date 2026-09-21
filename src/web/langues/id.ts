@@ -470,4 +470,5 @@ export const id: readonly string[] = [
   /* 461 */ "Satu garis dari tiap dua digelapkan, seperti di televisi",
   /* 462 */ "Membuka emulator di jendelanya sendiri, tanpa gim",
   /* 463 */ "Buka",
+  /* 464 */ "Volume",
 ];

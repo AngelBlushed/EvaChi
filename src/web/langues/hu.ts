@@ -473,4 +473,5 @@ export const hu: readonly string[] = [
   /* 461 */ "Minden második sor sötétebb, mint a televízión",
   /* 462 */ "Megnyitja az emulátort a saját ablakában, játék nélkül",
   /* 463 */ "Megnyitás",
+  /* 464 */ "Hangerő",
 ];

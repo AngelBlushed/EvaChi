@@ -471,4 +471,5 @@ export const cs: readonly string[] = [
   /* 461 */ "Každý druhý řádek ztmavený, jako na televizi",
   /* 462 */ "Otevře emulátor v jeho vlastním okně, bez hry",
   /* 463 */ "Otevřít",
+  /* 464 */ "Hlasitost",
 ];

@@ -471,4 +471,5 @@ export const de: readonly string[] = [
   /* 461 */ "Jede zweite Zeile abgedunkelt, wie auf einem Fernseher",
   /* 462 */ "Öffnet den Emulator in seinem eigenen Fenster, ohne Spiel",
   /* 463 */ "Öffnen",
+  /* 464 */ "Lautstärke",
 ];

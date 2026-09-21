@@ -470,4 +470,5 @@ export const fil: readonly string[] = [
   /* 461 */ "Isa sa bawat dalawang guhit ay pinadilim, gaya sa telebisyon",
   /* 462 */ "Binubuksan ang emulator sa sarili nitong bintana, walang laro",
   /* 463 */ "Buksan",
+  /* 464 */ "Lakas ng tunog",
 ];

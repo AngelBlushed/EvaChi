@@ -3011,6 +3011,24 @@
         </label>
 
         <label class="field">
+          Volume
+          <!-- `data-crans` : les paliers où la manette s'arrête, de dix en dix.
+               Le réglage vaut pour le jeu comme pour les bruits de
+               l'interface : deux volumes pour un seul appareil n'auraient
+               servi personne. -->
+          <input
+            type="range"
+            id="volume"
+            min="0"
+            max="100"
+            step="1"
+            value="100"
+            data-crans="0 10 20 30 40 50 60 70 80 90 100"
+          />
+          <span id="volume-value">100 %</span>
+        </label>
+
+        <label class="field">
           Vitesse du jeu
           <!-- `data-crans` : les paliers où la manette s'arrête. De 50 à 900 par
                pas de cinq, traverser la jauge demanderait cent soixante-dix

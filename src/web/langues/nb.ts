@@ -471,4 +471,5 @@ export const nb: readonly string[] = [
   /* 461 */ "Annenhver linje mørkere, som på et fjernsyn",
   /* 462 */ "Åpner emulatoren i dens eget vindu, uten spill",
   /* 463 */ "Åpne",
+  /* 464 */ "Lydstyrke",
 ];

@@ -471,4 +471,5 @@ export const sl: readonly string[] = [
   /* 461 */ "Vsaka druga vrstica potemnjena, kot na televiziji",
   /* 462 */ "Odpre emulator v njegovem lastnem oknu, brez igre",
   /* 463 */ "Odpri",
+  /* 464 */ "Glasnost",
 ];

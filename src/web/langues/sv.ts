@@ -471,4 +471,5 @@ export const sv: readonly string[] = [
   /* 461 */ "Varannan linje mörkare, som på en tv",
   /* 462 */ "Öppnar emulatorn i dess eget fönster, utan spel",
   /* 463 */ "Öppna",
+  /* 464 */ "Volym",
 ];

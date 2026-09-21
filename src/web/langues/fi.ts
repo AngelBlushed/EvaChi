@@ -470,4 +470,5 @@ export const fi: readonly string[] = [
   /* 461 */ "Joka toinen juova tummennettuna, kuten televisiossa",
   /* 462 */ "Avaa emulaattorin sen omaan ikkunaan, ilman peliä",
   /* 463 */ "Avaa",
+  /* 464 */ "Äänenvoimakkuus",
 ];

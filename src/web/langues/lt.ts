@@ -470,4 +470,5 @@ export const lt: readonly string[] = [
   /* 461 */ "Kas antra eilutė tamsesnė, kaip per televizorių",
   /* 462 */ "Atveria emuliatorių jo paties lange, be žaidimo",
   /* 463 */ "Atverti",
+  /* 464 */ "Garsumas",
 ];

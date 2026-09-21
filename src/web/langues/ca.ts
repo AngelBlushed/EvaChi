@@ -471,4 +471,5 @@ export const ca: readonly string[] = [
   /* 461 */ "Una línia de cada dues enfosquida, com en un televisor",
   /* 462 */ "Obre l’emulador a la seva pròpia finestra, sense joc",
   /* 463 */ "Obre",
+  /* 464 */ "Volum",
 ];

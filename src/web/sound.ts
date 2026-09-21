@@ -17,6 +17,20 @@ import { MESURE, frequence, prochaineMesure } from './ambience.ts';
 let contexte: AudioContext | null = null;
 /** Le volume général de l'interface, entre la synthèse et la sortie. */
 let sortie: GainNode | null = null;
+/** Le niveau voulu, de 0 à 1. Retenu même avant l'ouverture du contexte. */
+let niveau = 1;
+
+/**
+ * Règle le volume de l'interface, de 0 à 1.
+ *
+ * Le même réglage que pour le jeu : les deux contextes sont séparés, mais
+ * c'est une seule oreille qui écoute, et deux volumes à régler pour un seul
+ * appareil n'auraient servi personne.
+ */
+export function poserVolume(voulu: number): void {
+  niveau = Number.isFinite(voulu) ? Math.max(0, Math.min(1, voulu)) : 1;
+  if (sortie) sortie.gain.value = niveau;
+}
 
 /**
  * Prépare la sortie audio.
@@ -33,7 +47,7 @@ function ouvrir(): { ctx: AudioContext; out: GainNode } | null {
       return null;
     }
     sortie = contexte.createGain();
-    sortie.gain.value = 1;
+    sortie.gain.value = niveau;
     sortie.connect(contexte.destination);
   }
   if (contexte.state === 'suspended') void contexte.resume();

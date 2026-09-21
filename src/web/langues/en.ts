@@ -471,4 +471,5 @@ export const en: readonly string[] = [
   /* 461 */ "Every other line darkened, as on a television",
   /* 462 */ "Opens the emulator in its own window, with no game",
   /* 463 */ "Open",
+  /* 464 */ "Volume",
 ];
