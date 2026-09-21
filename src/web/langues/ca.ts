@@ -472,4 +472,7 @@ export const ca: readonly string[] = [
   /* 462 */ "Obre l’emulador a la seva pròpia finestra, sense joc",
   /* 463 */ "Obre",
   /* 464 */ "Volum",
+  /* 465 */ "Disc",
+  /* 466 */ "no s’ha pogut canviar de disc — {0}",
+  /* 467 */ "disc {0}",
 ];

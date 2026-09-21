@@ -472,4 +472,7 @@ export const eu: readonly string[] = [
   /* 462 */ "Emulagailua bere leihoan irekitzen du, jokorik gabe",
   /* 463 */ "Ireki",
   /* 464 */ "Bolumena",
+  /* 465 */ "Diskoa",
+  /* 466 */ "ezin izan da diskoa aldatu — {0}",
+  /* 467 */ "{0} diskoa",
 ];

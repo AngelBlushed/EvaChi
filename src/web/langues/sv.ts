@@ -472,4 +472,7 @@ export const sv: readonly string[] = [
   /* 462 */ "Öppnar emulatorn i dess eget fönster, utan spel",
   /* 463 */ "Öppna",
   /* 464 */ "Volym",
+  /* 465 */ "Skiva",
+  /* 466 */ "kunde inte byta skiva — {0}",
+  /* 467 */ "skiva {0}",
 ];

@@ -471,4 +471,7 @@ export const ro: readonly string[] = [
   /* 462 */ "Deschide emulatorul în propria fereastră, fără joc",
   /* 463 */ "Deschide",
   /* 464 */ "Volum",
+  /* 465 */ "Disc",
+  /* 466 */ "discul nu a putut fi schimbat — {0}",
+  /* 467 */ "discul {0}",
 ];

@@ -59,9 +59,27 @@ export function tenirEveille(enJeu: boolean): void {
   void invoke('keep_awake', { playing: enJeu }).catch(() => {});
 }
 
+/** Ce que le lecteur de disques contient, ou rien quand il n'y en a qu'un. */
+export async function disques(): Promise<Disques | null> {
+  return invoke<Disques | null>('disques');
+}
+
+/** Met le disque de ce rang dans le lecteur. */
+export async function changerDisque(rang: number): Promise<void> {
+  await invoke('changer_disque', { rang });
+}
+
 /** Relève les messages émis par le cœur depuis le dernier appel. */
 export async function takeMessages(): Promise<string[]> {
   return invoke<string[]>('take_messages');
+}
+
+/** Les disques d'un jeu, tels que le cœur les tient. */
+export interface Disques {
+  /** Le rang du disque inséré. */
+  readonly courant: number;
+  /** Le nom de chaque disque. Vide quand le cœur ne sait pas le dire. */
+  readonly titres: readonly string[];
 }
 
 /** Un fichier de la bibliothèque. */

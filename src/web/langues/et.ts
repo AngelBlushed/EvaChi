@@ -471,4 +471,7 @@ export const et: readonly string[] = [
   /* 462 */ "Avab emulaatori tema enda aknas, ilma mänguta",
   /* 463 */ "Ava",
   /* 464 */ "Helitugevus",
+  /* 465 */ "Plaat",
+  /* 466 */ "plaadi vahetamine ebaõnnestus — {0}",
+  /* 467 */ "plaat {0}",
 ];

@@ -42,6 +42,12 @@ pub enum CoreError {
 
     #[error("chemin illisible : {0}")]
     BadPath(String),
+
+    #[error("ce cœur n'a pas de lecteur de disques")]
+    SansDisques,
+
+    #[error("le cœur a refusé le disque {rang}")]
+    DisqueRefuse { rang: c_uint },
 }
 
 /// Identité d'un cœur, telle qu'il la déclare avant tout chargement.
@@ -54,6 +60,17 @@ pub struct CoreInfo {
     pub extensions: Vec<String>,
     /// Vrai si le cœur veut un chemin sur disque plutôt que le contenu en mémoire.
     pub need_fullpath: bool,
+}
+
+/// Ce que le lecteur de disques contient, tel que l'interface le montre.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Disques {
+    /// Le rang du disque inséré.
+    pub courant: u32,
+    /// Le nom de chaque disque, dans l'ordre. Vide quand le cœur n'en donne
+    /// pas : l'interface montre alors son rang, qui suffit à le désigner.
+    pub titres: Vec<String>,
 }
 
 /// Caractéristiques audiovisuelles du contenu chargé.
@@ -158,6 +175,34 @@ const ZONES: &[(c_uint, &str)] = &[(MEMORY_SAVE_RAM, "srm"), (MEMORY_RTC, "rtc")
 /// dizaines de kilooctets comparés puis écrits —, assez fréquent pour qu'un
 /// cœur qui s'arrête mal ne fasse pas perdre une partie entière.
 const PERIODE_PILES: u32 = 600;
+
+/// Le nom d'un disque, tel que le cœur le donne.
+///
+/// Les cœurs récents savent le dire — « Disc 2 », le plus souvent, ou le nom
+/// du fichier. Les anciens ne savent pas : on rend alors une chaîne vide, et
+/// c'est à l'interface de montrer le rang, qui suffit à désigner un disque.
+fn nom_du_disque(table: &DiskControlCallback, rang: c_uint) -> String {
+    let mut tampon = [0u8; 256];
+    for lecture in [table.get_image_label, table.get_image_path] {
+        let Some(lire) = lecture else { continue };
+        // SAFETY : le cœur écrit au plus `taille` octets dans le tampon, et
+        // termine par un zéro — c'est ce que l'ABI lui demande.
+        let bon = unsafe { lire(rang, tampon.as_mut_ptr().cast::<c_char>(), tampon.len()) };
+        if !bon {
+            continue;
+        }
+        let fin = tampon.iter().position(|octet| *octet == 0).unwrap_or(0);
+        let dit = String::from_utf8_lossy(&tampon[..fin]).trim().to_owned();
+        if !dit.is_empty() {
+            // Un chemin complet ne se montre pas : le nom du fichier suffit.
+            return Path::new(&dit)
+                .file_name()
+                .map(|nom| nom.to_string_lossy().into_owned())
+                .unwrap_or(dit);
+        }
+    }
+    String::new()
+}
 
 /// Résout un symbole obligatoire de l'ABI.
 unsafe fn resolve<T: Copy>(lib: &Library, name: &'static str) -> Result<T, CoreError> {
@@ -343,6 +388,9 @@ impl Core {
         // Le jeu retrouve ici la pile qu'il avait laissée, et pas avant : la
         // zone n'existe qu'une fois le contenu chargé.
         self.ouvrir_piles(path);
+        // Et ses autres disques, s'il en a : le jeu les réclamera plus tard,
+        // et il sera trop tard pour aller les chercher.
+        self.ouvrir_les_disques(path);
 
         let av = self.av_info();
         self.start_hw_render(&av);
@@ -645,6 +693,122 @@ impl Core {
             }
         }
         self.piles = piles;
+    }
+
+    /// Ce que le lecteur de disques contient, si le cœur en a un.
+    ///
+    /// Rend `None` quand le cœur n'a pas tendu sa table — la plupart des
+    /// consoles à cartouche — ou quand il n'y a qu'un disque : proposer d'en
+    /// changer alors qu'il n'y a rien d'autre serait une commande qui ne fait
+    /// rien.
+    pub fn disques(&self) -> Option<Disques> {
+        let table = with_host(|host| host.disques)?;
+        let (Some(combien), Some(courant)) = (table.get_num_images, table.get_image_index) else {
+            return None;
+        };
+        // SAFETY : les fonctions viennent du cœur lui-même, et le contenu est
+        // chargé — c'est la seule condition que l'ABI pose.
+        let (combien, courant) = unsafe { (combien(), courant()) };
+        if combien < 2 {
+            return None;
+        }
+
+        let titres = (0..combien).map(|rang| nom_du_disque(&table, rang)).collect();
+        Some(Disques { courant, titres })
+    }
+
+    /// Change de disque : ouvre le lecteur, échange, referme.
+    ///
+    /// Les trois gestes dans cet ordre, parce que c'est ce que le jeu attend :
+    /// il regarde le lecteur s'ouvrir, et c'est en le voyant se refermer qu'il
+    /// relit le disque. Changer sans ouvrir ne se remarque pas.
+    pub fn changer_disque(&mut self, rang: u32) -> Result<(), CoreError> {
+        if !self.content_loaded {
+            return Err(CoreError::NoContent);
+        }
+        let table = with_host(|host| host.disques).ok_or(CoreError::SansDisques)?;
+        let (Some(ouvrir), Some(poser)) = (table.set_eject_state, table.set_image_index) else {
+            return Err(CoreError::SansDisques);
+        };
+
+        // SAFETY : fonctions du cœur, contenu chargé, même fil qu'au
+        // chargement — les trois conditions de l'ABI.
+        let pose = unsafe {
+            ouvrir(true);
+            let pose = poser(rang);
+            ouvrir(false);
+            pose
+        };
+        match pose {
+            true => Ok(()),
+            false => Err(CoreError::DisqueRefuse { rang }),
+        }
+    }
+
+    /// Présente au cœur les autres disques du jeu, s'il y en a.
+    ///
+    /// Un cœur chargé depuis `Jeu (Disc 1).cue` ne connaît que ce disque-là :
+    /// le jeu réclame le deuxième en cours de partie, et personne ne peut le
+    /// lui donner. Les voisins sont donc retrouvés par leur nom et ajoutés à
+    /// la suite.
+    ///
+    /// Le disque déjà chargé garde le premier rang, quel que soit son numéro :
+    /// il est dans le lecteur, et l'échanger contre lui-même au moment où la
+    /// partie démarre ne servirait qu'à risquer quelque chose.
+    fn ouvrir_les_disques(&mut self, contenu: &Path) {
+        let Some(table) = with_host(|host| host.disques) else {
+            return;
+        };
+        let (Some(ajouter), Some(remplacer), Some(combien), Some(ouvrir)) = (
+            table.add_image_index,
+            table.replace_image_index,
+            table.get_num_images,
+            table.set_eject_state,
+        ) else {
+            return;
+        };
+        // SAFETY : fonctions du cœur, contenu chargé.
+        if unsafe { combien() } != 1 {
+            // Le cœur en connaît déjà plusieurs — un `.m3u`, le plus souvent.
+            // C'est lui qui a raison.
+            return;
+        }
+
+        let voisins = super::disques::voisins(contenu);
+        if voisins.len() < 2 {
+            return;
+        }
+
+        // Le lecteur s'ouvre le temps de l'opération : c'est ce que les cœurs
+        // attendent pour accepter qu'on touche à leur liste.
+        // SAFETY : mêmes conditions.
+        unsafe { ouvrir(true) };
+        for voisin in &voisins {
+            if voisin == contenu {
+                continue;
+            }
+            let Ok(chemin) = CString::new(voisin.to_string_lossy().as_bytes()) else {
+                continue;
+            };
+            let info = GameInfo {
+                path: chemin.as_ptr(),
+                data: std::ptr::null(),
+                size: 0,
+                meta: std::ptr::null(),
+            };
+            // SAFETY : `ajouter` crée un rang vide à la fin, que `remplacer`
+            // renseigne aussitôt ; `chemin` vit jusqu'à la fin de l'appel, ce
+            // que l'ABI exige — le cœur en garde une copie.
+            unsafe {
+                if !ajouter() {
+                    break;
+                }
+                let dernier = combien().saturating_sub(1);
+                remplacer(dernier, &info);
+            }
+        }
+        // SAFETY : on referme sur le disque qui était déjà là.
+        unsafe { ouvrir(false) };
     }
 
     /// Pose les triches, et garde les valeurs à maintenir.

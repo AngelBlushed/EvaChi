@@ -471,4 +471,7 @@ export const gl: readonly string[] = [
   /* 462 */ "Abre o emulador na súa propia xanela, sen xogo",
   /* 463 */ "Abrir",
   /* 464 */ "Volume",
+  /* 465 */ "Disco",
+  /* 466 */ "non se puido cambiar de disco — {0}",
+  /* 467 */ "disco {0}",
 ];

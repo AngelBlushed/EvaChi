@@ -62,6 +62,8 @@ import {
   saveStateSlot,
   setCroppedCover,
   setManualCover,
+  changerDisque,
+  disques,
   note,
   takeMessages,
   tenirEveille,
@@ -273,6 +275,7 @@ const placeholderPath = $<HTMLElement>('placeholder-path');
 const searchInput = $<HTMLInputElement>('search');
 const countsOut = $<HTMLElement>('counts');
 const nowPlaying = $<HTMLElement>('now-playing');
+const disquesMenu = $<HTMLElement>('disques');
 const statusOut = $<HTMLElement>('status');
 const fpsOut = $<HTMLElement>('fps');
 const resOut = $<HTMLElement>('res');
@@ -2927,8 +2930,66 @@ async function loadContent(name: string, bytes: Uint8Array, path?: string): Prom
 
   await audio.unlock();
   setRunning(true);
+  // Les disques après le démarrage : c'est le cœur qui répond, et il vient
+  // tout juste de recevoir son contenu.
+  await renderDisques();
   log(dit('{0} — chargé', name), 'ok');
   await drainMessages();
+}
+
+/**
+ * Dessine les disques du jeu en cours, s'il en a plusieurs.
+ *
+ * Rien à montrer pour un jeu de cartouche, ni pour un jeu tenant sur un seul
+ * disque : le repère reste caché, et le menu garde l'allure qu'il avait.
+ *
+ * Les noms viennent du cœur, qui les tient du fichier. Quand il n'en donne
+ * pas — les cœurs anciens ne savent pas les dire —, le rang suffit à désigner
+ * un disque, et c'est lui qu'on écrit.
+ */
+async function renderDisques(): Promise<void> {
+  if (!inShell || entry?.kind !== 'libretro') {
+    disquesMenu.hidden = true;
+    return;
+  }
+
+  let lecteur = null;
+  try {
+    lecteur = await disques();
+  } catch {
+    // Un cœur qui ne répond pas sur ce point ne doit pas empêcher de jouer.
+    lecteur = null;
+  }
+
+  // Le titre reste, les disques se refont : le premier enfant est le trait, le
+  // deuxième l'intitulé.
+  while (disquesMenu.children.length > 2) disquesMenu.lastElementChild?.remove();
+
+  if (!lecteur || lecteur.titres.length < 2) {
+    disquesMenu.hidden = true;
+    return;
+  }
+
+  for (const [rang, titre] of lecteur.titres.entries()) {
+    const choix = document.createElement('button');
+    choix.type = 'button';
+    choix.setAttribute('aria-checked', String(rang === lecteur.courant));
+    choix.textContent = titre || String(rang + 1);
+    choix.addEventListener('click', () => void poserDisque(rang));
+    disquesMenu.append(choix);
+  }
+  disquesMenu.hidden = false;
+}
+
+/** Met un disque dans le lecteur, et redessine la liste. */
+async function poserDisque(rang: number): Promise<void> {
+  try {
+    await changerDisque(rang);
+    log(dit('disque {0}', String(rang + 1)), 'ok');
+  } catch (error) {
+    log(dit('changement de disque impossible — {0}', reason(error)), 'err');
+  }
+  await renderDisques();
 }
 
 /** Repose le jeu et revient à la bibliothèque. */
@@ -2960,6 +3021,7 @@ async function stopPlaying(): Promise<void> {
   cheminEnCours = '';
   savedState = null;
   nowPlaying.textContent = 'EvaChi';
+  disquesMenu.hidden = true;
   fpsOut.textContent = '—';
   resOut.textContent = '—';
   shownSize = '';

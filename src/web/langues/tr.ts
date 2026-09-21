@@ -474,4 +474,7 @@ export const tr: readonly string[] = [
   /* 462 */ "Öykünücüyü kendi penceresinde, oyunsuz açar",
   /* 463 */ "Aç",
   /* 464 */ "Ses düzeyi",
+  /* 465 */ "Disk",
+  /* 466 */ "disk değiştirilemedi — {0}",
+  /* 467 */ "disk {0}",
 ];

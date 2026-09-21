@@ -472,4 +472,7 @@ export const nb: readonly string[] = [
   /* 462 */ "Åpner emulatoren i dens eget vindu, uten spill",
   /* 463 */ "Åpne",
   /* 464 */ "Lydstyrke",
+  /* 465 */ "Plate",
+  /* 466 */ "kunne ikke bytte plate — {0}",
+  /* 467 */ "plate {0}",
 ];

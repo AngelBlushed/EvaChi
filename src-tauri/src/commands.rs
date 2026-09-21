@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use tauri::ipc::Response;
 use tauri::{Manager, State};
 
-use evachi::libretro::{AvInfo, CoreInfo, Entrees, Manettes, Session, VideoFrame};
+use evachi::libretro::{AvInfo, CoreInfo, Disques, Entrees, Manettes, Session, VideoFrame};
 
 /// Au-delà, un état de jeu n'en est plus un.
 ///
@@ -3015,6 +3015,24 @@ pub fn keep_awake(playing: bool, paths: State<'_, Paths>) {
         };
         write_log(&paths, dit);
     }
+}
+
+/// Les disques du jeu en cours, ou rien quand il n'y en a qu'un.
+///
+/// C'est le cœur qui répond : lui seul sait combien de disques il tient, et
+/// sous quels noms. Un jeu de cartouche n'en a aucun, et la commande rend
+/// alors `null` — l'interface n'affiche rien.
+#[tauri::command]
+pub async fn disques(session: State<'_, Arc<Session>>) -> Result<Option<Disques>, String> {
+    let session = Arc::clone(&session);
+    au_travail(move || session.disques()).await
+}
+
+/// Met le disque de ce rang dans le lecteur.
+#[tauri::command]
+pub async fn changer_disque(rang: u32, session: State<'_, Arc<Session>>) -> Result<(), String> {
+    let session = Arc::clone(&session);
+    au_travail(move || session.changer_disque(rang)).await
 }
 
 #[tauri::command]

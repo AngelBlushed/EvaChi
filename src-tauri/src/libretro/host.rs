@@ -56,6 +56,12 @@ pub struct HostState {
     /// Les consoles portables qui se tiennent de côté — la WonderSwan — le
     /// demandent, et comptent sur l'hôte pour le faire.
     pub rotation: c_uint,
+    /// Le lecteur de disques, quand le cœur en a un.
+    ///
+    /// Donné par le cœur pendant `retro_set_environment`, donc avant tout
+    /// contenu : c'est lui qui décide s'il sait changer de disque, et l'hôte
+    /// qui s'en sert quand le jeu le demande.
+    pub disques: Option<DiskControlCallback>,
     /// Le contexte graphique réclamé par le cœur, s'il dessine en 3D.
     ///
     /// Renseigné pendant `retro_set_environment`, donc bien avant que le
@@ -106,6 +112,7 @@ impl Default for HostState {
             options_dirty: false,
             langue: super::langues::defaut(),
             rotation: 0,
+            disques: None,
             hw: None,
             #[cfg(windows)]
             gl: None,
@@ -715,6 +722,24 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 
         ENV_SHUTDOWN => {
             with_host(|host| host.shutdown = true);
+            true
+        }
+
+        ENV_SET_DISK_CONTROL_INTERFACE | ENV_SET_DISK_CONTROL_EXT_INTERFACE => {
+            if data.is_null() {
+                return false;
+            }
+            // Deux tables pour la même chose, l'ancienne et la neuve : la
+            // seconde ajoute trois fonctions à la fin, dont celle qui nomme
+            // les disques. Lire dix pointeurs dans une table qui n'en compte
+            // que sept irait chercher trois mots qui ne nous appartiennent
+            // pas ; on lit donc chacune pour ce qu'elle est.
+            let table = if cmd == ENV_SET_DISK_CONTROL_EXT_INTERFACE {
+                data.cast::<DiskControlCallback>().read()
+            } else {
+                DiskControlCallback::from(data.cast::<DiskControlSimple>().read())
+            };
+            with_host(|host| host.disques = Some(table));
             true
         }
 

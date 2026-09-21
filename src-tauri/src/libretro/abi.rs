@@ -33,6 +33,12 @@ pub const ENV_SET_PERFORMANCE_LEVEL: c_uint = 8;
 pub const ENV_GET_SYSTEM_DIRECTORY: c_uint = 9;
 pub const ENV_SET_PIXEL_FORMAT: c_uint = 10;
 pub const ENV_SET_INPUT_DESCRIPTORS: c_uint = 11;
+/// Le cœur tend sa table pour piloter son lecteur de disques.
+///
+/// C'est lui qui la donne, et l'hôte qui s'en sert : éjecter, changer de
+/// disque, refermer. Sans elle, un jeu qui demande le disque deux attend
+/// indéfiniment un geste que personne ne peut faire.
+pub const ENV_SET_DISK_CONTROL_INTERFACE: c_uint = 13;
 pub const ENV_SET_HW_RENDER: c_uint = 14;
 pub const ENV_GET_VARIABLE: c_uint = 15;
 pub const ENV_SET_VARIABLES: c_uint = 16;
@@ -71,6 +77,12 @@ pub const ENV_GET_CORE_OPTIONS_VERSION: c_uint = 52;
 pub const ENV_SET_CORE_OPTIONS_V2: c_uint = 67;
 pub const ENV_SET_CORE_OPTIONS_V2_INTL: c_uint = 68;
 pub const ENV_GET_PREFERRED_HW_RENDER: c_uint = 69;
+/// La même table, en plus complète : elle sait dire le nom de chaque disque.
+///
+/// Les cœurs récents tendent celle-ci, les anciens l'autre. Les sept
+/// premières fonctions sont les mêmes, dans le même ordre : c'est ce qui
+/// permet de les lire d'un seul et même morceau.
+pub const ENV_SET_DISK_CONTROL_EXT_INTERFACE: c_uint = 58 | ENV_EXPERIMENTAL;
 
 /// Marqueur des commandes encore expérimentales côté libretro.
 pub const ENV_EXPERIMENTAL: c_uint = 0x10000;
@@ -343,6 +355,65 @@ pub struct GameInfo {
     pub data: *const c_void,
     pub size: usize,
     pub meta: *const c_char,
+}
+
+/// La table que le cœur tend pour piloter son lecteur de disques.
+///
+/// Les sept premières fonctions sont celles de la version d'origine ; les
+/// trois dernières n'existent que dans la version étendue, et restent nulles
+/// quand le cœur tend l'ancienne. L'ordre est celui de l'ABI, et il ne se
+/// réarrange pas : c'est de la mémoire que le cœur nous prête.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DiskControlCallback {
+    /// Ouvre ou referme le lecteur. Rien ne se change tant qu'il est fermé.
+    pub set_eject_state: Option<unsafe extern "C" fn(bool) -> bool>,
+    pub get_eject_state: Option<unsafe extern "C" fn() -> bool>,
+    pub get_image_index: Option<unsafe extern "C" fn() -> c_uint>,
+    pub set_image_index: Option<unsafe extern "C" fn(c_uint) -> bool>,
+    pub get_num_images: Option<unsafe extern "C" fn() -> c_uint>,
+    /// Met un autre fichier à la place du disque de ce rang.
+    pub replace_image_index: Option<unsafe extern "C" fn(c_uint, *const GameInfo) -> bool>,
+    /// Ajoute un emplacement vide à la fin, à remplir par le précédent.
+    pub add_image_index: Option<unsafe extern "C" fn() -> bool>,
+    pub set_initial_image: Option<unsafe extern "C" fn(c_uint, *const c_char) -> bool>,
+    pub get_image_path: Option<unsafe extern "C" fn(c_uint, *mut c_char, usize) -> bool>,
+    /// Le nom du disque tel que le cœur l'affiche — « Disc 2 », le plus souvent.
+    pub get_image_label: Option<unsafe extern "C" fn(c_uint, *mut c_char, usize) -> bool>,
+}
+
+/// La version d'origine : les sept premières fonctions, et rien d'autre.
+///
+/// Lue à part parce qu'un cœur qui tend celle-ci n'a écrit que sept
+/// pointeurs : en lire dix irait chercher trois mots qui ne lui appartiennent
+/// pas.
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct DiskControlSimple {
+    pub set_eject_state: Option<unsafe extern "C" fn(bool) -> bool>,
+    pub get_eject_state: Option<unsafe extern "C" fn() -> bool>,
+    pub get_image_index: Option<unsafe extern "C" fn() -> c_uint>,
+    pub set_image_index: Option<unsafe extern "C" fn(c_uint) -> bool>,
+    pub get_num_images: Option<unsafe extern "C" fn() -> c_uint>,
+    pub replace_image_index: Option<unsafe extern "C" fn(c_uint, *const GameInfo) -> bool>,
+    pub add_image_index: Option<unsafe extern "C" fn() -> bool>,
+}
+
+impl From<DiskControlSimple> for DiskControlCallback {
+    fn from(simple: DiskControlSimple) -> Self {
+        Self {
+            set_eject_state: simple.set_eject_state,
+            get_eject_state: simple.get_eject_state,
+            get_image_index: simple.get_image_index,
+            set_image_index: simple.set_image_index,
+            get_num_images: simple.get_num_images,
+            replace_image_index: simple.replace_image_index,
+            add_image_index: simple.add_image_index,
+            set_initial_image: None,
+            get_image_path: None,
+            get_image_label: None,
+        }
+    }
 }
 
 /// Une option de configuration exposée par le cœur, terminée par une entrée nulle.

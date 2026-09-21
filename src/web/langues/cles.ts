@@ -485,6 +485,9 @@ export const CLES: readonly string[] = [
   "Ouvre l’émulateur sur sa propre fenêtre, sans jeu",
   "Ouvrir",
   "Volume",
+  "Disque",
+  "changement de disque impossible — {0}",
+  "disque {0}",
 ];
 
 /**

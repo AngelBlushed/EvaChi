@@ -471,4 +471,7 @@ export const lv: readonly string[] = [
   /* 462 */ "Atver emulatoru tā paša logā, bez spēles",
   /* 463 */ "Atvērt",
   /* 464 */ "Skaļums",
+  /* 465 */ "Disks",
+  /* 466 */ "neizdevās nomainīt disku — {0}",
+  /* 467 */ "disks {0}",
 ];

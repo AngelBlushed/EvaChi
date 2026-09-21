@@ -471,4 +471,7 @@ export const lt: readonly string[] = [
   /* 462 */ "Atveria emuliatorių jo paties lange, be žaidimo",
   /* 463 */ "Atverti",
   /* 464 */ "Garsumas",
+  /* 465 */ "Diskas",
+  /* 466 */ "nepavyko pakeisti disko — {0}",
+  /* 467 */ "diskas {0}",
 ];

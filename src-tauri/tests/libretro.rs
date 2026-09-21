@@ -367,6 +367,54 @@ fn le_deuxieme_joueur_atteint_le_coeur() {
     }
 }
 
+#[test]
+fn les_disques_voisins_arrivent_au_coeur_et_se_changent() {
+    // Le manque : un jeu chargé depuis son premier disque ne connaissait que
+    // celui-là. « Veuillez insérer le disque 2 », et personne ne pouvait le
+    // faire — la partie s'arrêtait là.
+    let _guard = exclusive();
+    let scratch = tempdir::TempDir::new();
+    let session = Session::locale();
+    session
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    for rang in 1..=3 {
+        std::fs::write(
+            scratch.path().join(format!("Jeu (Disc {rang}).test")),
+            b"contenu sans importance",
+        )
+        .expect("écriture du disque");
+    }
+    session
+        .load_content(&scratch.path().join("Jeu (Disc 1).test"))
+        .expect("chargement du premier disque");
+
+    let disques = session
+        .disques()
+        .expect("demande")
+        .expect("trois disques dans le lecteur");
+    assert_eq!(disques.titres.len(), 3, "les voisins ont été présentés");
+    assert_eq!(disques.courant, 0, "on joue celui qu'on a ouvert");
+    assert_eq!(disques.titres[1], "Jeu (Disc 2).test", "nommé par le cœur");
+
+    // Le cœur d'essai refuse de changer de disque tiroir fermé, comme les
+    // vrais : cette ligne éprouve donc aussi l'ordre des trois gestes.
+    session.changer_disque(2).expect("changement de disque");
+
+    let apres = session.disques().expect("demande").expect("toujours trois");
+    assert_eq!(apres.courant, 2, "le troisième disque est dans le lecteur");
+}
+
+#[test]
+fn un_jeu_d_un_seul_disque_n_en_propose_aucun() {
+    // Proposer de changer de disque quand il n'y en a qu'un serait une
+    // commande qui ne fait rien : l'interface n'affiche alors rien du tout.
+    let (_guard, session, _scratch) = session_with_content();
+
+    assert!(session.disques().expect("demande").is_none());
+}
+
 /// Le bouton par lequel le cœur d'essai sauvegarde dans sa pile, et celui par
 /// lequel il dit ce qu'il y trouve. Réécrits ici plutôt qu'importés, comme le
 /// reste : voir `test-core/src/lib.rs`.

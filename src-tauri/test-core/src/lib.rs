@@ -10,7 +10,7 @@
 #![allow(non_camel_case_types)]
 
 use std::os::raw::{c_char, c_uint, c_void};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 pub const WIDTH: u32 = 32;
 pub const HEIGHT: u32 = 16;
@@ -28,6 +28,9 @@ const ENV_GET_VARIABLE: c_uint = 15;
 const ENV_SET_VARIABLES: c_uint = 16;
 const ENV_GET_LANGUAGE: c_uint = 21;
 const ENV_GET_LOG_INTERFACE: c_uint = 27;
+/// La table du lecteur de disques, version étendue : dix fonctions, dont
+/// celle qui nomme chaque disque.
+const ENV_SET_DISK_CONTROL_EXT_INTERFACE: c_uint = 58 | 0x10000;
 /// La pile de la cartouche, au sens de libretro.
 const MEMORY_SAVE_RAM: c_uint = 0;
 /// La RAM de travail, au sens de libretro.
@@ -235,6 +238,13 @@ static mut RAM: Vec<u8> = Vec::new();
 /// La pile de la cartouche, celle que l'hôte relit et range.
 static mut PILE: Vec<u8> = Vec::new();
 
+/// Les disques que le lecteur contient, par leur chemin.
+static mut DISQUES: Vec<String> = Vec::new();
+/// Le disque inséré.
+static DISQUE: AtomicU64 = AtomicU64::new(0);
+/// Vrai quand le tiroir est ouvert.
+static TIROIR: AtomicBool = AtomicBool::new(false);
+
 /// Contenu accepté : le cœur n'en fait rien mais vérifie qu'on le lui passe.
 static CONTENT_SIZE: AtomicU64 = AtomicU64::new(0);
 
@@ -303,6 +313,121 @@ pub fn expected_pixel(x: u32, y: u32, frame: u64, buttons: u16, deuxieme: u16) -
 
     BACKGROUND
 }
+
+/// La table que le cœur tend à l'hôte pour piloter son lecteur.
+///
+/// L'ordre des champs est celui de `libretro.h`, et il ne souffre aucune
+/// liberté : l'hôte lit cette mémoire comme une structure C.
+#[repr(C)]
+struct DiskControlExt {
+    set_eject_state: Option<unsafe extern "C" fn(bool) -> bool>,
+    get_eject_state: Option<unsafe extern "C" fn() -> bool>,
+    get_image_index: Option<unsafe extern "C" fn() -> c_uint>,
+    set_image_index: Option<unsafe extern "C" fn(c_uint) -> bool>,
+    get_num_images: Option<unsafe extern "C" fn() -> c_uint>,
+    replace_image_index: Option<unsafe extern "C" fn(c_uint, *const GameInfo) -> bool>,
+    add_image_index: Option<unsafe extern "C" fn() -> bool>,
+    set_initial_image: Option<unsafe extern "C" fn(c_uint, *const c_char) -> bool>,
+    get_image_path: Option<unsafe extern "C" fn(c_uint, *mut c_char, usize) -> bool>,
+    get_image_label: Option<unsafe extern "C" fn(c_uint, *mut c_char, usize) -> bool>,
+}
+
+unsafe extern "C" fn tiroir_poser(ouvert: bool) -> bool {
+    TIROIR.store(ouvert, Ordering::SeqCst);
+    true
+}
+
+unsafe extern "C" fn tiroir_lire() -> bool {
+    TIROIR.load(Ordering::SeqCst)
+}
+
+unsafe extern "C" fn disque_lire() -> c_uint {
+    DISQUE.load(Ordering::SeqCst) as c_uint
+}
+
+/// Change de disque — mais seulement le tiroir ouvert.
+///
+/// C'est ce que font les vrais cœurs, et c'est tout l'intérêt : un hôte qui
+/// changerait de disque sans ouvrir le lecteur se ferait refuser ici, comme
+/// il se ferait refuser ailleurs.
+unsafe extern "C" fn disque_poser(rang: c_uint) -> bool {
+    if !TIROIR.load(Ordering::SeqCst) {
+        return false;
+    }
+    if (rang as usize) >= (*std::ptr::addr_of!(DISQUES)).len() {
+        return false;
+    }
+    DISQUE.store(u64::from(rang), Ordering::SeqCst);
+    true
+}
+
+unsafe extern "C" fn disques_combien() -> c_uint {
+    (*std::ptr::addr_of!(DISQUES)).len() as c_uint
+}
+
+unsafe extern "C" fn disque_remplacer(rang: c_uint, info: *const GameInfo) -> bool {
+    let disques = &mut *std::ptr::addr_of_mut!(DISQUES);
+    let Some(place) = disques.get_mut(rang as usize) else {
+        return false;
+    };
+    if info.is_null() || (*info).path.is_null() {
+        place.clear();
+        return true;
+    }
+    *place = std::ffi::CStr::from_ptr((*info).path)
+        .to_string_lossy()
+        .into_owned();
+    true
+}
+
+unsafe extern "C" fn disque_ajouter() -> bool {
+    (*std::ptr::addr_of_mut!(DISQUES)).push(String::new());
+    true
+}
+
+/// Écrit un texte dans le tampon de l'hôte, terminé par un zéro.
+unsafe fn dire_dans(tampon: *mut c_char, taille: usize, texte: &str) -> bool {
+    if tampon.is_null() || taille == 0 {
+        return false;
+    }
+    let octets = texte.as_bytes();
+    let tient = octets.len().min(taille - 1);
+    std::ptr::copy_nonoverlapping(octets.as_ptr(), tampon.cast::<u8>(), tient);
+    *tampon.add(tient) = 0;
+    true
+}
+
+unsafe extern "C" fn disque_chemin(rang: c_uint, tampon: *mut c_char, taille: usize) -> bool {
+    let disques = &*std::ptr::addr_of!(DISQUES);
+    match disques.get(rang as usize) {
+        Some(chemin) => dire_dans(tampon, taille, chemin),
+        None => false,
+    }
+}
+
+/// Le nom du disque : son nom de fichier, comme le font les vrais cœurs.
+unsafe extern "C" fn disque_nom(rang: c_uint, tampon: *mut c_char, taille: usize) -> bool {
+    let disques = &*std::ptr::addr_of!(DISQUES);
+    let Some(chemin) = disques.get(rang as usize) else {
+        return false;
+    };
+    let nom = chemin.rsplit(['/', '\\']).next().unwrap_or(chemin);
+    dire_dans(tampon, taille, nom)
+}
+
+/// La table, une fois pour toutes : l'hôte en garde une copie.
+static TABLE_DISQUES: DiskControlExt = DiskControlExt {
+    set_eject_state: Some(tiroir_poser),
+    get_eject_state: Some(tiroir_lire),
+    get_image_index: Some(disque_lire),
+    set_image_index: Some(disque_poser),
+    get_num_images: Some(disques_combien),
+    replace_image_index: Some(disque_remplacer),
+    add_image_index: Some(disque_ajouter),
+    set_initial_image: None,
+    get_image_path: Some(disque_chemin),
+    get_image_label: Some(disque_nom),
+};
 
 // --- Points d'entrée --------------------------------------------------------
 
@@ -456,6 +581,13 @@ pub unsafe extern "C" fn retro_init() {
     // Un vrai cœur annonce son format dès l'initialisation ; on fait pareil,
     // ce qui vérifie au passage que l'hôte le retient.
     if let Some(env) = ENVIRONMENT {
+        // Le lecteur de disques, tendu comme le font les cœurs de consoles à
+        // CD : une table de fonctions, que l'hôte garde.
+        env(
+            ENV_SET_DISK_CONTROL_EXT_INTERFACE,
+            std::ptr::addr_of!(TABLE_DISQUES) as *mut c_void,
+        );
+
         let mut format = PIXEL_FORMAT_XRGB8888;
         env(
             ENV_SET_PIXEL_FORMAT,
@@ -497,6 +629,19 @@ pub unsafe extern "C" fn retro_load_game(game: *const GameInfo) -> bool {
 
     CONTENT_SIZE.store((*game).size as u64, Ordering::SeqCst);
     FRAME.store(0, Ordering::SeqCst);
+
+    // Le contenu chargé entre dans le lecteur, et lui seul : un vrai cœur ne
+    // connaît que le disque qu'on lui a donné, et c'est à l'hôte de lui
+    // présenter les autres.
+    let chemin = match (*game).path.is_null() {
+        true => String::new(),
+        false => std::ffi::CStr::from_ptr((*game).path)
+            .to_string_lossy()
+            .into_owned(),
+    };
+    DISQUES = vec![chemin];
+    DISQUE.store(0, Ordering::SeqCst);
+    TIROIR.store(false, Ordering::SeqCst);
     true
 }
 

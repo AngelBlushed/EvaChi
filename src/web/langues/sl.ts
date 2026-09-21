@@ -472,4 +472,7 @@ export const sl: readonly string[] = [
   /* 462 */ "Odpre emulator v njegovem lastnem oknu, brez igre",
   /* 463 */ "Odpri",
   /* 464 */ "Glasnost",
+  /* 465 */ "Disk",
+  /* 466 */ "diska ni bilo mogoče zamenjati — {0}",
+  /* 467 */ "disk {0}",
 ];

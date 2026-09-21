@@ -471,4 +471,7 @@ export const id: readonly string[] = [
   /* 462 */ "Membuka emulator di jendelanya sendiri, tanpa gim",
   /* 463 */ "Buka",
   /* 464 */ "Volume",
+  /* 465 */ "Cakram",
+  /* 466 */ "tidak dapat mengganti cakram — {0}",
+  /* 467 */ "cakram {0}",
 ];

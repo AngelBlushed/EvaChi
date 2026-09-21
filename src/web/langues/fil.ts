@@ -471,4 +471,7 @@ export const fil: readonly string[] = [
   /* 462 */ "Binubuksan ang emulator sa sarili nitong bintana, walang laro",
   /* 463 */ "Buksan",
   /* 464 */ "Lakas ng tunog",
+  /* 465 */ "Disc",
+  /* 466 */ "hindi mapalitan ang disc — {0}",
+  /* 467 */ "disc {0}",
 ];

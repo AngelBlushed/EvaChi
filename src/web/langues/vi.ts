@@ -471,4 +471,7 @@ export const vi: readonly string[] = [
   /* 462 */ "Mở trình giả lập trong cửa sổ của chính nó, không có trò chơi",
   /* 463 */ "Mở",
   /* 464 */ "Âm lượng",
+  /* 465 */ "Đĩa",
+  /* 466 */ "không thể đổi đĩa — {0}",
+  /* 467 */ "đĩa {0}",
 ];

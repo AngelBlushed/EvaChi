@@ -41,6 +41,8 @@ pub enum Demande {
     Messages = 8,
     Triches = 9,
     Memoire = 10,
+    Disques = 11,
+    ChangerDisque = 12,
 }
 
 impl Demande {
@@ -56,6 +58,8 @@ impl Demande {
             8 => Self::Messages,
             9 => Self::Triches,
             10 => Self::Memoire,
+            11 => Self::Disques,
+            12 => Self::ChangerDisque,
             _ => return None,
         })
     }
@@ -91,6 +95,10 @@ impl Demande {
             // tourner une trame : ce qui prend du temps ici est un cœur figé,
             // et on ne veut pas l'attendre plus qu'une trame ou deux.
             Self::Triches | Self::Memoire => Duration::from_secs(10),
+            // Changer de disque ouvre un fichier, parfois sur un disque
+            // externe : plus large qu'une trame, mais pas au point de faire
+            // attendre qui s'est trompé de bouton.
+            Self::Disques | Self::ChangerDisque => Duration::from_secs(30),
         }
     }
 }

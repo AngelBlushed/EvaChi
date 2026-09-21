@@ -471,4 +471,7 @@ export const af: readonly string[] = [
   /* 462 */ "Open die emuleerder in sy eie venster, sonder ’n speletjie",
   /* 463 */ "Open",
   /* 464 */ "Volume",
+  /* 465 */ "Skyf",
+  /* 466 */ "kon nie van skyf verwissel nie — {0}",
+  /* 467 */ "skyf {0}",
 ];

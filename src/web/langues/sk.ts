@@ -472,4 +472,7 @@ export const sk: readonly string[] = [
   /* 462 */ "Otvorí emulátor v jeho vlastnom okne, bez hry",
   /* 463 */ "Otvoriť",
   /* 464 */ "Hlasitosť",
+  /* 465 */ "Disk",
+  /* 466 */ "disk sa nepodarilo vymeniť — {0}",
+  /* 467 */ "disk {0}",
 ];

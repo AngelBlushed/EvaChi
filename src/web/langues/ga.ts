@@ -472,4 +472,7 @@ export const ga: readonly string[] = [
   /* 462 */ "Osclaíonn sé an t-aithriseoir ina fhuinneog féin, gan chluiche",
   /* 463 */ "Oscail",
   /* 464 */ "Airde",
+  /* 465 */ "Diosca",
+  /* 466 */ "níorbh fhéidir an diosca a athrú — {0}",
+  /* 467 */ "diosca {0}",
 ];

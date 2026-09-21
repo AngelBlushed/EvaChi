@@ -471,4 +471,7 @@ export const ms: readonly string[] = [
   /* 462 */ "Membuka emulator dalam tetingkapnya sendiri, tanpa permainan",
   /* 463 */ "Buka",
   /* 464 */ "Kelantangan",
+  /* 465 */ "Cakera",
+  /* 466 */ "tidak dapat menukar cakera — {0}",
+  /* 467 */ "cakera {0}",
 ];

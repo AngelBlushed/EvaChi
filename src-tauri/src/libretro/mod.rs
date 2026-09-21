@@ -7,6 +7,8 @@
 
 pub mod abi;
 pub mod core;
+/// Les disques d'un jeu qui en a plusieurs, retrouvés par leur nom.
+pub mod disques;
 /// Le cœur dans un processus voisin. Windows seulement : le tuyau nommé, la
 /// mémoire partagée et l'objet de travail n'ont pas d'équivalent portable, et
 /// c'est la seule plateforme que l'application vise.
@@ -22,7 +24,7 @@ pub mod session;
 pub mod triches;
 
 pub use abi::{Entrees, Manettes, JOYPAD_BUTTONS, MANCHES, PORTS};
-pub use core::{AvInfo, Core, CoreInfo};
+pub use core::{AvInfo, Core, CoreInfo, Disques};
 pub use host::VideoFrame;
 pub use triches::{Consignes, Poke};
 pub use session::{FramePayload, Session};

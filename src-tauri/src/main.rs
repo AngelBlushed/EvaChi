@@ -174,6 +174,8 @@ fn main() {
             commands::run_frame,
             commands::keep_awake,
             commands::reset,
+            commands::disques,
+            commands::changer_disque,
             commands::take_messages,
             commands::save_state,
             commands::load_state,

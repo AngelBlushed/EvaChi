@@ -471,4 +471,7 @@ export const sw: readonly string[] = [
   /* 462 */ "Hufungua kiigaji katika dirisha lake lenyewe, bila mchezo",
   /* 463 */ "Fungua",
   /* 464 */ "Sauti",
+  /* 465 */ "Diski",
+  /* 466 */ "imeshindwa kubadilisha diski — {0}",
+  /* 467 */ "diski {0}",
 ];

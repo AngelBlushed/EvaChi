@@ -181,6 +181,21 @@ fn traiter(
             tourner(requete, coeur, segment, sequence)
         }
 
+        Demande::Disques => {
+            let coeur = coeur.as_ref().ok_or("aucun cœur chargé")?;
+            serde_json::to_vec(&coeur.disques()).map_err(|erreur| erreur.to_string())
+        }
+
+        Demande::ChangerDisque => {
+            let rang: u32 =
+                serde_json::from_slice(charge).map_err(|erreur| erreur.to_string())?;
+            let coeur = coeur.as_mut().ok_or("aucun cœur chargé")?;
+            coeur
+                .changer_disque(rang)
+                .map_err(|erreur| erreur.to_string())?;
+            Ok(Vec::new())
+        }
+
         Demande::Reinitialiser => {
             let coeur = coeur.as_mut().ok_or("aucun cœur chargé")?;
             coeur.reset().map_err(|erreur| erreur.to_string())?;

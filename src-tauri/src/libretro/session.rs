@@ -27,7 +27,7 @@ use std::sync::Mutex;
 use std::thread;
 
 use super::abi::Manettes;
-use super::core::{AvInfo, Core, CoreInfo};
+use super::core::{AvInfo, Core, CoreInfo, Disques};
 use super::host::VideoFrame;
 
 /// Canal de réponse à une requête. L'erreur est aplatie en texte : elle est
@@ -100,6 +100,13 @@ enum Request {
         debut: u32,
         longueur: u32,
         reply: Reply<Vec<u8>>,
+    },
+    Disques {
+        reply: Reply<Option<Disques>>,
+    },
+    ChangerDisque {
+        rang: u32,
+        reply: Reply<()>,
     },
     Unload {
         reply: Reply<()>,
@@ -216,6 +223,22 @@ impl Locale {
                                     Ok(super::distant::protocole::Tranche { debut, longueur }
                                         .decouper(core.ram()))
                                 }
+                                None => Err("aucun cœur chargé".into()),
+                            });
+                        }
+
+                        Request::Disques { reply } => {
+                            let _ = reply.send(match core.as_ref() {
+                                Some(core) => Ok(core.disques()),
+                                None => Err("aucun cœur chargé".into()),
+                            });
+                        }
+
+                        Request::ChangerDisque { rang, reply } => {
+                            let _ = reply.send(match core.as_mut() {
+                                Some(core) => core
+                                    .changer_disque(rang)
+                                    .map_err(|erreur| erreur.to_string()),
                                 None => Err("aucun cœur chargé".into()),
                             });
                         }
@@ -630,6 +653,35 @@ impl Session {
             file.extend(super::host::take_core_log());
         }
         file
+    }
+
+    /// Ce que le lecteur de disques contient, si le cœur en a un.
+    pub fn disques(&self) -> Result<Option<Disques>, String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::Disques { reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                let brut = self.demander(&mut tenant, Demande::Disques, &[])?;
+                serde_json::from_slice(&brut).map_err(|erreur| erreur.to_string())
+            }
+        }
+    }
+
+    /// Change de disque : ouvre le lecteur, échange, referme.
+    pub fn changer_disque(&self, rang: u32) -> Result<(), String> {
+        let mut tenant = self.tenant();
+        match &mut *tenant {
+            Tenant::Local(locale) => locale.call(|reply| Request::ChangerDisque { rang, reply }),
+            #[cfg(windows)]
+            Tenant::Distant(_) => {
+                use super::distant::protocole::Demande;
+                let charge = serde_json::to_vec(&rang).map_err(|erreur| erreur.to_string())?;
+                self.demander(&mut tenant, Demande::ChangerDisque, &charge)
+                    .map(|_| ())
+            }
+        }
     }
 
     pub fn reset(&self) -> Result<(), String> {

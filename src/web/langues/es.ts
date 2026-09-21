@@ -471,4 +471,7 @@ export const es: readonly string[] = [
   /* 462 */ "Abre el emulador en su propia ventana, sin juego",
   /* 463 */ "Abrir",
   /* 464 */ "Volumen",
+  /* 465 */ "Disco",
+  /* 466 */ "no se pudo cambiar de disco — {0}",
+  /* 467 */ "disco {0}",
 ];

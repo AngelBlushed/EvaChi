@@ -572,6 +572,39 @@ fn le_deuxieme_joueur_traverse_la_frontiere() {
 }
 
 #[test]
+fn les_disques_se_changent_aussi_a_cote() {
+    // Le chemin ordinaire : le cœur vit dans un autre processus, et la
+    // demande de changement lui parvient par le tuyau.
+    let bac = tempdir::TempDir::new();
+    let session = Session::isolee(evachi());
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    for rang in 1..=2 {
+        std::fs::write(
+            bac.path().join(format!("Jeu (Disc {rang}).test")),
+            b"contenu sans importance",
+        )
+        .expect("écriture du disque");
+    }
+    session
+        .load_content(&bac.path().join("Jeu (Disc 1).test"))
+        .expect("chargement du premier disque");
+
+    let disques = session
+        .disques()
+        .expect("demande")
+        .expect("deux disques dans le lecteur");
+    assert_eq!(disques.titres.len(), 2);
+    assert_eq!(disques.courant, 0);
+
+    session.changer_disque(1).expect("changement de disque");
+    let apres = session.disques().expect("demande").expect("toujours deux");
+    assert_eq!(apres.courant, 1, "le deuxième disque est dans le lecteur");
+}
+
+#[test]
 fn ce_que_le_coeur_dit_pendant_une_trame_arrive_a_la_fenetre() {
     // La trame relève elle-même le journal du cœur : ce qu'elle en retirait
     // restait dans le processus voisin, et tout ce qu'un cœur disait en cours

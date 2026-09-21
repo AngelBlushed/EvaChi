@@ -474,4 +474,7 @@ export const hu: readonly string[] = [
   /* 462 */ "Megnyitja az emulátort a saját ablakában, játék nélkül",
   /* 463 */ "Megnyitás",
   /* 464 */ "Hangerő",
+  /* 465 */ "Lemez",
+  /* 466 */ "a lemez cseréje nem sikerült — {0}",
+  /* 467 */ "{0}. lemez",
 ];

@@ -472,4 +472,7 @@ export const pl: readonly string[] = [
   /* 462 */ "Otwiera emulator w jego własnym oknie, bez gry",
   /* 463 */ "Otwórz",
   /* 464 */ "Głośność",
+  /* 465 */ "Płyta",
+  /* 466 */ "nie udało się zmienić płyty — {0}",
+  /* 467 */ "płyta {0}",
 ];

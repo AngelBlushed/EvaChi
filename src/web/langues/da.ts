@@ -472,4 +472,7 @@ export const da: readonly string[] = [
   /* 462 */ "Åbner emulatoren i dens eget vindue, uden spil",
   /* 463 */ "Åbn",
   /* 464 */ "Lydstyrke",
+  /* 465 */ "Disk",
+  /* 466 */ "kunne ikke skifte disk — {0}",
+  /* 467 */ "disk {0}",
 ];

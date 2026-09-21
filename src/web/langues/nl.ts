@@ -472,4 +472,7 @@ export const nl: readonly string[] = [
   /* 462 */ "Opent de emulator in zijn eigen venster, zonder spel",
   /* 463 */ "Openen",
   /* 464 */ "Volume",
+  /* 465 */ "Schijf",
+  /* 466 */ "kon niet van schijf wisselen — {0}",
+  /* 467 */ "schijf {0}",
 ];

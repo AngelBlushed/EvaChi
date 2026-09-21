@@ -471,4 +471,7 @@ export const is: readonly string[] = [
   /* 462 */ "Opnar hermi í hans eigin glugga, án leiks",
   /* 463 */ "Opna",
   /* 464 */ "Hljóðstyrkur",
+  /* 465 */ "Diskur",
+  /* 466 */ "ekki tókst að skipta um disk — {0}",
+  /* 467 */ "diskur {0}",
 ];

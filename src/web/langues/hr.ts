@@ -472,4 +472,7 @@ export const hr: readonly string[] = [
   /* 462 */ "Otvara emulator u njegovu vlastitom prozoru, bez igre",
   /* 463 */ "Otvori",
   /* 464 */ "Glasnoća",
+  /* 465 */ "Disk",
+  /* 466 */ "disk nije moguće promijeniti — {0}",
+  /* 467 */ "disk {0}",
 ];

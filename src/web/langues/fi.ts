@@ -471,4 +471,7 @@ export const fi: readonly string[] = [
   /* 462 */ "Avaa emulaattorin sen omaan ikkunaan, ilman peliä",
   /* 463 */ "Avaa",
   /* 464 */ "Äänenvoimakkuus",
+  /* 465 */ "Levy",
+  /* 466 */ "levyn vaihto ei onnistunut — {0}",
+  /* 467 */ "levy {0}",
 ];
