@@ -33,6 +33,14 @@ const FIGE: usize = 8;
 /// Avec X (bouton 9) en plus, il abandonne de lui-même.
 const ABANDON: usize = 9;
 
+/// Le bouton par lequel le cœur d'essai sauvegarde dans sa pile (L), et celui
+/// par lequel il dit ce qu'il y trouve (R).
+const SAUVER: usize = 10;
+const RELIRE: usize = 11;
+/// Ce que le jeu note dans sa pile, et le préfixe sous lequel il la relit.
+const PILE_ECRITE: &str = "partie sauvegardee";
+const DIT_PILE: &str = "pile :";
+
 fn boutons(tenus: &[usize]) -> Entrees {
     let mut etat = NO_BUTTONS;
     for index in tenus {
@@ -533,6 +541,64 @@ fn le_dechargement_laisse_au_coeur_le_temps_d_ecrire() {
     // Le processus est parti avec le cœur : plus rien ne répond, et c'est dit.
     let erreur = session.run_frame(NO_BUTTONS).expect_err("plus de cœur");
     assert!(erreur.contains("aucun cœur"), "{erreur}");
+}
+
+#[test]
+fn ce_que_le_coeur_dit_pendant_une_trame_arrive_a_la_fenetre() {
+    // La trame relève elle-même le journal du cœur : ce qu'elle en retirait
+    // restait dans le processus voisin, et tout ce qu'un cœur disait en cours
+    // de partie — un fichier manquant, une sauvegarde impossible — n'atteignait
+    // jamais la fenêtre. Seuls les chargements parlaient.
+    let (session, _bac) = partie();
+
+    session
+        .run_frame(boutons(&[RELIRE]))
+        .expect("trame de relecture");
+    let dits = session.take_messages();
+
+    assert!(
+        dits.iter().any(|dit| dit.contains(DIT_PILE)),
+        "le cœur a parlé pendant la trame, et rien n'est arrivé : {dits:?}"
+    );
+}
+
+#[test]
+fn la_pile_du_jeu_traverse_deux_parties_a_cote() {
+    // Le chemin ordinaire, celui de tous les jours : le cœur vit dans un autre
+    // processus, et c'est lui qui pose la pile sur le disque en s'en allant.
+    // La fenêtre, elle, n'en voit jamais un octet.
+    let (session, bac) = partie();
+    let contenu = bac.path().join("factice.test");
+
+    session
+        .run_frame(boutons(&[SAUVER]))
+        .expect("trame de sauvegarde");
+    session.unload().expect("déchargement");
+
+    let pile = bac.path().join("factice.srm");
+    let ecrit = std::fs::read(&pile).unwrap_or_else(|erreur| {
+        panic!("{} : {erreur}", pile.display());
+    });
+    assert!(
+        ecrit.starts_with(PILE_ECRITE.as_bytes()),
+        "la pile écrite ne porte pas ce que le jeu y a mis : {ecrit:?}"
+    );
+
+    // Un processus neuf, et le jeu doit retrouver sa partie.
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
+        .expect("rechargement du cœur");
+    session.load_content(&contenu).expect("rechargement");
+    session
+        .run_frame(boutons(&[RELIRE]))
+        .expect("trame de relecture");
+    let dits = session.take_messages();
+
+    assert!(
+        dits.iter()
+            .any(|dit| dit.contains(DIT_PILE) && dit.contains(PILE_ECRITE)),
+        "le jeu n'a pas retrouvé sa pile : {dits:?}"
+    );
 }
 
 #[test]

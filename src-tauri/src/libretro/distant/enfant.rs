@@ -240,6 +240,15 @@ fn tourner(
         }
         audio.extend_from_slice(&trame.audio);
         arret |= trame.shutdown;
+
+        // Ce que le cœur a dit pendant la trame repart dans la file de l'hôte,
+        // que la boucle relève pour l'attacher à la réponse. Sans ce
+        // reversement, tout ce qu'un cœur dit en cours de partie restait dans
+        // ce processus-ci : la trame l'avait déjà retiré de la file, et la
+        // fenêtre ne voyait plus que ce qui se disait aux chargements.
+        for dit in trame.messages {
+            host::poser_message(dit);
+        }
     }
 
     *sequence = sequence.wrapping_add(1);

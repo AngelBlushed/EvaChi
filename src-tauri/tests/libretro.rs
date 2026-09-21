@@ -333,6 +333,73 @@ fn le_dechargement_libere_le_coeur() {
     assert!(error.contains("aucun cœur"), "message inattendu : {error}");
 }
 
+/// Le bouton par lequel le cœur d'essai sauvegarde dans sa pile, et celui par
+/// lequel il dit ce qu'il y trouve. Réécrits ici plutôt qu'importés, comme le
+/// reste : voir `test-core/src/lib.rs`.
+const SAUVER: usize = 10;
+const RELIRE: usize = 11;
+/// Ce que le jeu note dans sa pile, et le préfixe sous lequel il la relit.
+const PILE_ECRITE: &str = "partie sauvegardee";
+const DIT_PILE: &str = "pile :";
+
+#[test]
+fn la_pile_du_jeu_traverse_deux_parties() {
+    // Le manque que ceci répare : le cœur exposait sa pile, personne ne la
+    // lisait, et le jeu oubliait tout d'une partie à l'autre. On sauvegardait
+    // dans le jeu, la sauvegarde y était, elle n'atteignait jamais le disque.
+    let (_guard, session, scratch) = session_with_content();
+    let contenu = scratch.path().join("factice.test");
+
+    let mut sauver = NO_BUTTONS;
+    sauver.boutons[SAUVER] = 1;
+    session.run_frame(sauver).expect("trame de sauvegarde");
+    session.unload().expect("déchargement");
+
+    let pile = scratch.path().join("factice.srm");
+    let ecrit = std::fs::read(&pile).unwrap_or_else(|erreur| {
+        panic!("{} : {erreur}", pile.display());
+    });
+    assert!(
+        ecrit.starts_with(PILE_ECRITE.as_bytes()),
+        "la pile écrite ne porte pas ce que le jeu y a mis : {ecrit:?}"
+    );
+
+    // Deuxième partie, même dossier de sauvegardes : le jeu doit retrouver ce
+    // qu'il avait noté. Seul le cœur peut le dire — la pile n'appartient
+    // qu'à lui.
+    session
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+        .expect("rechargement du cœur");
+    session.load_content(&contenu).expect("rechargement du contenu");
+
+    let mut relire = NO_BUTTONS;
+    relire.boutons[RELIRE] = 1;
+    session.run_frame(relire).expect("trame de relecture");
+    let dits = session.take_messages();
+
+    assert!(
+        dits.iter()
+            .any(|dit| dit.contains(DIT_PILE) && dit.contains(PILE_ECRITE)),
+        "le jeu n'a pas retrouvé sa pile : {dits:?}"
+    );
+}
+
+#[test]
+fn une_partie_sans_sauvegarde_ne_laisse_rien() {
+    // L'autre moitié de la règle : on n'écrit que ce que le jeu a changé. Un
+    // fichier de sauvegarde vide pour chaque jeu lancé encombrerait le dossier
+    // et ferait croire à une partie là où il n'y en a pas.
+    let (_guard, session, scratch) = session_with_content();
+
+    session.run_frame(NO_BUTTONS).expect("trame");
+    session.unload().expect("déchargement");
+
+    assert!(
+        !scratch.path().join("factice.srm").exists(),
+        "une partie où rien n'a été sauvegardé ne doit rien laisser"
+    );
+}
+
 /// Répertoire temporaire minimal, effacé à la destruction.
 ///
 /// Écrit sur place plutôt que tiré d'une dépendance : le besoin tient en vingt

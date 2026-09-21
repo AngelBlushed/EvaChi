@@ -13,3 +13,6 @@
 //! par l'interface.
 
 pub mod libretro;
+/// Les sauvegardes que le jeu écrit lui-même. Ici plutôt que dans le binaire :
+/// c'est le cœur qui les remplit, et c'est donc la bibliothèque qui les range.
+pub mod piles;

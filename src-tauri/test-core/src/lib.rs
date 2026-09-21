@@ -28,6 +28,8 @@ const ENV_GET_VARIABLE: c_uint = 15;
 const ENV_SET_VARIABLES: c_uint = 16;
 const ENV_GET_LANGUAGE: c_uint = 21;
 const ENV_GET_LOG_INTERFACE: c_uint = 27;
+/// La pile de la cartouche, au sens de libretro.
+const MEMORY_SAVE_RAM: c_uint = 0;
 /// La RAM de travail, au sens de libretro.
 const MEMORY_SYSTEM_RAM: c_uint = 2;
 const PIXEL_FORMAT_XRGB8888: c_uint = 1;
@@ -76,6 +78,29 @@ pub const RAM_TAILLE: usize = 2048;
 /// fois : sans triche il monte sans fin, et avec une triche il repart de la
 /// même valeur à chaque trame pour ne monter que d'un cran.
 pub const RAM_COMPTEUR: usize = 0;
+
+/// La taille de la pile de la cartouche que ce cœur expose.
+///
+/// Trente-deux octets : une vraie pile en fait des milliers, mais celle-ci
+/// doit tenir en entier dans un message d'épreuve qui a échoué.
+pub const PILE_TAILLE: usize = 32;
+
+/// Ce que le jeu note dans sa pile quand on lui demande de sauvegarder.
+///
+/// Du texte, et non des octets quelconques : une épreuve qui échoue montre
+/// alors ce qu'elle a trouvé à la place, en clair.
+pub const PILE_ECRITE: &[u8] = b"partie sauvegardee";
+
+/// Le bouton par lequel le jeu sauvegarde — L, dans la numérotation libretro.
+pub const BOUTON_SAUVER: u32 = 10;
+/// Et celui par lequel il dit ce qu'il trouve dans sa pile — R.
+///
+/// C'est le seul moyen, pour une épreuve, de voir que l'hôte a bien rendu au
+/// jeu ce qu'il avait sauvegardé : la pile n'appartient qu'au cœur, personne
+/// d'autre ne peut dire ce qu'elle contient.
+pub const BOUTON_RELIRE: u32 = 11;
+/// Ce que le cœur écrit alors, suivi du contenu de sa pile.
+pub const DIT_PILE: &str = "pile : ";
 
 /// Ce que le cœur écrit quand on lui pose une triche, pour qu'on sache qu'elle
 /// est bien arrivée jusqu'à lui — et dans quel ordre.
@@ -207,6 +232,8 @@ static mut FRAMEBUFFER: Vec<u32> = Vec::new();
 static mut AUDIO: Vec<i16> = Vec::new();
 /// La RAM de travail, celle que les triches ont le droit d'écrire.
 static mut RAM: Vec<u8> = Vec::new();
+/// La pile de la cartouche, celle que l'hôte relit et range.
+static mut PILE: Vec<u8> = Vec::new();
 
 /// Contenu accepté : le cœur n'en fait rien mais vérifie qu'on le lui passe.
 static CONTENT_SIZE: AtomicU64 = AtomicU64::new(0);
@@ -415,9 +442,10 @@ pub unsafe extern "C" fn retro_init() {
     FRAME.store(0, Ordering::SeqCst);
     FRAMEBUFFER = vec![0; (STRIDE * HEIGHT) as usize];
     AUDIO = vec![0; AUDIO_FRAMES * 2];
-    // Allouée une fois pour toutes : l'hôte garde le pointeur qu'on lui rend,
-    // et une réallocation le laisserait pendre.
+    // Allouées une fois pour toutes : l'hôte garde les pointeurs qu'on lui
+    // rend, et une réallocation les laisserait pendre.
     RAM = vec![0; RAM_TAILLE];
+    PILE = vec![0; PILE_TAILLE];
 
     // Un vrai cœur annonce son format dès l'initialisation ; on fait pareil,
     // ce qui vérifie au passage que l'hôte le retient.
@@ -527,6 +555,18 @@ pub unsafe extern "C" fn retro_run() {
         *octet = octet.wrapping_add(1);
     }
 
+    // Et il sauvegarde quand on le lui demande, dans sa pile à lui. C'est à
+    // l'hôte de la porter jusqu'au disque : ce cœur-ci n'écrit aucun fichier,
+    // comme la plupart des cœurs de consoles à cartouche.
+    let pile = &mut *std::ptr::addr_of_mut!(PILE);
+    if buttons & (1 << BOUTON_SAUVER) != 0 {
+        let tient = PILE_ECRITE.len().min(pile.len());
+        pile[..tient].copy_from_slice(&PILE_ECRITE[..tient]);
+    }
+    if buttons & (1 << BOUTON_RELIRE) != 0 {
+        dire(&format!("{DIT_PILE}{}", String::from_utf8_lossy(pile)));
+    }
+
     let frame = FRAME.load(Ordering::SeqCst);
 
     let buffer = &mut *std::ptr::addr_of_mut!(FRAMEBUFFER);
@@ -631,23 +671,26 @@ pub extern "C" fn retro_get_region() -> c_uint {
 /// Appelé par l'hôte selon l'ABI libretro.
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_memory_data(id: c_uint) -> *mut c_void {
-    // La RAM de travail, et rien d'autre. La mémoire de sauvegarde reste
-    // absente à dessein : une triche qui la trouverait pourrait coûter une
-    // partie, et l'épreuve doit voir l'hôte s'en passer.
-    if id != MEMORY_SYSTEM_RAM {
-        return std::ptr::null_mut();
+    // Deux zones, et deux seulement : la RAM de travail, que les triches ont
+    // le droit d'écrire, et la pile de la cartouche, qu'elles ne doivent
+    // jamais atteindre. Les avoir toutes les deux ici est ce qui permet à
+    // l'épreuve de vérifier que l'hôte ne les confond pas.
+    match id {
+        MEMORY_SYSTEM_RAM => (*std::ptr::addr_of_mut!(RAM)).as_mut_ptr().cast::<c_void>(),
+        MEMORY_SAVE_RAM => (*std::ptr::addr_of_mut!(PILE)).as_mut_ptr().cast::<c_void>(),
+        _ => std::ptr::null_mut(),
     }
-    (*std::ptr::addr_of_mut!(RAM)).as_mut_ptr().cast::<c_void>()
 }
 
 /// # Safety
 /// Appelé par l'hôte selon l'ABI libretro.
 #[no_mangle]
 pub unsafe extern "C" fn retro_get_memory_size(id: c_uint) -> usize {
-    if id != MEMORY_SYSTEM_RAM {
-        return 0;
+    match id {
+        MEMORY_SYSTEM_RAM => (*std::ptr::addr_of!(RAM)).len(),
+        MEMORY_SAVE_RAM => (*std::ptr::addr_of!(PILE)).len(),
+        _ => 0,
     }
-    (*std::ptr::addr_of!(RAM)).len()
 }
 
 /// # Safety

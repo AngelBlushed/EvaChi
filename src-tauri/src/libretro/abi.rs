@@ -44,10 +44,18 @@ pub const ENV_GET_LANGUAGE: c_uint = 21;
 
 /// La mémoire de sauvegarde de la cartouche, celle qui finit sur le disque.
 ///
-/// Nommée pour être reconnue, jamais pour être touchée : c'est la distinction
-/// entre elle et la RAM de travail qui garantit qu'une triche ne peut pas
-/// abîmer une sauvegarde. Voir [`crate::libretro::triches`].
+/// Jamais touchée par les triches : c'est la distinction entre elle et la RAM
+/// de travail qui garantit qu'une triche ne peut pas abîmer une sauvegarde.
+/// Voir [`crate::libretro::triches`]. Elle a son propre chemin, celui des
+/// piles : le cœur l'expose, et l'hôte la relit et la range —
+/// voir [`crate::piles`].
 pub const MEMORY_SAVE_RAM: c_uint = 0;
+/// L'horloge de la cartouche, pour les jeux qui suivent le temps réel.
+///
+/// Rangée comme la pile, sous son propre suffixe : sans elle, une partie
+/// reprise ne sait plus quel jour on était, et les jeux qui font pousser
+/// quelque chose la nuit ne poussent plus.
+pub const MEMORY_RTC: c_uint = 1;
 /// La RAM de travail de la console. La seule que les triches écrivent.
 pub const MEMORY_SYSTEM_RAM: c_uint = 2;
 pub const ENV_GET_LOG_INTERFACE: c_uint = 27;

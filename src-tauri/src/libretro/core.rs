@@ -126,7 +126,38 @@ pub struct Core {
     /// qu'au gré de l'utilisateur, et la trame est le seul endroit de ce
     /// programme où compter les microsecondes a un sens.
     pokes: Vec<super::triches::Poke>,
+    /// Où ranger les piles du jeu.
+    save_dir: std::path::PathBuf,
+    /// Les zones de sauvegarde suivies pendant la partie.
+    piles: Vec<Suivie>,
+    /// Trames écoulées depuis le dernier coup d'œil aux piles.
+    depuis: u32,
 }
+
+/// Une zone de sauvegarde suivie : où elle va, et ce que le disque en a.
+struct Suivie {
+    /// Le numéro de la zone dans l'ABI.
+    quoi: c_uint,
+    chemin: std::path::PathBuf,
+    /// La copie de ce qui est écrit : on ne réécrit que si la zone a changé.
+    ecrit: Vec<u8>,
+    /// Vrai quand on s'est déjà plaint de ne pas pouvoir écrire, pour ne pas
+    /// le redire toutes les dix secondes.
+    plainte: bool,
+}
+
+/// Les zones qu'un cœur peut exposer, et le suffixe qu'elles prennent.
+///
+/// Les mêmes que partout ailleurs dans le monde libretro : une sauvegarde
+/// écrite par EvaChi se relit chez un autre hôte, et l'inverse.
+const ZONES: &[(c_uint, &str)] = &[(MEMORY_SAVE_RAM, "srm"), (MEMORY_RTC, "rtc")];
+
+/// Tous les combien on regarde si la pile a changé.
+///
+/// Dix secondes de jeu environ. Assez rare pour ne rien coûter — quelques
+/// dizaines de kilooctets comparés puis écrits —, assez fréquent pour qu'un
+/// cœur qui s'arrête mal ne fasse pas perdre une partie entière.
+const PERIODE_PILES: u32 = 600;
 
 /// Résout un symbole obligatoire de l'ABI.
 unsafe fn resolve<T: Copy>(lib: &Library, name: &'static str) -> Result<T, CoreError> {
@@ -244,6 +275,9 @@ impl Core {
             content_loaded: false,
             initialised: true,
             pokes: Vec::new(),
+            save_dir: save_dir.to_path_buf(),
+            piles: Vec::new(),
+            depuis: 0,
         })
     }
 
@@ -298,6 +332,10 @@ impl Core {
         //
         // SAFETY : le contenu est chargé, ce que l'ABI exige pour cet appel.
         unsafe { (self.api.set_controller_port_device)(0, DEVICE_JOYPAD) };
+
+        // Le jeu retrouve ici la pile qu'il avait laissée, et pas avant : la
+        // zone n'existe qu'une fois le contenu chargé.
+        self.ouvrir_piles(path);
 
         let av = self.av_info();
         self.start_hw_render(&av);
@@ -435,6 +473,14 @@ impl Core {
         // SAFETY : contenu chargé, rappels posés, même thread qu'au chargement.
         unsafe { (self.api.run)() };
 
+        // La pile part sur le disque de loin en loin, et pas seulement à la
+        // fin : un cœur qui tombe ne doit pas emporter la partie avec lui.
+        self.depuis = self.depuis.saturating_add(1);
+        if self.depuis >= PERIODE_PILES {
+            self.depuis = 0;
+            self.ranger_piles();
+        }
+
         let audio = host::take_audio();
         Ok(with_host(|host| Frame {
             video: host.video_fresh.then(|| host.video.clone()),
@@ -477,8 +523,9 @@ impl Core {
     /// Ce que la recherche a le droit de lire et d'écrire.
     ///
     /// La RAM de travail, et elle seule. La mémoire de sauvegarde est une
-    /// autre zone, que rien ici ne demande jamais : c'est ce qui fait qu'une
-    /// triche ne peut pas coûter une partie sauvegardée.
+    /// autre zone, que les triches ne demandent jamais : c'est ce qui fait
+    /// qu'une triche ne peut pas coûter une partie sauvegardée. Elle a son
+    /// propre chemin — voir [`Core::ouvrir_piles`].
     pub fn ram(&self) -> &[u8] {
         match self.zone(MEMORY_SYSTEM_RAM) {
             // SAFETY : la zone vaut tant que le contenu est chargé, et
@@ -506,6 +553,91 @@ impl Core {
     /// Combien d'octets la RAM de travail compte, zéro si le cœur la cache.
     pub fn taille_ram(&self) -> usize {
         self.ram().len()
+    }
+
+    /// Rend au jeu les piles qu'il avait laissées, et note où les reposer.
+    ///
+    /// Beaucoup de cœurs — presque tous ceux des consoles à cartouche — ne
+    /// sauvegardent pas eux-mêmes : ils exposent la pile en mémoire et
+    /// comptent sur l'hôte pour la relire au chargement et la ranger à la fin.
+    /// C'est la convention libretro, et sans ce geste ces jeux-là oubliaient
+    /// tout d'une partie à l'autre : on pouvait sauvegarder dans le jeu, la
+    /// sauvegarde y était, elle n'atteignait simplement jamais le disque.
+    ///
+    /// Un cœur qui s'occupe de ses sauvegardes tout seul n'expose rien ici —
+    /// il rend une zone vide, et on le laisse faire.
+    fn ouvrir_piles(&mut self, contenu: &Path) {
+        self.piles.clear();
+        self.depuis = 0;
+
+        for (quoi, suffixe) in ZONES {
+            let Some((debut, taille)) = self.zone(*quoi) else {
+                continue;
+            };
+            let chemin = crate::piles::chemin(&self.save_dir, contenu, suffixe);
+
+            // SAFETY : la zone vaut tant que le contenu est chargé, ce que
+            // `zone` vient de vérifier, et l'unicité vient de `&mut self`.
+            let zone = unsafe { std::slice::from_raw_parts_mut(debut, taille) };
+            if let Ok(lu) = std::fs::read(&chemin) {
+                let verse = crate::piles::verser(&lu, zone);
+                if verse != lu.len() {
+                    host::poser_message(format!(
+                        "{} : {} octets de sauvegarde pour une zone de {taille} — le reste est laissé de côté",
+                        chemin.display(),
+                        lu.len()
+                    ));
+                }
+            }
+            let ecrit = zone.to_vec();
+
+            self.piles.push(Suivie {
+                quoi: *quoi,
+                chemin,
+                ecrit,
+                plainte: false,
+            });
+        }
+    }
+
+    /// Écrit les piles qui ont changé depuis la dernière fois.
+    ///
+    /// Comparées avant d'être écrites : une pile ne bouge que quand le jeu
+    /// sauvegarde, c'est-à-dire presque jamais, et réécrire sans raison ferait
+    /// tourner le disque toutes les dix secondes pour rien.
+    fn ranger_piles(&mut self) {
+        if self.piles.is_empty() || !self.content_loaded {
+            return;
+        }
+        // La liste est empruntée le temps de l'écriture, comme pour les
+        // triches : elle et la zone seraient sinon deux emprunts du même cœur.
+        let mut piles = std::mem::take(&mut self.piles);
+        for pile in piles.iter_mut() {
+            let Some((debut, taille)) = self.zone(pile.quoi) else {
+                continue;
+            };
+            // SAFETY : même garantie que ci-dessus, en lecture seule.
+            let zone = unsafe { std::slice::from_raw_parts(debut, taille) };
+            if zone == pile.ecrit.as_slice() {
+                continue;
+            }
+            match crate::piles::ecrire(&pile.chemin, zone) {
+                Ok(()) => {
+                    pile.ecrit = zone.to_vec();
+                    pile.plainte = false;
+                }
+                Err(raison) => {
+                    // Dit une fois, pas toutes les dix secondes : un disque
+                    // plein le resterait, et le journal deviendrait illisible
+                    // au moment précis où il faut le lire.
+                    if !pile.plainte {
+                        pile.plainte = true;
+                        host::poser_message(format!("sauvegarde du jeu impossible — {raison}"));
+                    }
+                }
+            }
+        }
+        self.piles = piles;
     }
 
     /// Pose les triches, et garde les valeurs à maintenir.
@@ -609,6 +741,10 @@ pub struct Frame {
 
 impl Drop for Core {
     fn drop(&mut self) {
+        // La pile du jeu d'abord : elle vit dans une zone que le déchargement
+        // emporte, et c'est ici qu'on quitte la partie.
+        self.ranger_piles();
+
         // L'ABI impose de décharger le contenu avant de dénitialiser, et de ne
         // rien appeler après `retro_deinit`.
         unsafe {

@@ -9,6 +9,12 @@
 //! Recommencer un jeu depuis le début demande donc de retirer ce fichier-là,
 //! et lui seul. On ne le devine pas : on va le chercher, on le nomme, et on ne
 //! touche à rien d'autre.
+//!
+//! Tous les cœurs ne l'écrivent pas eux-mêmes. Beaucoup — la majorité des
+//! consoles à cartouche — se contentent d'exposer la pile en mémoire et
+//! attendent de l'hôte qu'il la relise au chargement et la range à la fin.
+//! C'est ce que fait [`crate::libretro::core`] avec les trois fonctions du bas
+//! de ce module ; sans elles, ces jeux-là oubliaient tout entre deux parties.
 
 use std::path::{Path, PathBuf};
 
@@ -130,6 +136,53 @@ pub fn effacer(base: &Path, rom_path: &str) -> Result<usize, String> {
     Ok(retires)
 }
 
+/// Où ranger la pile d'un contenu, sous tel suffixe.
+///
+/// Le nom du jeu sans son extension, plus celle de la pile — `Zelda.gbc`
+/// donne `Zelda.srm`. C'est la règle que suivent les autres hôtes libretro
+/// depuis toujours : une sauvegarde écrite ici se relit ailleurs, et l'inverse.
+///
+/// Le suffixe s'ajoute au lieu de remplacer : `Sonic 3 (USA) v1.1` garde son
+/// `.1`, qu'une substitution d'extension prendrait pour la sienne.
+pub fn chemin(dossier: &Path, contenu: &Path, suffixe: &str) -> PathBuf {
+    let souche = contenu
+        .file_stem()
+        .map(|nom| nom.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "sans-nom".to_owned());
+    dossier.join(format!("{souche}.{suffixe}"))
+}
+
+/// Verse dans la zone du cœur ce qu'on a relu sur le disque.
+///
+/// Les deux tailles ne coïncident pas toujours : un cœur change parfois la
+/// taille qu'il expose d'une version à l'autre, et certains ajoutent une
+/// entête à ce qu'ils écrivent. On recopie ce qui tient, et on rend le compte
+/// pour que l'appelant puisse le dire — plutôt que de refuser une partie
+/// entière pour quelques octets de différence.
+pub fn verser(lu: &[u8], zone: &mut [u8]) -> usize {
+    let combien = lu.len().min(zone.len());
+    zone[..combien].copy_from_slice(&lu[..combien]);
+    combien
+}
+
+/// Écrit une pile sans risquer de l'abîmer à mi-chemin.
+///
+/// Une coupure pendant l'écriture laisserait un fichier tronqué là où il y
+/// avait une partie. On écrit donc à côté, puis on échange : à tout instant,
+/// le fichier du jeu est soit l'ancien entier, soit le nouveau entier.
+pub fn ecrire(chemin: &Path, octets: &[u8]) -> Result<(), String> {
+    if let Some(parent) = chemin.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|erreur| format!("{} : {erreur}", parent.display()))?;
+    }
+    let voisin = PathBuf::from(format!("{}.nouvelle", chemin.display()));
+    std::fs::write(&voisin, octets).map_err(|erreur| format!("{} : {erreur}", voisin.display()))?;
+    std::fs::rename(&voisin, chemin).map_err(|erreur| {
+        let _ = std::fs::remove_file(&voisin);
+        format!("{} : {erreur}", chemin.display())
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -218,5 +271,56 @@ mod tests {
 
         assert!(piles.is_empty());
         assert_eq!(retires, 0);
+    }
+
+    #[test]
+    fn nomme_la_pile_d_apres_le_jeu_sans_lui_manger_un_point() {
+        // Les jeux d'archive portent souvent un numéro de révision : une
+        // substitution d'extension prendrait le « .1 » pour la sienne, et deux
+        // révisions du même jeu se partageraient une seule sauvegarde.
+        let base = Path::new("C:/saves");
+
+        assert_eq!(
+            chemin(base, Path::new("C:/jeux/Zelda.gbc"), "srm"),
+            base.join("Zelda.srm")
+        );
+        assert_eq!(
+            chemin(base, Path::new("C:/jeux/Sonic 3 (USA) v1.1.md"), "srm"),
+            base.join("Sonic 3 (USA) v1.1.srm")
+        );
+        // Et ce qu'on écrit se retrouve : les deux bouts doivent s'accorder.
+        let pile = chemin(base, Path::new("C:/jeux/Zelda.gbc"), "srm");
+        let nom = pile.file_name().unwrap().to_string_lossy().into_owned();
+        assert!(appartient(&nom, &souche("C:/jeux/Zelda.gbc")));
+    }
+
+    #[test]
+    fn verse_ce_qui_tient_et_dit_combien() {
+        // Plus court que la zone : le reste appartient au cœur, on n'y touche
+        // pas. Plus long : on s'arrête au bord plutôt que d'écrire à côté.
+        let mut zone = [9u8; 4];
+        assert_eq!(verser(&[1, 2], &mut zone), 2);
+        assert_eq!(zone, [1, 2, 9, 9]);
+
+        let mut zone = [0u8; 2];
+        assert_eq!(verser(&[1, 2, 3, 4], &mut zone), 2);
+        assert_eq!(zone, [1, 2]);
+    }
+
+    #[test]
+    fn ecrit_sans_laisser_de_moitie() {
+        let base = scratch();
+        let pile = base.join("Zelda.srm");
+
+        ecrire(&pile, b"premiere partie").expect("écriture");
+        let premiere = std::fs::read(&pile).expect("relecture");
+        ecrire(&pile, b"deuxieme").expect("écriture");
+        let deuxieme = std::fs::read(&pile).expect("relecture");
+        let restes = std::fs::read_dir(&base).expect("dossier").count();
+        let _ = std::fs::remove_dir_all(&base);
+
+        assert_eq!(premiere, b"premiere partie");
+        assert_eq!(deuxieme, b"deuxieme", "la seconde écriture remplace la première");
+        assert_eq!(restes, 1, "aucun fichier de passage ne doit rester");
     }
 }

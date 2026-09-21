@@ -24,7 +24,6 @@ mod install;
 mod manual;
 mod pads;
 mod parler;
-mod piles;
 mod tri;
 mod sentinel;
 mod shots;
@@ -34,6 +33,8 @@ mod touches;
 mod triches;
 
 use evachi::libretro::Session;
+// Les piles vivent dans la bibliothèque, avec le cœur qui les remplit.
+use evachi::piles;
 use tauri::Manager;
 
 /// Argument interne : interroge un cœur et ressort, sans ouvrir de fenêtre.
