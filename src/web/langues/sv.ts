@@ -475,4 +475,11 @@ export const sv: readonly string[] = [
   /* 465 */ "Skiva",
   /* 466 */ "kunde inte byta skiva — {0}",
   /* 467 */ "skiva {0}",
+  /* 468 */ "Hölje",
+  /* 469 */ "Det andra sättet att hantera de svarta fälten: att ställa dit möbeln som hörde till. Allt är ritat, i temats färger — ingenting hämtas, och spelets bild lämnas i fred.",
+  /* 470 */ "Handhållen konsol",
+  /* 471 */ "Svarta fält, och ingenting i dem",
+  /* 472 */ "Konsolen i händerna: korset till vänster, knapparna till höger",
+  /* 473 */ "Dåtidens apparat: det infällda glaset, högtalaren, reglaget",
+  /* 474 */ "Television",
 ];

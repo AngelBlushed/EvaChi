@@ -477,4 +477,11 @@ export const hu: readonly string[] = [
   /* 465 */ "Lemez",
   /* 466 */ "a lemez cseréje nem sikerült — {0}",
   /* 467 */ "{0}. lemez",
+  /* 468 */ "Burkolat",
+  /* 469 */ "A fekete sávok másik kezelése: beletenni azt a bútort, ami hozzájuk tartozott. Minden rajzolt, a téma színeivel — semmi sem töltődik le, és a játék képéhez nem nyúlunk.",
+  /* 470 */ "Hordozható konzol",
+  /* 471 */ "Fekete sávok, és semmi bennük",
+  /* 472 */ "A konzol a kézben: a kereszt balra, a gombok jobbra",
+  /* 473 */ "A kor készüléke: a süllyesztett üveg, a hangszóró, a csúszka",
+  /* 474 */ "Televízió",
 ];

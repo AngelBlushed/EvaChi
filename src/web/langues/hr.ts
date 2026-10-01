@@ -475,4 +475,11 @@ export const hr: readonly string[] = [
   /* 465 */ "Disk",
   /* 466 */ "disk nije moguće promijeniti — {0}",
   /* 467 */ "disk {0}",
+  /* 468 */ "Okvir",
+  /* 469 */ "Drugi način nošenja s crnim prugama: staviti u njih namještaj koji je uz njih išao. Sve je nacrtano, u bojama teme — ništa se ne preuzima i slika igre se ne dira.",
+  /* 470 */ "Prijenosna konzola",
+  /* 471 */ "Crne pruge, i ništa u njima",
+  /* 472 */ "Konzola u rukama: križ lijevo, tipke desno",
+  /* 473 */ "Televizor onog doba: ugrađeno staklo, zvučnik, klizač",
+  /* 474 */ "Televizor",
 ];

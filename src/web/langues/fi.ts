@@ -474,4 +474,11 @@ export const fi: readonly string[] = [
   /* 465 */ "Levy",
   /* 466 */ "levyn vaihto ei onnistunut — {0}",
   /* 467 */ "levy {0}",
+  /* 468 */ "Kehys",
+  /* 469 */ "Toinen tapa käsitellä mustia palkkeja: asettaa niihin se huonekalu, joka niihin kuului. Kaikki on piirretty teeman väreillä — mitään ei ladata, eikä pelin kuvaan kosketa.",
+  /* 470 */ "Käsikonsoli",
+  /* 471 */ "Mustat palkit, eikä niissä mitään",
+  /* 472 */ "Konsoli käsissä: ristiohjain vasemmalla, napit oikealla",
+  /* 473 */ "Ajan televisio: upotettu lasi, kaiutin, liukusäädin",
+  /* 474 */ "Televisio",
 ];

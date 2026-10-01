@@ -475,4 +475,11 @@ export const nl: readonly string[] = [
   /* 465 */ "Schijf",
   /* 466 */ "kon niet van schijf wisselen — {0}",
   /* 467 */ "schijf {0}",
+  /* 468 */ "Behuizing",
+  /* 469 */ "De andere manier om met de zwarte balken om te gaan: er het meubel in zetten dat erbij hoorde. Alles is getekend, in de kleuren van het thema — er wordt niets gedownload en het beeld van het spel blijft onaangeroerd.",
+  /* 470 */ "Draagbare console",
+  /* 471 */ "Zwarte balken, en niets erin",
+  /* 472 */ "De console in de handen: het kruis links, de knoppen rechts",
+  /* 473 */ "Het toestel van toen: het verzonken glas, de luidspreker, de schuif",
+  /* 474 */ "Televisie",
 ];

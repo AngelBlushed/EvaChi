@@ -475,4 +475,11 @@ export const pl: readonly string[] = [
   /* 465 */ "Płyta",
   /* 466 */ "nie udało się zmienić płyty — {0}",
   /* 467 */ "płyta {0}",
+  /* 468 */ "Obudowa",
+  /* 469 */ "Drugi sposób na czarne pasy: wstawić w nie mebel, który do nich należał. Wszystko jest narysowane, w barwach motywu — nic się nie pobiera, a obrazu gry nikt nie dotyka.",
+  /* 470 */ "Konsola przenośna",
+  /* 471 */ "Czarne pasy i nic w środku",
+  /* 472 */ "Konsola w dłoniach: krzyżak po lewej, przyciski po prawej",
+  /* 473 */ "Odbiornik z tamtych lat: wpuszczone szkło, głośnik, suwak",
+  /* 474 */ "Telewizor",
 ];

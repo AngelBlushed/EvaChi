@@ -475,4 +475,11 @@ export const eu: readonly string[] = [
   /* 465 */ "Diskoa",
   /* 466 */ "ezin izan da diskoa aldatu — {0}",
   /* 467 */ "{0} diskoa",
+  /* 468 */ "Karkasa",
+  /* 469 */ "Banda beltzak tratatzeko beste modua: haiekin zetorren altzaria jartzea. Dena marraztuta dago, gaiaren koloreekin — ez da ezer deskargatzen, eta jokoaren irudia ukitu gabe geratzen da.",
+  /* 470 */ "Kontsola eramangarria",
+  /* 471 */ "Banda beltzak, eta ezer ez barruan",
+  /* 472 */ "Kontsola eskuetan: gurutzea ezkerrean, botoiak eskuinean",
+  /* 473 */ "Garai hartako telebista: beira txertatua, bozgorailua, graduatzailea",
+  /* 474 */ "Telebista",
 ];

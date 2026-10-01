@@ -301,6 +301,8 @@ const langueMenu = $<HTMLDivElement>('menu-langue');
 const echelleList = $<HTMLDivElement>('echelle-list');
 const lissageList = $<HTMLDivElement>('lissage-list');
 const nuanceList = $<HTMLDivElement>('nuance-list');
+const habillageList = $<HTMLDivElement>('habillage-list');
+const habillage = $<HTMLDivElement>('habillage');
 const etirementList = $<HTMLDivElement>('etirement-list');
 const croquisManette = $<HTMLTemplateElement>('croquis-manette');
 const raccourcisEtatBoite = $<HTMLDListElement>('raccourcis-etat');
@@ -388,6 +390,7 @@ const RETENU = {
   favoris: 'evachi.favoris',
   echelle: 'evachi.echelle',
   lissage: 'evachi.lissage',
+  habillage: 'evachi.habillage',
   etirement: 'evachi.etirement',
   zoneMorte: 'evachi.zone-morte',
   etats: 'evachi.etats',
@@ -1983,6 +1986,30 @@ const ECHELLES = [
   ['4', '×4', aTraduire('Chaque pixel sur seize — pour les grands écrans')],
 ] as const;
 
+/**
+ * Les habillages : ce qu'on pose dans les bandes noires.
+ *
+ * Peu de consoles ont les proportions d'un écran d'aujourd'hui, et il reste
+ * donc de la place sur les côtés. L'étirement la supprime en déformant
+ * l'image ; l'habillage la remplit sans y toucher.
+ *
+ * Deux meubles, parce qu'il y a deux façons d'avoir joué : devant un
+ * téléviseur, ou la console dans les mains.
+ */
+const HABILLAGES = [
+  ['aucun', aTraduire('Aucun'), aTraduire('Des bandes noires, et rien dedans')],
+  [
+    'televiseur',
+    aTraduire('Téléviseur'),
+    aTraduire('Le poste de l’époque : le verre enchâssé, le haut-parleur, la molette'),
+  ],
+  [
+    'portable',
+    aTraduire('Console portable'),
+    aTraduire('La console dans les mains : la croix à gauche, les boutons à droite'),
+  ],
+] as const;
+
 const LISSAGES = [
   ['net', aTraduire('Net'), aTraduire('Les pixels restent carrés, comme sur la machine d’origine')],
   [
@@ -2014,6 +2041,60 @@ function echelleImage(): string {
 
 function lissageImage(): string {
   return retenu(RETENU.lissage) === 'doux' ? 'doux' : 'net';
+}
+
+/** L'habillage retenu, ou aucun. */
+function habillageChoisi(): string {
+  const garde = retenu(RETENU.habillage);
+  return HABILLAGES.some(([id]) => id === garde) ? (garde as string) : 'aucun';
+}
+
+/**
+ * Au-delà, la marge peut tenir un ornement.
+ *
+ * En deçà, le haut-parleur et la croix viendraient se coller au verre, et ce
+ * qui devait meubler ferait une bavure. Mesuré en `--u`, l'unité de
+ * l'habillage : le seuil vaut donc la même chose en fenêtre et en plein
+ * écran.
+ */
+const MARGE_ORNEMENT = 13;
+
+/**
+ * Pose le meuble autour de l'image.
+ *
+ * Appelée par [`fitScreen`], qui vient de calculer où tombe l'image : c'est
+ * la seule chose que l'habillage a besoin de savoir. Tout le reste — le
+ * creux, les fentes du haut-parleur, la croix — se déduit en CSS de ces
+ * quelques mesures.
+ */
+function poserHabillage(boite: { width: number; height: number }, large: number, haut: number): void {
+  const choix = habillageChoisi();
+  // Un émulateur autonome affiche son image dans sa propre fenêtre : il n'y a
+  // ici aucune bande noire à combler.
+  habillage.hidden = choix === 'aucun' || entry?.kind === 'externe';
+  if (habillage.hidden) return;
+
+  habillage.classList.toggle('portable', choix === 'portable');
+  habillage.style.width = `${Math.floor(boite.width)}px`;
+  habillage.style.height = `${Math.floor(boite.height)}px`;
+
+  // L'unité : le centième du plus petit côté. Tout l'habillage s'y mesure, et
+  // garde donc ses proportions quelle que soit la taille de la fenêtre.
+  const unite = Math.min(boite.width, boite.height) / 100;
+  const margeX = Math.max(0, (boite.width - large) / 2);
+  const margeY = Math.max(0, (boite.height - haut) / 2);
+
+  // En pixels, et non en nombres nus : le CSS les mêle à `--u`, et
+  // « 290 - 58px » n'est pas un calcul valide — la règle entière serait jetée,
+  // et l'ornement retomberait à sa place par défaut, à moitié dehors.
+  habillage.style.setProperty('--u', `${unite}px`);
+  habillage.style.setProperty('--marge-x', `${Math.round(margeX)}px`);
+  habillage.style.setProperty('--marge-y', `${Math.round(margeY)}px`);
+  habillage.style.setProperty('--vitre-l', `${Math.round(large)}px`);
+  habillage.style.setProperty('--vitre-h', `${Math.round(haut)}px`);
+
+  if (margeX >= MARGE_ORNEMENT * unite) habillage.setAttribute('data-large', '');
+  else habillage.removeAttribute('data-large');
 }
 
 /** Le filtre retenu, ou aucun. */
@@ -2103,6 +2184,13 @@ function renderGraphisme(): void {
     });
     etirementList.append(choix);
   }
+
+  renderChoix(habillageList, HABILLAGES, habillageChoisi(), (id) => {
+    retenir(RETENU.habillage, id);
+    renderGraphisme();
+    // L'habillage mange un peu de place : l'image se remesure avec lui.
+    fitScreen();
+  });
 
   renderChoix(lissageList, LISSAGES, lissageImage(), (id) => {
     retenir(RETENU.lissage, id);
@@ -2479,8 +2567,18 @@ function fitScreen(available?: { width: number; height: number }): void {
   const ratio = core?.info.aspectRatio || canvas.width / Math.max(1, canvas.height) || 1;
   // La taille rapportée par l'observateur est celle d'après la mise en page ;
   // la relire soi-même juste après un redimensionnement rend l'ancienne.
-  const box = available ?? playerView.getBoundingClientRect();
-  if (box.width === 0 || box.height === 0) return;
+  const place = available ?? playerView.getBoundingClientRect();
+  if (place.width === 0 || place.height === 0) return;
+
+  // L'habillage réclame son cadre. Sans cette réserve, une image qui remplit
+  // déjà la fenêtre ne lui laisserait pas un pixel, et le meuble n'aurait
+  // nulle part où se montrer. Rien n'est retenu quand on n'en veut pas.
+  const cadre =
+    habillageChoisi() === 'aucun' ? 0 : Math.min(place.width, place.height) * 0.035;
+  const box = {
+    width: Math.max(1, place.width - cadre * 2),
+    height: Math.max(1, place.height - cadre * 2),
+  };
 
   let width = box.width;
   let height = width / ratio;
@@ -2533,6 +2631,10 @@ function fitScreen(available?: { width: number; height: number }): void {
       repeindre();
     }
   }
+
+  // Et le meuble autour, s'il y en a un. En dernier : il se mesure sur
+  // l'image, qui vient seulement d'être posée.
+  poserHabillage(place, Math.floor(width), Math.floor(height));
 }
 
 /**

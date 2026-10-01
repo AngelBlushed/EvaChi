@@ -1832,6 +1832,227 @@
         overflow: hidden;
       }
       .player[hidden] { display: none; }
+      /* Les trois calques — l'habillage, l'image, les filtres — occupent la
+         même case : sans cela, chacun prendrait sa propre rangée et le jeu
+         cesserait d'être au milieu. */
+      .player > * { grid-area: 1 / 1; }
+
+      /* --- L'habillage ---
+       *
+       * Ce qui comble les bandes noires. Peu de consoles ont les proportions
+       * d'un écran d'aujourd'hui : il reste de la place sur les côtés, et
+       * plutôt que de la laisser noire, on y pose le meuble qui allait avec.
+       *
+       * Dessiné, et non photographié : une image coûterait des mégaoctets, ne
+       * suivrait pas les palettes et ne grandirait pas proprement. Tout ici
+       * est fait de dégradés et de rayures, et se mesure en `--u`, le
+       * centième du plus petit côté — l'habillage garde donc ses proportions
+       * de la fenêtre au plein écran.
+       */
+      .habillage {
+        /* La teinte du meuble. Tirée du thème — elle en garde la nuance — mais
+           ramenée vers un gris moyen : les palettes sombres d'EvaChi vont
+           jusqu'au presque-noir, et un poste noir sur fond noir ne se voit
+           pas. Mélangée, elle reste lisible sur les trente-six. */
+        --meuble: color-mix(in oklab, var(--raised) 38%, #76767e);
+        position: relative;
+        z-index: 0;
+        /* Un meuble ne se clique pas : les gestes vont au jeu derrière. */
+        pointer-events: none;
+        border-radius: calc(var(--u) * 2.6);
+        background:
+          radial-gradient(120% 70% at 24% 0%, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 60%),
+          linear-gradient(
+            170deg,
+            color-mix(in oklab, var(--meuble) 82%, white),
+            var(--meuble) 42%,
+            color-mix(in oklab, var(--meuble) 72%, black)
+          );
+        box-shadow:
+          inset 0 0 0 1px rgba(255, 255, 255, 0.12),
+          inset 0 calc(var(--u) * -1.4) calc(var(--u) * 2.4) rgba(0, 0, 0, 0.34);
+      }
+
+      /* Une rainure sur le flanc resté vide du poste : sans elle, c'est une
+         dalle nue. La console portable n'en a pas — la croix y est déjà. */
+      .habillage:not(.portable)[data-large]::before {
+        content: "";
+        position: absolute;
+        left: calc(var(--marge-x) / 2 - var(--u) * 0.2);
+        top: 22%;
+        width: calc(var(--u) * 0.4);
+        height: 56%;
+        border-radius: calc(var(--u) * 0.2);
+        background: rgba(0, 0, 0, 0.22);
+        box-shadow: calc(var(--u) * 0.2) 0 0 rgba(255, 255, 255, 0.08);
+      }
+      .habillage[hidden] { display: none; }
+
+      /* Le creux où le verre est enchâssé. Il vit derrière l'image, qui le
+         couvre exactement : ce qu'on en voit est l'anneau autour. */
+      .habillage .vitre {
+        position: absolute;
+        left: var(--marge-x);
+        top: var(--marge-y);
+        width: var(--vitre-l);
+        height: var(--vitre-h);
+        background: #000;
+        border-radius: calc(var(--u) * 0.7);
+        box-shadow:
+          0 0 0 calc(var(--u) * 1.5) #0c0c0e,
+          0 0 0 calc(var(--u) * 1.75) color-mix(in oklab, var(--meuble) 60%, black),
+          inset 0 0 calc(var(--u) * 2) rgba(0, 0, 0, 0.9),
+          0 calc(var(--u) * 0.2) 0 calc(var(--u) * 1.75) rgba(255, 255, 255, 0.14),
+          0 calc(var(--u) * 1.2) calc(var(--u) * 2.4) rgba(0, 0, 0, 0.5);
+      }
+
+      /* Les ornements ne paraissent que si la marge est assez large pour les
+         tenir : serrés contre le verre, ils feraient une bavure. */
+      .habillage .ornement { display: none; }
+      .habillage[data-large] .ornement { display: block; }
+      /* Chaque meuble n'a que les siens : le poste n'a pas de croix, et la
+         console portable pas de molette de volume. */
+      .habillage:not(.portable) .croix,
+      .habillage:not(.portable) .boutons,
+      .habillage.portable .hp,
+      .habillage.portable .glissiere { display: none; }
+
+      /* Le haut-parleur : des fentes, et rien d'autre. */
+      .habillage .hp {
+        position: absolute;
+        /* Jamais plus large que la moitié de la marge : sur un écran étroit,
+           le flanc est mince et la grille doit s'y plier. */
+        --hp-l: min(calc(var(--u) * 6.5), calc(var(--marge-x) * 0.55));
+        top: 44%;
+        width: var(--hp-l);
+        height: calc(var(--vitre-h) * 0.62);
+        transform: translateY(-50%);
+        border-radius: calc(var(--u) * 0.5);
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(0, 0, 0, 0.42) 0 calc(var(--u) * 0.42),
+          color-mix(in oklab, var(--meuble) 70%, white) calc(var(--u) * 0.42) calc(var(--u) * 0.95)
+        );
+        box-shadow:
+          inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+          0 1px 0 rgba(255, 255, 255, 0.1);
+      }
+      .habillage .hp.droite { right: calc((var(--marge-x) - var(--hp-l)) / 2); }
+      .habillage .hp.gauche { left: calc((var(--marge-x) - var(--hp-l)) / 2); }
+
+      /* La glissière du volume, et son bouton. */
+      .habillage .glissiere {
+        position: absolute;
+        bottom: calc(var(--u) * 5.5);
+        right: calc((var(--marge-x) - var(--u) * 1.3) / 2);
+        width: calc(var(--u) * 1.3);
+        height: calc(var(--u) * 8);
+        border-radius: calc(var(--u) * 0.65);
+        background: linear-gradient(to right, rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.18));
+        box-shadow:
+          inset 0 0 calc(var(--u) * 0.5) rgba(0, 0, 0, 0.6),
+          0 1px 0 rgba(255, 255, 255, 0.1);
+      }
+      .habillage .glissiere::after {
+        content: "";
+        position: absolute;
+        left: calc(var(--u) * -0.75);
+        top: 34%;
+        width: calc(var(--u) * 2.8);
+        height: calc(var(--u) * 1.5);
+        border-radius: calc(var(--u) * 0.3);
+        background: linear-gradient(
+          to bottom,
+          color-mix(in oklab, var(--meuble) 70%, white),
+          color-mix(in oklab, var(--meuble) 85%, black)
+        );
+        box-shadow: 0 calc(var(--u) * 0.15) calc(var(--u) * 0.35) rgba(0, 0, 0, 0.5);
+      }
+
+      /* La diode : allumée, puisqu'on joue. */
+      .habillage .diode {
+        position: absolute;
+        bottom: calc(var(--u) * 2.4);
+        right: calc((var(--marge-x) - var(--u) * 1.1) / 2);
+        width: calc(var(--u) * 1.1);
+        height: calc(var(--u) * 1.1);
+        border-radius: 50%;
+        background: var(--accent);
+        box-shadow: 0 0 calc(var(--u) * 1.4) var(--accent);
+      }
+
+      /* --- L'habillage d'une console portable ---
+       *
+       * Même idée, autres ornements : la croix à gauche, les boutons à
+       * droite, là où les pouces les trouvent. C'est aussi ce qui remplit le
+       * mieux les côtés — une console portable est large et son écran petit,
+       * exactement la forme du vide qu'on comble.
+       */
+      .habillage.portable { border-radius: calc(var(--u) * 6); }
+      .habillage.portable .vitre { border-radius: calc(var(--u) * 0.5); }
+
+      /* La croix directionnelle : deux barres, un creux au milieu. */
+      .habillage .croix {
+        --croix-l: min(calc(var(--u) * 16), calc(var(--marge-x) * 0.46));
+        position: absolute;
+        top: 50%;
+        left: calc((var(--marge-x) - var(--croix-l)) / 2);
+        width: var(--croix-l);
+        height: var(--croix-l);
+        transform: translateY(-50%);
+      }
+      .habillage .croix::before,
+      .habillage .croix::after {
+        content: "";
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        border-radius: calc(var(--u) * 0.5);
+        background: linear-gradient(145deg, #3b3b42, #1d1d22);
+        box-shadow:
+          inset 0 calc(var(--u) * 0.12) 0 rgba(255, 255, 255, 0.12),
+          0 calc(var(--u) * 0.2) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.4);
+      }
+      .habillage .croix::before { width: 100%; height: 34%; }
+      .habillage .croix::after { width: 34%; height: 100%; }
+      /* Le creux du milieu, qu'un pouce trouve sans regarder. */
+      .habillage .croix::before { box-shadow:
+        inset 0 calc(var(--u) * 0.12) 0 rgba(255, 255, 255, 0.14),
+        inset 0 calc(var(--u) * -0.12) 0 rgba(0, 0, 0, 0.5),
+        0 calc(var(--u) * 0.25) calc(var(--u) * 0.5) rgba(0, 0, 0, 0.45); }
+
+      /* Les deux boutons, posés en biais comme ils l'ont toujours été. */
+      .habillage .boutons {
+        --boutons-l: min(calc(var(--u) * 18), calc(var(--marge-x) * 0.54));
+        position: absolute;
+        top: 50%;
+        right: calc((var(--marge-x) - var(--boutons-l)) / 2);
+        width: var(--boutons-l);
+        height: calc(var(--boutons-l) * 0.62);
+        transform: translateY(-50%) rotate(-18deg);
+      }
+      .habillage .boutons::before,
+      .habillage .boutons::after {
+        content: "";
+        position: absolute;
+        top: 50%;
+        width: calc(var(--boutons-l) * 0.42);
+        height: calc(var(--boutons-l) * 0.42);
+        margin-top: calc(var(--boutons-l) * -0.21);
+        border-radius: 50%;
+        background: radial-gradient(
+          118% 118% at 34% 26%,
+          color-mix(in oklab, var(--accent) 80%, white),
+          color-mix(in oklab, var(--accent) 55%, black)
+        );
+        box-shadow:
+          inset 0 calc(var(--u) * -0.25) calc(var(--u) * 0.4) rgba(0, 0, 0, 0.45),
+          0 0 0 calc(var(--u) * 0.18) rgba(0, 0, 0, 0.35),
+          0 calc(var(--u) * 0.3) calc(var(--u) * 0.6) rgba(0, 0, 0, 0.45);
+      }
+      .habillage .boutons::before { left: 0; }
+      .habillage .boutons::after { right: 0; }
 
       /*
        * La taille est posée en pixels par le code : `max-width` ne fait que
@@ -2655,6 +2876,16 @@
         </div>
 
         <div class="player" id="player" hidden>
+          <!-- Le meuble autour de l'image. Caché tant qu'on n'en veut pas, et
+               mesuré par le code : lui seul sait où tombe l'image. -->
+          <div class="habillage" id="habillage" hidden>
+            <div class="vitre"></div>
+            <div class="ornement hp droite"></div>
+            <div class="ornement glissiere"></div>
+            <div class="ornement croix"></div>
+            <div class="ornement boutons"></div>
+            <div class="ornement diode"></div>
+          </div>
           <canvas id="screen" width="64" height="32"></canvas>
           <!-- Le second écran ne sert qu'aux filtres : un canevas ne peut pas
                changer d'avis sur la façon dont on peint dessus, et l'un des
@@ -2935,6 +3166,14 @@
           proportions ; à cent, elle remplit la fenêtre, quitte à s'allonger.
         </p>
         <div class="crans" id="etirement-list"></div>
+
+        <h3 class="section">Habillage</h3>
+        <p class="hint-text">
+          L'autre façon de traiter les bandes noires : y poser le meuble qui
+          allait avec. Tout est dessiné, aux couleurs du thème — rien n'est
+          téléchargé, et l'image du jeu n'est pas touchée.
+        </p>
+        <div class="menus" id="habillage-list"></div>
 
         <h3 class="section">Lissage</h3>
         <div class="menus" id="lissage-list"></div>

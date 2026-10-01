@@ -475,4 +475,11 @@ export const cs: readonly string[] = [
   /* 465 */ "Disk",
   /* 466 */ "disk nelze vyměnit — {0}",
   /* 467 */ "disk {0}",
+  /* 468 */ "Rámeček",
+  /* 469 */ "Druhý způsob, jak naložit s černými pruhy: postavit do nich nábytek, který k nim patřil. Vše je nakreslené v barvách motivu — nic se nestahuje a obraz hry zůstává nedotčený.",
+  /* 470 */ "Kapesní konzole",
+  /* 471 */ "Černé pruhy a nic v nich",
+  /* 472 */ "Konzole v rukou: kříž vlevo, tlačítka vpravo",
+  /* 473 */ "Tehdejší přijímač: zapuštěné sklo, reproduktor, posuvník",
+  /* 474 */ "Televizor",
 ];

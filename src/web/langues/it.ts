@@ -474,4 +474,11 @@ export const it: readonly string[] = [
   /* 465 */ "Disco",
   /* 466 */ "impossibile cambiare disco — {0}",
   /* 467 */ "disco {0}",
+  /* 468 */ "Mobile",
+  /* 469 */ "L’altro modo di trattare le bande nere: metterci dentro il mobile che le accompagnava. È tutto disegnato, con i colori del tema — non si scarica nulla e l’immagine del gioco non viene toccata.",
+  /* 470 */ "Console portatile",
+  /* 471 */ "Bande nere, e niente dentro",
+  /* 472 */ "La console tra le mani: la croce a sinistra, i tasti a destra",
+  /* 473 */ "Il televisore di allora: il vetro incassato, l’altoparlante, il cursore",
+  /* 474 */ "Televisore",
 ];

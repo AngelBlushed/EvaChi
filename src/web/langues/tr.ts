@@ -477,4 +477,11 @@ export const tr: readonly string[] = [
   /* 465 */ "Disk",
   /* 466 */ "disk değiştirilemedi — {0}",
   /* 467 */ "disk {0}",
+  /* 468 */ "Kasa",
+  /* 469 */ "Siyah şeritlerle baş etmenin öteki yolu: oraya onlarla birlikte gelen mobilyayı koymak. Her şey çizilmiştir, temanın renkleriyle — hiçbir şey indirilmez ve oyunun görüntüsüne dokunulmaz.",
+  /* 470 */ "Taşınabilir konsol",
+  /* 471 */ "Siyah şeritler, içlerinde hiçbir şey yok",
+  /* 472 */ "Konsol ellerde: yön tuşu solda, düğmeler sağda",
+  /* 473 */ "O zamanın alıcısı: gömme cam, hoparlör, sürgü",
+  /* 474 */ "Televizyon",
 ];

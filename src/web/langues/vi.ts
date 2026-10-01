@@ -474,4 +474,11 @@ export const vi: readonly string[] = [
   /* 465 */ "Đĩa",
   /* 466 */ "không thể đổi đĩa — {0}",
   /* 467 */ "đĩa {0}",
+  /* 468 */ "Vỏ máy",
+  /* 469 */ "Cách khác để xử lý những dải đen: đặt vào đó chính món đồ đi cùng chúng ngày trước. Tất cả đều được vẽ, theo màu của chủ đề — không tải về thứ gì, và hình ảnh trò chơi không bị động đến.",
+  /* 470 */ "Máy chơi cầm tay",
+  /* 471 */ "Dải đen, và chẳng có gì bên trong",
+  /* 472 */ "Máy trong tay: phím chữ thập bên trái, các nút bên phải",
+  /* 473 */ "Chiếc máy thuở ấy: tấm kính lõm, loa, cần gạt",
+  /* 474 */ "Ti vi",
 ];

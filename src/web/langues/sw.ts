@@ -474,4 +474,11 @@ export const sw: readonly string[] = [
   /* 465 */ "Diski",
   /* 466 */ "imeshindwa kubadilisha diski — {0}",
   /* 467 */ "diski {0}",
+  /* 468 */ "Kifuniko",
+  /* 469 */ "Njia nyingine ya kushughulikia mistari myeusi: kuweka humo samani iliyoandamana nayo. Kila kitu kimechorwa, kwa rangi za mandhari — hakuna kinachopakuliwa, na picha ya mchezo haiguswi.",
+  /* 470 */ "Kiweko cha mkononi",
+  /* 471 */ "Mistari myeusi, na hakuna kitu ndani yake",
+  /* 472 */ "Kiweko mikononi: msalaba kushoto, vitufe kulia",
+  /* 473 */ "Televisheni ya wakati ule: kioo kilichozama, spika, kitelezi",
+  /* 474 */ "Televisheni",
 ];

@@ -474,4 +474,11 @@ export const af: readonly string[] = [
   /* 465 */ "Skyf",
   /* 466 */ "kon nie van skyf verwissel nie — {0}",
   /* 467 */ "skyf {0}",
+  /* 468 */ "Omhulsel",
+  /* 469 */ "Die ander manier om swart stroke te hanteer: sit die meubelstuk daar wat daarby gehoort het. Alles word geteken, in die tema se kleure — niks word afgelaai nie, en die spel se beeld bly onaangeraak.",
+  /* 470 */ "Draagbare konsole",
+  /* 471 */ "Swart stroke, en niks daarin nie",
+  /* 472 */ "Die konsole in die hande: die kruis links, die knoppies regs",
+  /* 473 */ "Die stel van destyds: die ingelegde glas, die luidspreker, die skuifknop",
+  /* 474 */ "Televisie",
 ];

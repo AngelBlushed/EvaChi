@@ -474,4 +474,11 @@ export const lt: readonly string[] = [
   /* 465 */ "Diskas",
   /* 466 */ "nepavyko pakeisti disko — {0}",
   /* 467 */ "diskas {0}",
+  /* 468 */ "Korpusas",
+  /* 469 */ "Kitas būdas elgtis su juodomis juostomis – įstatyti į jas tą baldą, kuris prie jų derėjo. Viskas nupiešta temos spalvomis – niekas neatsisiunčiama, o žaidimo vaizdas lieka nepaliestas.",
+  /* 470 */ "Nešiojama konsolė",
+  /* 471 */ "Juodos juostos, ir nieko jose",
+  /* 472 */ "Konsolė rankose: kryžius kairėje, mygtukai dešinėje",
+  /* 473 */ "Ano meto televizorius: įleistas stiklas, garsiakalbis, slankiklis",
+  /* 474 */ "Televizorius",
 ];

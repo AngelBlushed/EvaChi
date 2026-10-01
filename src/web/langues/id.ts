@@ -474,4 +474,11 @@ export const id: readonly string[] = [
   /* 465 */ "Cakram",
   /* 466 */ "tidak dapat mengganti cakram — {0}",
   /* 467 */ "cakram {0}",
+  /* 468 */ "Selongsong",
+  /* 469 */ "Cara lain menghadapi bilah hitam: menaruh perabot yang dulu menyertainya di sana. Semuanya digambar, dengan warna tema — tidak ada yang diunduh, dan gambar permainan tidak disentuh.",
+  /* 470 */ "Konsol genggam",
+  /* 471 */ "Bilah hitam, dan tidak ada apa-apa di dalamnya",
+  /* 472 */ "Konsol di tangan: salib di kiri, tombol di kanan",
+  /* 473 */ "Pesawat zaman itu: kaca terbenam, pengeras suara, penggeser",
+  /* 474 */ "Televisi",
 ];
