@@ -195,6 +195,9 @@ const SYSTEM_HINTS: readonly (readonly [string, string])[] = [
   ['scummvm', 'scummvm'],
   ['point click', 'scummvm'],
   ['chip 8', 'chip8'],
+  ['pokemon mini', 'pokemini'],
+  ['tic 80', 'tic80'],
+  ['lowres nx', 'lowresnx'],
 ];
 
 /** Réduit un nom de dossier à des mots comparables : minuscules, sans accents. */

@@ -80,12 +80,12 @@ reprendrait ce travail doit le savoir avant, pas après.
 
 <!-- credits:debut -->
 
-<details><summary><b>Les 44 cœurs libretro</b> — nom, console, licence, auteurs</summary>
+<details><summary><b>Les 47 cœurs libretro</b> — nom, console, licence, auteurs</summary>
 
 | Cœur | Console | Licence | Auteurs |
 |---|---|---|---|
 | Atari800 | Atari 800 · 5200 | GPLv2 | Petr Stehlik |
-| Azahar | Nintendo 3DS | GPLv2+ | Azahar Emulator |
+| Azahar | Nintendo 3DS | GPLv3+ | Azahar Emulator |
 | Beetle Lynx | Atari Lynx | Zlib\|GPLv2 | K. Wilkins, Mednafen Team |
 | Beetle NeoPop | Neo Geo Pocket | GPLv2 | neopop_uk, Mednafen Team |
 | Beetle PCE Fast | PC Engine · TurboGrafx | GPLv2 | Mednafen Team |
@@ -105,7 +105,8 @@ reprendrait ce travail doit le savoir avant, pas après.
 | Gambatte | Game Boy/Game Boy Color | GPLv2 | Sinamas |
 | Genesis Plus GX | Mega Drive · Master System · Game Gear · Mega-CD | **Non-commercial** | Charles McDonald, Eke-Eke |
 | GW | Game & Watch | zlib | Andre Leiradella |
-| LRPS2 | Sony PlayStation 2 | GPL | PCSX2 Team |
+| lowresnx | LowRes NX | zlib | timoinutilis |
+| LRPS2 | Sony PlayStation 2 | GPLv3 | PCSX2 Team |
 | melonDS | Nintendo DS | GPLv3 | Arisotura |
 | Mesen | Nintendo NES | GPLv3 | M. Bibaud (aka Sour) |
 | mGBA | Game Boy Advance | MPLv2.0 | endrift |
@@ -113,11 +114,12 @@ reprendrait ce travail doit le savoir avant, pas après.
 | Neko Project II Kai | PC-98 | MIT | Neko Project II Team, Tomohiro Yoshidomi |
 | Opera | 3DO | **LGPL/Non-commercial** | trapexit, JohnnyDude, FreeDO team |
 | PicoDrive | Sega 32X | **MAME** | notaz, fdave, irixxxx |
+| PokeMini | Pokémon Mini | GPLv3 | JustBurn |
 | PPSSPP | PSP | GPLv2 | Henrik Hrydgard |
 | ProSystem | Atari 7800 | GPLv2 | Greg Stanton, Brian Berlin, Leonis, Greg DeMent |
 | PUAE | Amiga | GPLv2 | UAE Team |
 | PX68k | Sharp X68000 | **Custom Non-Commercial** | hissorii |
-| SAME CDi (Git) | CD-i | GPLv2+ | MAMEdev |
+| SAME CDi (Git) | CD-i | GPLv3 | MAMEdev |
 | SameBoy | Game Boy · Game Boy Color | MIT | LIJI32 |
 | ScummVM | Point & click | GPLv3 | SCUMMVMdev |
 | Snes9x | Super Nintendo | **Non-commercial** | Snes9x Team |
@@ -125,6 +127,7 @@ reprendrait ce travail doit le savoir avant, pas après.
 | Stella 2014 | Atari 2600 | GPLv2 | Stephen Anthony, Bradford Mott, Eckhard Stolberg, Brian Watson |
 | SwanStation | PlayStation | GPLv3 | stenzek |
 | theodore | Thomson MO5 · TO7 | GPLv3 | T. Lorblanches |
+| TIC-80 | TIC-80 | MIT | Nesbox, RobLoach |
 | vecx | Vectrex | GPLv3 | Valavan Manohararajah, John Hawthorn, Nikita Zimin, Demeth |
 | VICE x64 | Commodore 64 | GPLv2 | VICE Team |
 | Virtual Jaguar | Atari Jaguar | GPLv3 | Joseph Mattiello, David Raingeard, Shamus |

@@ -118,7 +118,8 @@ Un cœur par console, choisi pour sa fidélité :
 | PC Engine · TurboGrafx | Beetle PCE Fast | Atari Jaguar | Virtual Jaguar |
 | Neo Geo Pocket | Beetle NeoPop | Atari Lynx | Beetle Lynx |
 | WonderSwan | Beetle WonderSwan | Intellivision | FreeIntv |
-| | | Vectrex | VecX |
+| Pokémon Mini | PokeMini | Vectrex | VecX |
+| TIC-80 | TIC-80 | LowRes NX | LowRes NX |
 
 ## Ce qui a été vu tourner
 
@@ -130,7 +131,8 @@ Drive, Master System · Game Gear, Game Boy · Color, Game Boy Advance, NES,
 Super Nintendo, Nintendo 64, Nintendo DS, PlayStation, Neo Geo Pocket Color,
 WonderSwan, Virtual Boy, Vectrex, Intellivision, Atari 2600, Atari 7800, Atari
 800 · 5200, Atari Jaguar, Atari Lynx, Amiga, Commodore 64, Amstrad CPC, ZX
-Spectrum, Thomson MO5 · TO7, MSX · ColecoVision, MS-DOS, Arcade, CHIP-8.
+Spectrum, Thomson MO5 · TO7, MSX · ColecoVision, MS-DOS, Arcade, CHIP-8,
+TIC-80.
 
 **Particularités relevées, qui ne sont pas des défauts :**
 
@@ -142,6 +144,12 @@ Spectrum, Thomson MO5 · TO7, MSX · ColecoVision, MS-DOS, Arcade, CHIP-8.
 - *WonderSwan* — GunPey s'affiche de côté. Beetle WonderSwan ne demande pas la
   rotation à l'hôte, il la laisse en option de cœur.
 - *Vectrex* — fond noir à quatre-vingts pour cent, comme un écran vectoriel.
+
+**Chargées, sans jeu lancé** : Pokémon Mini et LowRes NX. Leurs cœurs sont
+posés par l'installateur d'EvaChi et se chargent dans le processus de sonde
+(`usable: true`), mais aucune cartouche n'a été essayée : on n'en avait pas.
+TIC-80, lui, a tourné sur une cartouche écrite pour l'occasion — palette,
+texte, animation, soixante et une images par seconde.
 
 **Pas encore éprouvées** : PC-98 (le cœur trouve ses deux fichiers système mais
 l'image reste noire), Sharp X68000, Point & click, Game & Watch, 3DO,

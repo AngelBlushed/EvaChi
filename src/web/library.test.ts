@@ -894,3 +894,31 @@ describe('jeux livrés dans un zip', () => {
     assert.equal(volet?.preferred, 'snes9x_libretro', 'et c’est le cœur de la console qui le prend');
   });
 });
+
+describe('consoles sans BIOS ajoutées en 0.6.4', () => {
+  const POKEMINI = core('pokemini_libretro', ['min'], 'PokeMini');
+  const TIC80 = core('tic80_libretro', ['tic'], 'TIC-80');
+  const LOWRES = core('lowresnx_libretro', ['nx'], 'LowRes NX');
+  const TOUS = [POKEMINI, TIC80, LOWRES];
+
+  it('range chaque cartouche dans le volet de sa console', () => {
+    for (const [fichier, dossier, attendu] of [
+      ['Zenith.min', 'Pokemon Mini (.min)', 'pokemini_libretro'],
+      ['Demo.tic', 'TIC-80 (.tic)', 'tic80_libretro'],
+      ['Jeu.nx', 'LowRes NX (.nx)', 'lowresnx_libretro'],
+    ] as const) {
+      const [volet] = groupLibrary([rom(fichier, dossier)], TOUS, {}, NO_CHOICE, '');
+
+      assert.equal(volet?.games.length, 1, `${fichier} apparaît`);
+      assert.equal(volet?.preferred, attendu, `${fichier} part chez ${attendu}`);
+    }
+  });
+
+  it('reconnaît le dossier même écrit avec un accent ou sans tiret', () => {
+    // « Pokémon Mini », « TIC 80 », « Lowres-NX » : le nom que quelqu'un donne
+    // à son dossier n'est pas toujours celui de l'ossature.
+    assert.equal(hintedCore('Pokémon Mini', [POKEMINI]), 'pokemini_libretro');
+    assert.equal(hintedCore('TIC 80', [TIC80]), 'tic80_libretro');
+    assert.equal(hintedCore('Lowres-NX', [LOWRES]), 'lowresnx_libretro');
+  });
+});

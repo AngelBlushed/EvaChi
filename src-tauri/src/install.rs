@@ -76,6 +76,13 @@ const CATALOGUE: &[(&str, &str, &str)] = &[
     ("theodore_libretro", "Theodore", "Thomson MO5 · TO7"),
     ("dosbox_pure_libretro", "DOSBox-pure", "MS-DOS"),
     ("scummvm_libretro", "ScummVM", "Point & click"),
+    // Trois consoles sans le moindre micrologiciel à fournir : la Pokémon Mini
+    // en a un de remplacement intégré, les deux autres n'en ont jamais eu.
+    // Leurs cartouches se partagent librement, ce qui n'est pas le cas de tout
+    // ce qui précède.
+    ("pokemini_libretro", "PokeMini", "Pokémon Mini"),
+    ("tic80_libretro", "TIC-80", "TIC-80"),
+    ("lowresnx_libretro", "LowRes NX", "LowRes NX"),
 ];
 
 /// Les cœurs qu'EvaChi propose d'installer.
