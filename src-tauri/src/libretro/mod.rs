@@ -6,6 +6,8 @@
 //! code spécifique à une machine émulée ne vit ici.
 
 pub mod abi;
+/// Les jeux livrés dans un zip, que la plupart des cœurs ne savent pas lire.
+pub mod archives;
 pub mod core;
 /// Les disques d'un jeu qui en a plusieurs, retrouvés par leur nom.
 pub mod disques;

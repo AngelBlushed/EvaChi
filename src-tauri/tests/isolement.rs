@@ -663,6 +663,35 @@ fn la_pile_du_jeu_traverse_deux_parties_a_cote() {
 }
 
 #[test]
+fn un_jeu_dans_un_zip_s_ouvre_aussi_a_cote() {
+    // Le chemin ordinaire : le cœur vit dans un autre processus, et c'est lui
+    // qui déballe l'archive dans son propre dossier.
+    use std::io::Write;
+
+    let bac = tempdir::TempDir::new();
+    let session = Session::isolee(evachi());
+    session
+        .load_core(&test_core_path(), bac.path(), bac.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    let archive = bac.path().join("Jeu.zip");
+    {
+        let sortie = std::fs::File::create(&archive).expect("archive");
+        let mut ecrivain = zip::ZipWriter::new(sortie);
+        ecrivain
+            .start_file("Jeu (Europe).test", zip::write::SimpleFileOptions::default())
+            .expect("entrée");
+        ecrivain.write_all(b"contenu sans importance").expect("écriture");
+        ecrivain.finish().expect("fin");
+    }
+
+    session.load_content(&archive).expect("un zip doit s'ouvrir à côté aussi");
+    let trame = session.run_frame(NO_BUTTONS).expect("trame");
+
+    assert!(trame.video.is_some(), "le jeu tourne");
+}
+
+#[test]
 fn deux_parties_de_suite_ne_se_marchent_pas_dessus() {
     // Le troisième défaut, celui qu'on ne réparait pas : un cœur laisse des
     // variables globales C que `retro_deinit` ne remet pas à zéro, et la

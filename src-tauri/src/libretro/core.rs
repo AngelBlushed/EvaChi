@@ -6,7 +6,7 @@
 
 use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_uint, c_void};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use libloading::{Library, Symbol};
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,9 @@ pub enum CoreError {
 
     #[error("chemin illisible : {0}")]
     BadPath(String),
+
+    #[error("{0}")]
+    Archive(String),
 
     #[error("ce cœur n'a pas de lecteur de disques")]
     SansDisques,
@@ -149,6 +152,8 @@ pub struct Core {
     piles: Vec<Suivie>,
     /// Trames écoulées depuis le dernier coup d'œil aux piles.
     depuis: u32,
+    /// Le dossier où une archive a été déballée, à effacer en partant.
+    deballe: Option<std::path::PathBuf>,
 }
 
 /// Une zone de sauvegarde suivie : où elle va, et ce que le disque en a.
@@ -323,6 +328,7 @@ impl Core {
             save_dir: save_dir.to_path_buf(),
             piles: Vec::new(),
             depuis: 0,
+            deballe: None,
         })
     }
 
@@ -337,7 +343,13 @@ impl Core {
     /// aucun, et les lire quand même se payait comptant : une image de quatre
     /// gigaoctets sur un disque externe coûtait deux minutes de lecture pure,
     /// pour un tampon aussitôt jeté.
-    pub fn load_content(&mut self, path: &Path) -> Result<AvInfo, CoreError> {
+    ///
+    /// Une archive zip que le cœur ne sait pas lire est ouverte ici : c'est la
+    /// ROM qu'elle contient qu'on lui donne. Voir [`super::archives`].
+    pub fn load_content(&mut self, demande: &Path) -> Result<AvInfo, CoreError> {
+        let deballe = self.ouvrir_archive(demande)?;
+        let path = deballe.as_path();
+
         let c_path = CString::new(path.to_string_lossy().as_bytes())
             .map_err(|_| CoreError::BadPath(path.display().to_string()))?;
 
@@ -395,6 +407,51 @@ impl Core {
         let av = self.av_info();
         self.start_hw_render(&av);
         Ok(av)
+    }
+
+    /// Rend le fichier à donner au cœur : celui qu'on a reçu, ou la ROM qu'il
+    /// contient quand c'est une archive que le cœur ne lit pas.
+    ///
+    /// Les cœurs d'arcade et de quelques micro-ordinateurs ouvrent les zips
+    /// eux-mêmes — c'est même leur seul format, une ROM d'arcade étant
+    /// éclatée en une dizaine de puces —, et on leur rend l'archive telle
+    /// quelle. Tous les autres déclarent `sfc`, `gba`, `md`, et n'ont aucune
+    /// idée de ce qu'est un zip.
+    fn ouvrir_archive(&mut self, demande: &Path) -> Result<PathBuf, CoreError> {
+        self.vider_deballage();
+        if !super::archives::est_une_archive(demande) {
+            return Ok(demande.to_path_buf());
+        }
+        let lit_les_zips = self
+            .info
+            .extensions
+            .iter()
+            .any(|ext| ext.eq_ignore_ascii_case("zip"));
+        if lit_les_zips {
+            return Ok(demande.to_path_buf());
+        }
+
+        // Un dossier par processus : le cœur d'à côté et la fenêtre peuvent
+        // vivre ensemble, et chacun nettoie le sien.
+        let dossier = std::env::temp_dir().join(format!("evachi-archives-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dossier);
+        match super::archives::deballer(demande, &self.info.extensions, &dossier) {
+            Ok(sortie) => {
+                self.deballe = Some(sortie.dossier);
+                Ok(sortie.fichier)
+            }
+            Err(raison) => {
+                let _ = std::fs::remove_dir_all(&dossier);
+                Err(CoreError::Archive(raison))
+            }
+        }
+    }
+
+    /// Efface ce qu'une archive précédente a laissé.
+    fn vider_deballage(&mut self) {
+        if let Some(dossier) = self.deballe.take() {
+            let _ = std::fs::remove_dir_all(dossier);
+        }
     }
 
     /// Met en place le contexte graphique quand le cœur en a réclamé un.
@@ -915,6 +972,9 @@ impl Drop for Core {
         // La pile du jeu d'abord : elle vit dans une zone que le déchargement
         // emporte, et c'est ici qu'on quitte la partie.
         self.ranger_piles();
+
+        // Et la ROM sortie de son archive : elle n'était là que pour la partie.
+        self.vider_deballage();
 
         // L'ABI impose de décharger le contenu avant de dénitialiser, et de ne
         // rien appeler après `retro_deinit`.

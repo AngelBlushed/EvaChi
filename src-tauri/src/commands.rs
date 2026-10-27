@@ -2591,6 +2591,14 @@ pub struct RomEntry {
     /// déduction : une image `.iso` dans un dossier « 3DO » est un jeu 3DO,
     /// quelles que soient les consoles qui acceptent aussi cette extension.
     pub folder: String,
+    /// Les extensions des fichiers que contient une archive zip.
+    ///
+    /// Vide pour tout ce qui n'est pas un zip. C'est ce qui permet de proposer
+    /// un `Zelda.zip` aux cœurs Super Nintendo : le nom dit `zip`, mais c'est
+    /// `sfc` qu'ils attendent, et eux seuls savent le lire une fois l'archive
+    /// ouverte.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub inner: Vec<String>,
 }
 
 /// Profondeur maximale explorée dans la bibliothèque.
@@ -2674,12 +2682,21 @@ fn scan_roms(directory: &Path, folder: &str, depth: usize, out: &mut Vec<RomEntr
             continue;
         }
 
+        // Un zip dit ce qu'il contient : sans cela, la bibliothèque ne voit
+        // qu'une extension `zip`, que presque aucun cœur ne déclare.
+        let inner = if evachi::libretro::archives::est_une_archive(&path) {
+            evachi::libretro::archives::contenus(&path)
+        } else {
+            Vec::new()
+        };
+
         out.push(RomEntry {
             name: name.to_owned(),
             path: path.to_string_lossy().into_owned(),
             extension: extension.to_lowercase(),
             size: entry.metadata().map(|m| m.len()).unwrap_or(0),
             folder: folder.to_owned(),
+            inner,
         });
     }
 }

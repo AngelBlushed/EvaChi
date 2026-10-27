@@ -28,9 +28,23 @@ export interface Shelf {
   readonly preferred: string | undefined;
 }
 
-/** Les cœurs installés capables d'ouvrir ce fichier. */
+/**
+ * Les cœurs installés capables d'ouvrir ce fichier.
+ *
+ * Un zip s'ouvre de deux façons. Les cœurs d'arcade et de quelques micros le
+ * lisent eux-mêmes, et déclarent `zip`. Tous les autres déclarent `sfc`, `gba`,
+ * `md`… : EvaChi ouvre l'archive pour eux et leur donne la ROM qu'elle
+ * contient. Un zip est donc aussi proposé aux cœurs qui acceptent l'un de ses
+ * fichiers — sans quoi un `Zelda.zip` rangé chez les Super Nintendo n'avait
+ * aucun preneur, et disparaissait de la liste sans un mot.
+ */
 export function coresFor(rom: RomEntry, catalog: readonly CatalogEntry[]): CatalogEntry[] {
-  return catalog.filter((candidate) => candidate.extensions.includes(rom.extension));
+  const dedans = rom.extension === 'zip' ? (rom.inner ?? []) : [];
+  return catalog.filter(
+    (candidate) =>
+      candidate.extensions.includes(rom.extension) ||
+      dedans.some((ext) => candidate.extensions.includes(ext)),
+  );
 }
 
 /**

@@ -482,6 +482,114 @@ fn une_partie_sans_sauvegarde_ne_laisse_rien() {
     );
 }
 
+/// Écrit une archive zip contenant les fichiers donnés.
+fn ecrire_zip(chemin: &std::path::Path, fichiers: &[(&str, &[u8])]) {
+    use std::io::Write;
+    let sortie = std::fs::File::create(chemin).expect("archive");
+    let mut ecrivain = zip::ZipWriter::new(sortie);
+    let options = zip::write::SimpleFileOptions::default();
+    for (nom, contenu) in fichiers {
+        ecrivain.start_file(*nom, options).expect("entrée");
+        ecrivain.write_all(contenu).expect("écriture");
+    }
+    ecrivain.finish().expect("fin de l'archive");
+}
+
+#[test]
+fn un_jeu_dans_un_zip_s_ouvre_comme_un_autre() {
+    // Le défaut : le cœur d'essai déclare `test|bin`, pas `zip`, comme presque
+    // tous les cœurs de console. Un jeu rangé dans une archive n'avait aucun
+    // preneur — il ne se lançait pas, et la bibliothèque ne le montrait même
+    // pas.
+    let _guard = exclusive();
+    let scratch = tempdir::TempDir::new();
+    let session = Session::locale();
+    session
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    let archive = scratch.path().join("Jeu.zip");
+    ecrire_zip(
+        &archive,
+        &[("Jeu (Europe).test", b"contenu sans importance"), ("notice.txt", b"lisez-moi")],
+    );
+
+    session.load_content(&archive).expect("un zip doit s'ouvrir");
+    let frame = session.run_frame(NO_BUTTONS).expect("trame");
+
+    assert!(frame.video.is_some(), "le jeu tourne");
+}
+
+#[test]
+fn un_zip_sans_jeu_dit_pourquoi() {
+    let _guard = exclusive();
+    let scratch = tempdir::TempDir::new();
+    let session = Session::locale();
+    session
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    let archive = scratch.path().join("Photos.zip");
+    ecrire_zip(&archive, &[("vacances.jpg", b"x")]);
+
+    let refus = session.load_content(&archive).expect_err("rien à ouvrir là-dedans");
+
+    assert!(refus.contains("aucun fichier"), "refus peu clair : {refus}");
+}
+
+#[test]
+fn la_rom_sortie_du_zip_ne_reste_pas_apres_la_partie() {
+    // Elle n'était là que pour jouer : la laisser traîner, c'est remplir le
+    // disque de copies que personne ne retrouvera.
+    let _guard = exclusive();
+    let scratch = tempdir::TempDir::new();
+    let session = Session::locale();
+    session
+        .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+        .expect("chargement du cœur d'essai");
+
+    let archive = scratch.path().join("Jeu.zip");
+    ecrire_zip(&archive, &[("jeu.test", b"contenu")]);
+    session.load_content(&archive).expect("ouverture");
+
+    let dossier = std::env::temp_dir().join(format!("evachi-archives-{}", std::process::id()));
+    let pendant = dossier.exists();
+    session.unload().expect("déchargement");
+    let apres = dossier.exists();
+
+    assert!(pendant, "la ROM est déballée pendant la partie");
+    assert!(!apres, "et effacée quand elle se termine");
+}
+
+#[test]
+fn la_sauvegarde_d_un_zip_porte_le_nom_du_zip() {
+    // C'est le nom que l'utilisateur reconnaît, pas celui du catalogue qui est
+    // à l'intérieur — et c'est lui que « Effacer la sauvegarde » retrouve.
+    let (_guard, session, scratch) = {
+        let guard = exclusive();
+        let scratch = tempdir::TempDir::new();
+        let session = Session::locale();
+        session
+            .load_core(&test_core_path(), scratch.path(), scratch.path(), "en")
+            .expect("chargement du cœur d'essai");
+        (guard, session, scratch)
+    };
+
+    let archive = scratch.path().join("Mon jeu.zip");
+    ecrire_zip(&archive, &[("The Game (USA) (Rev 3).test", b"contenu")]);
+    session.load_content(&archive).expect("ouverture");
+
+    let mut sauver = NO_BUTTONS;
+    sauver.boutons[SAUVER] = 1;
+    session.run_frame(sauver).expect("trame de sauvegarde");
+    session.unload().expect("déchargement");
+
+    assert!(
+        scratch.path().join("Mon jeu.srm").exists(),
+        "la pile doit porter le nom de l'archive"
+    );
+}
+
 /// Répertoire temporaire minimal, effacé à la destruction.
 ///
 /// Écrit sur place plutôt que tiré d'une dépendance : le besoin tient en vingt

@@ -96,6 +96,14 @@ export interface RomEntry {
    * peut pas dire.
    */
   readonly folder: string;
+  /**
+   * Les extensions des fichiers qu'une archive zip contient.
+   *
+   * Absent pour tout ce qui n'est pas un zip. C'est ce qui permet de proposer
+   * un `Zelda.zip` aux cœurs Super Nintendo : le nom dit `zip`, mais c'est
+   * `sfc` qu'ils attendent.
+   */
+  readonly inner?: readonly string[];
 }
 
 // --- Les triches ------------------------------------------------------------

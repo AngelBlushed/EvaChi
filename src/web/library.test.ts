@@ -833,3 +833,64 @@ describe('dossier de jeu déballé', () => {
     assert.equal(collapseExtracted([]).length, 0);
   });
 });
+
+describe('jeux livrés dans un zip', () => {
+  /** Un zip, avec ce qu'il contient. */
+  function zip(name: string, folder: string, inner: string[]): RomEntry {
+    return { name, path: `${folder}/${name}`, extension: 'zip', size: 1024, folder, inner };
+  }
+
+  const SNES = core('snes9x_libretro', ['smc', 'sfc', 'swc', 'fig'], 'Snes9x');
+  const ARCADE = core('fbneo_libretro', ['zip', '7z', 'cue', 'chd'], 'FinalBurn Neo');
+
+  it('propose un zip aux cœurs qui ouvrent ce qu’il contient', () => {
+    // Le défaut : un Zelda.zip chez les Super Nintendo n'avait aucun preneur,
+    // aucun cœur de la console ne déclarant `zip`. Il disparaissait de la liste.
+    const preneurs = coresFor(zip('Zelda.zip', 'Super Nintendo', ['sfc']), [SNES, ARCADE]);
+
+    assert.deepEqual(
+      preneurs.map((candidate) => candidate.id),
+      ['snes9x_libretro', 'fbneo_libretro'],
+    );
+  });
+
+  it('garde les cœurs qui lisent les zips eux-mêmes', () => {
+    // Une ROM d'arcade est éclatée en puces `.rom`, qu'aucun cœur de console
+    // ne reconnaît : seul le cœur d'arcade la prend, et il prend l'archive.
+    const preneurs = coresFor(zip('mslug.zip', 'Arcade', ['rom', 'bin']), [SNES, ARCADE]);
+
+    assert.deepEqual(
+      preneurs.map((candidate) => candidate.id),
+      ['fbneo_libretro'],
+    );
+  });
+
+  it('n’offre rien pour un zip qui ne contient aucun jeu', () => {
+    const preneurs = coresFor(zip('photos.zip', 'Super Nintendo', ['jpg', 'txt']), [SNES]);
+
+    assert.equal(preneurs.length, 0);
+  });
+
+  it('ne change rien pour un fichier qui n’est pas un zip', () => {
+    // `inner` ne vaut que pour une archive : une ROM brute passe comme avant.
+    const preneurs = coresFor(rom('Zelda.sfc', 'Super Nintendo'), [SNES, ARCADE]);
+
+    assert.deepEqual(
+      preneurs.map((candidate) => candidate.id),
+      ['snes9x_libretro'],
+    );
+  });
+
+  it('range un zip de Super Nintendo dans le volet de la console', () => {
+    const [volet] = groupLibrary(
+      [zip('Zelda.zip', 'Super Nintendo (smc-sfc)', ['sfc'])],
+      [SNES, ARCADE],
+      {},
+      NO_CHOICE,
+      '',
+    );
+
+    assert.equal(volet?.games.length, 1, 'le jeu apparaît');
+    assert.equal(volet?.preferred, 'snes9x_libretro', 'et c’est le cœur de la console qui le prend');
+  });
+});
