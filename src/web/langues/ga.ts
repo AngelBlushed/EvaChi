@@ -475,11 +475,4 @@ export const ga: readonly string[] = [
   /* 465 */ "Diosca",
   /* 466 */ "níorbh fhéidir an diosca a athrú — {0}",
   /* 467 */ "diosca {0}",
-  /* 468 */ "Cásáil",
-  /* 469 */ "An bealach eile chun déileáil leis na barraí dubha: an troscán a bhain leo a chur iontu. Tá gach rud líníochta, i ndathanna an téama — ní íoslódáiltear rud ar bith, agus ní bhaintear le pictiúr an chluiche.",
-  /* 470 */ "Consól iniompartha",
-  /* 471 */ "Barraí dubha, agus faic iontu",
-  /* 472 */ "An consól sna lámha: an chros ar chlé, na cnaipí ar dheis",
-  /* 473 */ "Teilifíseán na linne: an ghloine shuite, an callaire, an sleamhnán",
-  /* 474 */ "Teilifíseán",
 ];

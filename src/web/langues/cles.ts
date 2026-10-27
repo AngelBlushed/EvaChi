@@ -488,13 +488,6 @@ export const CLES: readonly string[] = [
   "Disque",
   "changement de disque impossible — {0}",
   "disque {0}",
-  "Habillage",
-  "L'autre façon de traiter les bandes noires : y poser le meuble qui allait avec. Tout est dessiné, aux couleurs du thème — rien n'est téléchargé, et l'image du jeu n'est pas touchée.",
-  "Console portable",
-  "Des bandes noires, et rien dedans",
-  "La console dans les mains : la croix à gauche, les boutons à droite",
-  "Le poste de l’époque : le verre enchâssé, le haut-parleur, la molette",
-  "Téléviseur",
 ];
 
 /**

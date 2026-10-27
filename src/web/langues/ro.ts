@@ -474,11 +474,4 @@ export const ro: readonly string[] = [
   /* 465 */ "Disc",
   /* 466 */ "discul nu a putut fi schimbat — {0}",
   /* 467 */ "discul {0}",
-  /* 468 */ "Carcasă",
-  /* 469 */ "Cealaltă cale de a trata benzile negre: să pui în ele mobila care le însoțea. Totul este desenat, în culorile temei — nu se descarcă nimic, iar imaginea jocului rămâne neatinsă.",
-  /* 470 */ "Consolă portabilă",
-  /* 471 */ "Benzi negre, și nimic în ele",
-  /* 472 */ "Consola în mâini: crucea la stânga, butoanele la dreapta",
-  /* 473 */ "Televizorul de atunci: sticla încastrată, difuzorul, cursorul",
-  /* 474 */ "Televizor",
 ];

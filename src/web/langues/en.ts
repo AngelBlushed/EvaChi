@@ -475,11 +475,4 @@ export const en: readonly string[] = [
   /* 465 */ "Disc",
   /* 466 */ "could not change disc — {0}",
   /* 467 */ "disc {0}",
-  /* 468 */ "Casing",
-  /* 469 */ "The other way to deal with black bars: put the furniture that went with them in there. Everything is drawn, in the theme’s colours — nothing is downloaded, and the game’s picture is left alone.",
-  /* 470 */ "Handheld console",
-  /* 471 */ "Black bars, and nothing in them",
-  /* 472 */ "The console in your hands: the pad on the left, the buttons on the right",
-  /* 473 */ "The set of the day: the recessed glass, the speaker, the slider",
-  /* 474 */ "Television",
 ];

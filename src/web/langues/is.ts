@@ -474,11 +474,4 @@ export const is: readonly string[] = [
   /* 465 */ "Diskur",
   /* 466 */ "ekki tókst að skipta um disk — {0}",
   /* 467 */ "diskur {0}",
-  /* 468 */ "Umgjörð",
-  /* 469 */ "Hin leiðin til að fást við svörtu borðana: að setja þangað húsgagnið sem fylgdi þeim. Allt er teiknað, í litum þemans — ekkert er sótt og mynd leiksins er látin í friði.",
-  /* 470 */ "Lófatölva",
-  /* 471 */ "Svartir borðar, og ekkert í þeim",
-  /* 472 */ "Tölvan í höndunum: krossinn til vinstri, hnapparnir til hægri",
-  /* 473 */ "Tækið frá þeim tíma: innfellda glerið, hátalarinn, sleðinn",
-  /* 474 */ "Sjónvarp",
 ];

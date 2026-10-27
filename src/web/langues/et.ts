@@ -474,11 +474,4 @@ export const et: readonly string[] = [
   /* 465 */ "Plaat",
   /* 466 */ "plaadi vahetamine ebaõnnestus — {0}",
   /* 467 */ "plaat {0}",
-  /* 468 */ "Raam",
-  /* 469 */ "Teine viis mustade ribadega toime tulla: panna sinna mööbel, mis nende juurde kuulus. Kõik on joonistatud teema värvides — midagi ei laadita alla ja mängu pilti ei puudutata.",
-  /* 470 */ "Pihukonsool",
-  /* 471 */ "Mustad ribad, ja midagi nende sees",
-  /* 472 */ "Konsool käes: rist vasakul, nupud paremal",
-  /* 473 */ "Tolleaegne telekas: süvistatud klaas, kõlar, liugur",
-  /* 474 */ "Teler",
 ];

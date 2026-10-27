@@ -474,11 +474,4 @@ export const pt: readonly string[] = [
   /* 465 */ "Disco",
   /* 466 */ "não foi possível mudar de disco — {0}",
   /* 467 */ "disco {0}",
-  /* 468 */ "Moldura",
-  /* 469 */ "A outra forma de tratar as barras pretas: pôr nelas o móvel que as acompanhava. Está tudo desenhado, nas cores do tema — nada é transferido e a imagem do jogo não é tocada.",
-  /* 470 */ "Consola portátil",
-  /* 471 */ "Barras pretas, e nada lá dentro",
-  /* 472 */ "A consola nas mãos: a cruz à esquerda, os botões à direita",
-  /* 473 */ "O aparelho de então: o vidro embutido, o altifalante, o cursor",
-  /* 474 */ "Televisor",
 ];

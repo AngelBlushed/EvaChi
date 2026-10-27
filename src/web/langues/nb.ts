@@ -475,11 +475,4 @@ export const nb: readonly string[] = [
   /* 465 */ "Plate",
   /* 466 */ "kunne ikke bytte plate — {0}",
   /* 467 */ "plate {0}",
-  /* 468 */ "Ramme",
-  /* 469 */ "Den andre måten å håndtere de svarte feltene på: å sette inn møbelet som hørte til. Alt er tegnet, i temaets farger — ingenting lastes ned, og spillets bilde røres ikke.",
-  /* 470 */ "Håndholdt konsoll",
-  /* 471 */ "Svarte felt, og ingenting i dem",
-  /* 472 */ "Konsollen i hendene: korset til venstre, knappene til høyre",
-  /* 473 */ "Datidens apparat: det innfelte glasset, høyttaleren, skyveknappen",
-  /* 474 */ "Fjernsyn",
 ];

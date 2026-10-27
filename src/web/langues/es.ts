@@ -474,11 +474,4 @@ export const es: readonly string[] = [
   /* 465 */ "Disco",
   /* 466 */ "no se pudo cambiar de disco — {0}",
   /* 467 */ "disco {0}",
-  /* 468 */ "Carcasa",
-  /* 469 */ "La otra manera de tratar las bandas negras: poner dentro el mueble que las acompañaba. Todo está dibujado, con los colores del tema — no se descarga nada y la imagen del juego no se toca.",
-  /* 470 */ "Consola portátil",
-  /* 471 */ "Bandas negras, y nada dentro",
-  /* 472 */ "La consola en las manos: la cruceta a la izquierda, los botones a la derecha",
-  /* 473 */ "El televisor de entonces: el cristal embutido, el altavoz, el deslizador",
-  /* 474 */ "Televisor",
 ];

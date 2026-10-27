@@ -474,11 +474,4 @@ export const ptBR: readonly string[] = [
   /* 465 */ "Disco",
   /* 466 */ "não foi possível trocar de disco — {0}",
   /* 467 */ "disco {0}",
-  /* 468 */ "Moldura",
-  /* 469 */ "A outra forma de tratar as faixas pretas: colocar nelas o móvel que as acompanhava. Tudo é desenhado, nas cores do tema — nada é baixado e a imagem do jogo não é tocada.",
-  /* 470 */ "Console portátil",
-  /* 471 */ "Faixas pretas, e nada dentro",
-  /* 472 */ "O console nas mãos: o direcional à esquerda, os botões à direita",
-  /* 473 */ "O aparelho da época: o vidro embutido, o alto-falante, o controle deslizante",
-  /* 474 */ "Televisor",
 ];

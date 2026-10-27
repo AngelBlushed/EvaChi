@@ -475,11 +475,4 @@ export const de: readonly string[] = [
   /* 465 */ "Disc",
   /* 466 */ "Disc konnte nicht gewechselt werden — {0}",
   /* 467 */ "Disc {0}",
-  /* 468 */ "Rahmen",
-  /* 469 */ "Die andere Art, mit den schwarzen Balken umzugehen: das Möbelstück hineinstellen, das dazugehörte. Alles ist gezeichnet, in den Farben des Themas — nichts wird heruntergeladen, und das Bild des Spiels bleibt unberührt.",
-  /* 470 */ "Handheld-Konsole",
-  /* 471 */ "Schwarze Balken, und nichts darin",
-  /* 472 */ "Die Konsole in den Händen: das Steuerkreuz links, die Knöpfe rechts",
-  /* 473 */ "Das Gerät von damals: das eingefasste Glas, der Lautsprecher, der Schieberegler",
-  /* 474 */ "Fernseher",
 ];

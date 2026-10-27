@@ -474,11 +474,4 @@ export const lv: readonly string[] = [
   /* 465 */ "Disks",
   /* 466 */ "neizdevās nomainīt disku — {0}",
   /* 467 */ "disks {0}",
-  /* 468 */ "Korpuss",
-  /* 469 */ "Otrs veids, kā tikt galā ar melnajām joslām: ielikt tajās to mēbeli, kas tām piederēja. Viss ir uzzīmēts motīva krāsās — nekas netiek lejupielādēts, un spēles attēls paliek neskarts.",
-  /* 470 */ "Rokas konsole",
-  /* 471 */ "Melnas joslas, un nekā tajās",
-  /* 472 */ "Konsole rokās: krusts pa kreisi, pogas pa labi",
-  /* 473 */ "Tā laika televizors: iegremdētais stikls, skaļrunis, slīdnis",
-  /* 474 */ "Televizors",
 ];

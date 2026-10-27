@@ -475,11 +475,4 @@ export const ca: readonly string[] = [
   /* 465 */ "Disc",
   /* 466 */ "no s’ha pogut canviar de disc — {0}",
   /* 467 */ "disc {0}",
-  /* 468 */ "Marc",
-  /* 469 */ "L’altra manera de tractar les bandes negres: posar-hi el moble que hi anava. Tot està dibuixat, amb els colors del tema — no es baixa res i la imatge del joc no es toca.",
-  /* 470 */ "Consola portàtil",
-  /* 471 */ "Bandes negres, i res a dins",
-  /* 472 */ "La consola a les mans: la creueta a l’esquerra, els botons a la dreta",
-  /* 473 */ "El televisor de l’època: el vidre encastat, l’altaveu, la rodeta",
-  /* 474 */ "Televisor",
 ];

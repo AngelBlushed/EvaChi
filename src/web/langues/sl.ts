@@ -475,11 +475,4 @@ export const sl: readonly string[] = [
   /* 465 */ "Disk",
   /* 466 */ "diska ni bilo mogoče zamenjati — {0}",
   /* 467 */ "disk {0}",
-  /* 468 */ "Ohišje",
-  /* 469 */ "Drugi način ravnanja s črnimi pasovi: vanje postaviti pohištvo, ki je sodilo zraven. Vse je narisano, v barvah teme — nič se ne prenese in slike igre se ne dotaknemo.",
-  /* 470 */ "Prenosna konzola",
-  /* 471 */ "Črni pasovi in nič v njih",
-  /* 472 */ "Konzola v rokah: križ levo, gumbi desno",
-  /* 473 */ "Takratni sprejemnik: vgrajeno steklo, zvočnik, drsnik",
-  /* 474 */ "Televizor",
 ];

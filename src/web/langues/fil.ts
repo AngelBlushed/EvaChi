@@ -474,11 +474,4 @@ export const fil: readonly string[] = [
   /* 465 */ "Disc",
   /* 466 */ "hindi mapalitan ang disc — {0}",
   /* 467 */ "disc {0}",
-  /* 468 */ "Balangkas",
-  /* 469 */ "Ang isa pang paraan para harapin ang mga itim na guhit: ilagay doon ang kasangkapang kasama nito noon. Lahat ay iginuhit, sa mga kulay ng tema — walang dina-download, at hindi ginagalaw ang larawan ng laro.",
-  /* 470 */ "Hawak-kamay na konsola",
-  /* 471 */ "Mga itim na guhit, at walang laman",
-  /* 472 */ "Ang konsola sa kamay: ang krus sa kaliwa, ang mga pindutan sa kanan",
-  /* 473 */ "Ang telebisyon noon: ang nakabaong salamin, ang speaker, ang slider",
-  /* 474 */ "Telebisyon",
 ];

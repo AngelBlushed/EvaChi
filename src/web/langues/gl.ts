@@ -474,11 +474,4 @@ export const gl: readonly string[] = [
   /* 465 */ "Disco",
   /* 466 */ "non se puido cambiar de disco — {0}",
   /* 467 */ "disco {0}",
-  /* 468 */ "Carcasa",
-  /* 469 */ "A outra maneira de tratar as bandas negras: poñer dentro o moble que as acompañaba. Todo está debuxado, coas cores do tema — non se descarga nada e a imaxe do xogo non se toca.",
-  /* 470 */ "Consola portátil",
-  /* 471 */ "Bandas negras, e nada dentro",
-  /* 472 */ "A consola nas mans: a cruceta á esquerda, os botóns á dereita",
-  /* 473 */ "O televisor daquela: o cristal encaixado, o altofalante, o deslizador",
-  /* 474 */ "Televisor",
 ];

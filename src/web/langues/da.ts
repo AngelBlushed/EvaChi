@@ -475,11 +475,4 @@ export const da: readonly string[] = [
   /* 465 */ "Disk",
   /* 466 */ "kunne ikke skifte disk — {0}",
   /* 467 */ "disk {0}",
-  /* 468 */ "Ramme",
-  /* 469 */ "Den anden måde at håndtere de sorte bjælker på: at sætte det møbel ind, der hørte til. Alt er tegnet i temaets farver — intet hentes, og spillets billede røres ikke.",
-  /* 470 */ "Håndholdt konsol",
-  /* 471 */ "Sorte bjælker, og intet i dem",
-  /* 472 */ "Konsollen i hænderne: korset til venstre, knapperne til højre",
-  /* 473 */ "Datidens apparat: det indfattede glas, højttaleren, skyderen",
-  /* 474 */ "Fjernsyn",
 ];

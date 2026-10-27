@@ -474,11 +474,4 @@ export const ms: readonly string[] = [
   /* 465 */ "Cakera",
   /* 466 */ "tidak dapat menukar cakera — {0}",
   /* 467 */ "cakera {0}",
-  /* 468 */ "Kerangka",
-  /* 469 */ "Cara lain menangani jalur hitam: meletakkan di situ perabot yang dahulu menemaninya. Semuanya dilukis, dengan warna tema — tiada apa-apa dimuat turun, dan gambar permainan tidak disentuh.",
-  /* 470 */ "Konsol mudah alih",
-  /* 471 */ "Jalur hitam, dan tiada apa-apa di dalamnya",
-  /* 472 */ "Konsol di tangan: palang di kiri, butang di kanan",
-  /* 473 */ "Pesawat zaman itu: kaca terbenam, pembesar suara, penggelongsor",
-  /* 474 */ "Televisyen",
 ];
