@@ -132,7 +132,9 @@ Super Nintendo, Nintendo 64, Nintendo DS, PlayStation, Neo Geo Pocket Color,
 WonderSwan, Virtual Boy, Vectrex, Intellivision, Atari 2600, Atari 7800, Atari
 800 · 5200, Atari Jaguar, Atari Lynx, Amiga, Commodore 64, Amstrad CPC, ZX
 Spectrum, Thomson MO5 · TO7, MSX · ColecoVision, MS-DOS, Arcade, CHIP-8,
-TIC-80.
+TIC-80, Nintendo 3DS (Azahar : The Binding of Isaac, 60 images par seconde),
+PlayStation 2 (LRPS2 : GTA Vice City Stories, SLES-54622, 59 images par
+seconde).
 
 **Particularités relevées, qui ne sont pas des défauts :**
 
@@ -154,6 +156,27 @@ texte, animation, soixante et une images par seconde.
 **Pas encore éprouvées** : PC-98 (le cœur trouve ses deux fichiers système mais
 l'image reste noire), Sharp X68000, Point & click, Game & Watch, 3DO,
 Dreamcast, Saturn, Mega-CD, PC Engine, Sega 32X, Philips CD-i.
+
+### Ce que réclament les cœurs 3DS et PS2
+
+**Nintendo 3DS — Azahar : aucun BIOS.** La fiche officielle du cœur ne déclare
+aucun micrologiciel, et un dépôt déchiffré (`.cci`) se lance sans rien. Seuls les
+dépôts **chiffrés** (`.cia`, certains `.3ds`) demandent des clés, dans
+`azahar/sysdata/aes_keys.txt`.
+
+**PlayStation 2 — LRPS2 : une BIOS de PS2, une seule suffit.** Elle se pose dans
+`%APPDATA%pp.evachi\system\pcsx2ios\`. Le cœur n'exige aucun nom de
+fichier : il prend ce qu'il trouve dans ce dossier. Prendre celle de la région du
+jeu — `ps2-0200e-…` pour un jeu européen, `…a…` pour américain, `…j…` pour
+japonais. La BIOS du PCSX2 autonome convient : c'est la même, il faut seulement
+la recopier.
+
+Ces deux cœurs avaient été écartés à tort. Leurs fiches étaient jugées
+« inutilisables » par la sonde, et la faute était la nôtre : la sonde ne se
+terminait pas après Azahar (le détachement de sa bibliothèque fige le processus,
+comme pour le cœur d'à côté), et elle lisait sans le vérifier la valeur d'une
+option que le cœur PS2 déclare sans valeur — un pointeur nul passé à la
+bibliothèque C. Les cœurs n'y étaient pour rien.
 
 ## Les consoles sans cœur libretro
 

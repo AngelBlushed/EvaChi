@@ -103,6 +103,37 @@ struct CachedCore {
     /// Date de modification du fichier au moment de l'interrogation.
     modified: u64,
     entry: CoreEntry,
+    /// La version d'EvaChi qui a interrogé le cœur.
+    ///
+    /// Une fiche « inutilisable » se refait à chaque nouvelle version. Le défaut
+    /// n'est pas toujours dans le cœur : la sonde elle-même a écarté Azahar
+    /// parce qu'elle ne savait pas se terminer, et le cœur PS2 parce qu'elle
+    /// lisait mal ses options. Sans cela, la correction n'aurait rien changé
+    /// chez personne — le fichier du cœur n'ayant pas bougé, la fiche fautive
+    /// serait restée en place pour toujours.
+    #[serde(default)]
+    sonde: String,
+}
+
+/// La version d'EvaChi, pour dater une interrogation.
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+
+/// Ce qu'on écrit à la place d'une version quand c'est l'utilisateur qui a
+/// écarté le cœur. Son choix n'est pas un échec de la sonde : il ne se refait
+/// pas, quelle que soit la version.
+const CHOIX: &str = "choix";
+
+impl CachedCore {
+    /// Vrai si cette fiche vaut encore pour ce fichier.
+    ///
+    /// Le fichier n'a pas bougé, et — si le cœur a été jugé inutilisable — la
+    /// version qui l'a jugé est la nôtre. Un cœur utilisable reste en cache
+    /// tant que son fichier ne change pas : le ré-interroger ne dirait rien de
+    /// neuf et coûterait un processus de plus à chaque démarrage.
+    fn vaut_encore(&self, modified: u64) -> bool {
+        self.modified == modified
+            && (self.entry.usable || self.sonde == VERSION || self.sonde == CHOIX)
+    }
 }
 
 /// Un émulateur autonome, lancé comme un programme séparé.
@@ -814,6 +845,9 @@ pub fn set_core_usable(
         return Err(format!("cœur inconnu : {path}"));
     };
     connu.entry.usable = usable;
+    // Écarté à la main, le cœur le reste : ce n'est pas la sonde qui l'a jugé.
+    // Rétabli, il redevient une fiche ordinaire.
+    connu.sonde = if usable { VERSION.to_owned() } else { CHOIX.to_owned() };
     write_config(&paths, &config)
 }
 
@@ -2216,10 +2250,38 @@ pub fn probe_core_to_stdout(path: &Path) -> i32 {
     match serde_json::to_string(&entry) {
         Ok(json) => {
             println!("{json}");
-            0
+            // La fiche est écrite : tout ce qui suit ne pourrait que nuire.
+            // Rendre la main par la sortie ordinaire détache la bibliothèque du
+            // cœur, et cela fige le processus quand le cœur a laissé des fils
+            // en vie — Azahar le fait. La fiche était complète et `usable`,
+            // mais le processus ne se terminait jamais ; EvaChi, qui n'attend
+            // que quinze secondes, le tenait pour mort et l'écartait. Le cœur
+            // d'à côté s'en va déjà ainsi, pour la même raison.
+            quitter_sans_detacher(0)
         }
         Err(_) => 1,
     }
+}
+
+/// Termine ce processus sur-le-champ, sans repasser par la sortie ordinaire.
+///
+/// `TerminateProcess` ne détache aucune bibliothèque : ni elle ne fige, ni elle
+/// attend les fils qu'un cœur a laissés. Ailleurs que sous Windows, la sortie
+/// ordinaire suffit.
+fn quitter_sans_detacher(code: i32) -> i32 {
+    use std::io::Write;
+    // Ce qu'on vient d'écrire doit être parti avant qu'on ne coupe : un
+    // processus terminé de force ne vide aucun tampon.
+    let _ = std::io::stdout().flush();
+    let _ = std::io::stderr().flush();
+
+    #[cfg(windows)]
+    {
+        use windows_sys::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
+        // SAFETY : on se termine soi-même, après avoir tout rendu.
+        unsafe { TerminateProcess(GetCurrentProcess(), code as u32) };
+    }
+    code
 }
 
 /// Extension des bibliothèques dynamiques de la plateforme courante.
@@ -2512,7 +2574,7 @@ fn resolve_cores(paths: &Paths) -> Result<Vec<CoreEntry>, String> {
         let stamp = modified_at(path);
 
         match config.cores.get(&key) {
-            Some(known) if known.modified == stamp => cores.push(known.entry.clone()),
+            Some(known) if known.vaut_encore(stamp) => cores.push(known.entry.clone()),
             _ => {
                 let (entry, refus) = probe_core_with_reason(path);
                 if !entry.usable {
@@ -2523,6 +2585,7 @@ fn resolve_cores(paths: &Paths) -> Result<Vec<CoreEntry>, String> {
                     CachedCore {
                         modified: stamp,
                         entry: entry.clone(),
+                        sonde: VERSION.to_owned(),
                     },
                 );
                 changed = true;
@@ -3152,6 +3215,49 @@ pub fn directories(paths: State<'_, Paths>) -> Vec<(String, String)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Une fiche de cœur, telle que le cache la garde.
+    fn fiche(usable: bool, sonde: &str, modified: u64) -> CachedCore {
+        CachedCore {
+            modified,
+            entry: CoreEntry {
+                id: "essai_libretro".into(),
+                path: "essai_libretro.dll".into(),
+                name: "Essai".into(),
+                extensions: Vec::new(),
+                usable,
+            },
+            sonde: sonde.into(),
+        }
+    }
+
+    #[test]
+    fn un_coeur_utilisable_reste_en_cache_tant_que_son_fichier_ne_bouge_pas() {
+        // Le ré-interroger ne dirait rien de neuf, et coûterait un processus de
+        // plus à chaque démarrage.
+        assert!(fiche(true, "0.0.1", 10).vaut_encore(10));
+        assert!(fiche(true, "", 10).vaut_encore(10), "même une fiche d'avant la date de sonde");
+        assert!(!fiche(true, VERSION, 10).vaut_encore(11), "un fichier modifié se re-sonde");
+    }
+
+    #[test]
+    fn un_echec_de_sonde_se_refait_a_chaque_version() {
+        // Le défaut n'est pas toujours dans le cœur : la sonde a écarté Azahar
+        // parce qu'elle ne savait pas se terminer, et le cœur PS2 parce qu'elle
+        // lisait mal ses options. Une fiche faite par une version plus ancienne,
+        // ou par aucune, ne doit pas survivre à la correction.
+        assert!(fiche(false, VERSION, 10).vaut_encore(10), "cette version l'a déjà jugé");
+        assert!(!fiche(false, "0.0.1", 10).vaut_encore(10), "une version plus ancienne");
+        assert!(!fiche(false, "", 10).vaut_encore(10), "une fiche d'avant la date de sonde");
+    }
+
+    #[test]
+    fn un_coeur_ecarte_a_la_main_le_reste() {
+        // C'est un choix de l'utilisateur, pas un échec : la version suivante ne
+        // doit pas le lui reprendre en re-sondant le cœur.
+        assert!(fiche(false, CHOIX, 10).vaut_encore(10));
+        assert!(!fiche(false, CHOIX, 10).vaut_encore(11), "sauf si le fichier a changé");
+    }
 
     fn frame(width: u32, height: u32, rgba: Vec<u8>) -> VideoFrame {
         VideoFrame {

@@ -609,6 +609,15 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
             with_host(|host| {
                 // Le tableau se termine par une entrée dont la clé est nulle.
                 while !(*entry).key.is_null() {
+                    // Une clé sans valeur n'est pas une option : on passe. Lire
+                    // la valeur sans la vérifier envoyait un pointeur nul à la
+                    // bibliothèque C, et le cœur PS2 s'effondrait avant d'avoir
+                    // dit un mot — c'est lui qui portait la faute dans la tête
+                    // de tout le monde, alors que c'était cette ligne.
+                    if (*entry).value.is_null() {
+                        entry = entry.add(1);
+                        continue;
+                    }
                     let key = CStr::from_ptr((*entry).key).to_string_lossy().into_owned();
                     let spec = CStr::from_ptr((*entry).value).to_string_lossy();
 
@@ -837,6 +846,41 @@ pub unsafe extern "C" fn environment(cmd: c_uint, data: *mut c_void) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn une_option_sans_valeur_ne_fait_pas_tomber_l_hote() {
+        // Le cœur PS2 déclare une clé dont la valeur est nulle. Lire cette valeur
+        // sans la vérifier envoyait un pointeur nul à `strlen`, et le processus
+        // mourait d'une violation d'accès avant d'avoir dit un mot : la sonde le
+        // déclarait inutilisable, et personne ne savait pourquoi.
+        let sans_valeur = CString::new("pcsx2_sans_valeur").unwrap();
+        let bonne_cle = CString::new("pcsx2_renderer").unwrap();
+        let bonne_valeur = CString::new("Moteur de rendu; Auto|OpenGL|Logiciel").unwrap();
+
+        let tableau = [
+            Variable { key: sans_valeur.as_ptr(), value: std::ptr::null() },
+            Variable { key: bonne_cle.as_ptr(), value: bonne_valeur.as_ptr() },
+            // L'entrée qui ferme le tableau.
+            Variable { key: std::ptr::null(), value: std::ptr::null() },
+        ];
+
+        // SAFETY : le tableau est valide et terminé, comme le veut l'ABI.
+        let accepte = unsafe { environment(ENV_SET_VARIABLES, tableau.as_ptr() as *mut c_void) };
+
+        assert!(accepte, "l'hôte accepte la déclaration");
+        let (retenue, ignoree) = with_host(|host| {
+            (
+                host.options.get("pcsx2_renderer").cloned(),
+                host.options.contains_key("pcsx2_sans_valeur"),
+            )
+        });
+        assert_eq!(
+            retenue.as_deref().map(|valeur| valeur.to_str().unwrap()),
+            Some("Auto"),
+            "l'option suivante est bien lue, avec sa valeur par défaut"
+        );
+        assert!(!ignoree, "l'entrée sans valeur n'est pas une option");
+    }
 
     #[test]
     fn un_quart_de_tour_amene_le_bord_droit_en_haut() {
